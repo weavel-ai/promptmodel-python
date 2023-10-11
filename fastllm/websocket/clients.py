@@ -115,7 +115,8 @@ class DevWebsocketClient:
         try:
             if message["type"] == LocalTask.LIST_MODULES:
                 res_from_local_db = list_llm_modules()
-                data = {"llm_modules": res_from_local_db}
+                modules_with_local_usage = [module for module in res_from_local_db if module['local_usage'] == True]
+                data = {"llm_modules": modules_with_local_usage}
 
             elif message["type"] == LocalTask.LIST_VERSIONS:
                 llm_module_uuid = message["llm_module_uuid"]
