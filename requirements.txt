@@ -5,3 +5,7 @@ cryptography
 pyyaml
 InquirerPy
 litellm
+python-dotenv
+websockets
+termcolor
+watchdog

@@ -1,4 +1,4 @@
-# Agentlabs
+# FastLLM
 
 > Create LLM-powered services in a blink.
 
