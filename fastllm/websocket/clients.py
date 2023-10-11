@@ -170,6 +170,7 @@ class DevWebsocketClient:
                         llm_module_version: LLMModuleVersion = create_llm_module_version(
                             llm_module_uuid=llm_module_uuid,
                             status=LLMModuleVersionStatus.BROKEN.value,
+                            from_uuid=message['from_uuid']
                         )
                         llm_module_version_uuid = llm_module_version.uuid
 

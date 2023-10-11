@@ -32,12 +32,12 @@ def create_llm_modules(llm_module_list: list):
         
 
 def create_llm_module_version(
-    llm_module_uuid: str, previous_version_uuid: Optional[str], status: str
+    llm_module_uuid: str, from_uuid: Optional[str], status: str
 ):
     """Create a new LLM module version with the given parameters."""
     return LLMModuleVersion.create(
         uuid=uuid4(),
-        previous_version_uuid=previous_version_uuid,
+        from_uuid=from_uuid,
         llm_module_uuid=llm_module_uuid,
         status=status
     )
