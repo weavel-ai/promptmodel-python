@@ -1,3 +1,4 @@
+import os
 from typing import Dict
 from ..utils.config_utils import read_config
 import requests
@@ -21,7 +22,7 @@ class APIClient:
     """
 
     @classmethod
-    def _get_headers(cls) -> Dict:
+    def _get_headers(cls, use_cli_key: bool = True) -> Dict:
         """
         Reads, decrypts the api_key, and returns headers for API request.
 
@@ -31,17 +32,19 @@ class APIClient:
             a dictionary containing the Authorization header
         """
         config = read_config()
+        if use_cli_key:
+            if "user" not in config:
+                print(
+                    "User not logged in. Please run [violet]fastllm login[/violet] first."
+                )
+                exit()
 
-        if "user" not in config:
-            print(
-                "User not logged in. Please run [violet]fastllm login[/violet] first."
-            )
-            exit()
-
-        encrypted_key = config["user"]["encrypted_api_key"]
-        if encrypted_key is None:
-            raise Exception("No API key found. Please run 'fastllm login' first.")
-        decrypted_key = decrypt_message(encrypted_key)
+            encrypted_key = config["user"]["encrypted_api_key"]
+            if encrypted_key is None:
+                raise Exception("No API key found. Please run 'fastllm login' first.")
+            decrypted_key = decrypt_message(encrypted_key)
+        else:
+            decrypted_key = os.environ.get("FASTLLM_API_KEY")
         headers = {"Authorization": f"Bearer {decrypted_key}"}
         return headers
 
@@ -54,6 +57,7 @@ class APIClient:
         data: Dict = None,
         json: Dict = None,
         ignore_auth_error: bool = False,
+        use_cli_key: bool = True,
         **kwargs,
     ) -> requests.Response:
         """
@@ -80,7 +84,7 @@ class APIClient:
             The response object returned by the requests library
         """
         url = f"{ENDPOINT_URL}{path}"
-        headers = cls._get_headers()
+        headers = cls._get_headers(use_cli_key)
         try:
             response = requests.request(
                 method,

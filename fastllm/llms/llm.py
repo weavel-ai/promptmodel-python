@@ -1,4 +1,5 @@
 """Base module for interacting with OpenAI's Language Model API."""
+"""Base module for interacting with OpenAI's Language Model API."""
 import re
 import os
 import json

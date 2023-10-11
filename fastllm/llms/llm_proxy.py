@@ -1,4 +1,5 @@
 import inspect
+import asyncio
 from typing import (
     Any,
     AsyncGenerator,
@@ -10,9 +11,15 @@ from typing import (
     Tuple,
     Union,
 )
-from .llm import LLM
-
-
+from fastllm.llms.llm import LLM
+from fastllm.utils.config_utils import read_config, upsert_config
+from fastllm.utils.prompt_util import fetch_prompts
+from fastllm.apis.base import APIClient
+from fastllm.database.crud import (
+    get_latest_version_prompts,
+    get_deployed_prompts,
+    update_deployed_cache
+)
 class LLMProxy(LLM):
     def __init__(self, name: str):
         super().__init__()
@@ -20,19 +27,10 @@ class LLMProxy(LLM):
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            messages, model = self._fetch_from_cloud()
+            prompts, model = asyncio.run(fetch_prompts(self._name))
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
-            # TODO: Fill in the messages with inputs
-
-            # Check for specific keys in kwargs
-            call_args = {"messages": messages, "model": model}
-
-            if "output_keys" in kwargs:
-                call_args["output_keys"] = kwargs["output_keys"]
-            if "function_list" in kwargs:
-                call_args["function_list"] = kwargs["function_list"]
-
+            call_args = self._prepare_call_args(prompts, model, inputs, kwargs)
             # Call the generator with the arguments
             gen_instance = gen(**call_args)
 
@@ -53,17 +51,10 @@ class LLMProxy(LLM):
 
     def _wrap_async_gen(self, async_gen: Callable[..., Any]) -> Callable[..., Any]:
         async def wrapper(inputs: Dict[str, Any], **kwargs):
-            messages, model = self._fetch_from_cloud()
+            prompts, model = await fetch_prompts(self._name)
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
-            # TODO: Fill in the messages with inputs
-
-            call_args = {"messages": messages, "model": model}
-
-            if "output_keys" in kwargs:
-                call_args["output_keys"] = kwargs["output_keys"]
-            if "function_list" in kwargs:
-                call_args["function_list"] = kwargs["function_list"]
+            call_args = self._prepare_call_args(prompts, model, inputs, kwargs)
 
             # Call async_gen with the arguments
             async_gen_instance = async_gen(**call_args)
@@ -85,16 +76,8 @@ class LLMProxy(LLM):
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            messages, model = self._fetch_from_cloud()
-            # TODO: Fill in the messages with inputs
-
-            # Check for specific keys in kwargs
-            call_args = {"messages": messages, "model": model}
-
-            if "output_keys" in kwargs:
-                call_args["output_keys"] = kwargs["output_keys"]
-            if "function_list" in kwargs:
-                call_args["function_list"] = kwargs["function_list"]
+            prompts, model = asyncio.run(fetch_prompts(self._name))
+            call_args = self._prepare_call_args(prompts, model, inputs, kwargs)
 
             # Call the method with the arguments
             result = method(**call_args)
@@ -105,30 +88,26 @@ class LLMProxy(LLM):
 
     def _wrap_async_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         async def async_wrapper(inputs: Dict[str, Any], **kwargs):
-            messages, model = self._fetch_from_cloud()
-            # TODO: Fill in the messages with inputs
-
-            # Check for specific keys in kwargs
-            call_args = {"messages": messages, "model": model}
-
-            if "output_keys" in kwargs:
-                call_args["output_keys"] = kwargs["output_keys"]
-            if "function_list" in kwargs:
-                call_args["function_list"] = kwargs["function_list"]
+            prompts, model = await fetch_prompts(self._name) # messages, model, prompt_metadata = self._fetch_prompts()
+            call_args = self._prepare_call_args(prompts, model, inputs, kwargs)
 
             # Call the method with the arguments
             result = await method(**call_args)
             self._log_to_cloud(result)
-            return result
+            return result # return FastLLMOutput = {result, prompt_metadata, output_metadata (token_usage, cost, latency)}
 
         return async_wrapper
 
-    def _fetch_from_cloud(self) -> Tuple[List[Dict[str, str]], str]:
-        # TODO: Fetch from cloud
-        return [
-            {"role": "system", "content": "Help the user."},
-            {"role": "user", "content": "What's your name?"},
-        ], "gpt-3.5-turbo"
+    def _prepare_call_args(self, prompts, model, inputs, kwargs):
+        messages = [{'content': prompt['content'].format(**inputs), 'role': prompt['role']} for prompt in prompts]
+        call_args = {"messages": messages, "model": model}
+
+        if "output_keys" in kwargs:
+            call_args["output_keys"] = kwargs["output_keys"]
+        if "function_list" in kwargs:
+            call_args["function_list"] = kwargs["function_list"]
+            
+        return call_args
 
     def _log_to_cloud(self, output: Union[str, Dict[str, str]]):
         # TODO: Log to cloud
@@ -202,3 +181,4 @@ class LLMProxy(LLM):
         return self._wrap_async_gen(super().astream_and_parse_function_call)(
             inputs, function_list
         )
+        

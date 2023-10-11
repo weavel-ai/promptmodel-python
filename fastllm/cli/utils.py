@@ -28,7 +28,6 @@ def get_org(config: Dict[str, Any]) -> Dict[str, Any]:
         org = config["user"]["default_org"]
     return org
 
-
 def get_project(config: Dict[str, Any], org: Dict[str, Any]) -> Dict[str, Any]:
     """
     Gets the current project from the configuration.

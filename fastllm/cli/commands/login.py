@@ -27,7 +27,7 @@ def login():
         # Check access every 5 seconds
         try:
             res = APIClient.execute("/check_cli_access", ignore_auth_error=True)
-            if res.status_code == 200:
+            if res.json() == True:
                 print("[green]Access granted![/green] 🎉")
                 print("Run [violet][bold]fastllm dev[/bold][/violet] to start developing prompts.\n")
                 return

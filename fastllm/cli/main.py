@@ -1,9 +1,16 @@
+import os
+import sys
 import typer
-from .commands.login import app as login
-from .commands.dev import app as dev
-from .commands.project import app as project
-from .commands.configure import app as configure
+from fastllm.cli.commands.login import app as login
+from fastllm.cli.commands.dev import app as dev
+from fastllm.cli.commands.project import app as project
+from fastllm.cli.commands.configure import app as configure
 
+
+# 현재 작업 디렉토리를 sys.path에 추가
+current_working_directory = os.getcwd()
+if current_working_directory not in sys.path:
+    sys.path.append(current_working_directory)
 
 app = typer.Typer(no_args_is_help=True)
 
