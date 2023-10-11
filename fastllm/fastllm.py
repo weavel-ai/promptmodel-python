@@ -28,7 +28,7 @@ class FastLLM:
         self.samples: List[Dict[str, Any]] = []
 
 
-    def ai(self, name: str) -> LLMProxy:
+    def fastmodel(self, name: str) -> LLMProxy:
         return LLMProxy(name)
 
     def register(self, func):
@@ -40,7 +40,7 @@ class FastLLM:
             # print(instruction)
             if (
                 instruction.opname in ["LOAD_ATTR", "LOAD_METHOD"]
-                and instruction.argval == "ai"
+                and instruction.argval == "fastmodel"
             ):
                 next_instruction = instructions[idx + 1]
 
