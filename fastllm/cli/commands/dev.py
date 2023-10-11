@@ -1,3 +1,4 @@
+import os
 import time
 import asyncio
 import typer
@@ -5,6 +6,7 @@ import json
 import sys
 import importlib
 import signal
+from importlib import resources
 from requests import request
 from typing import Callable, Dict, Any, List
 
@@ -41,13 +43,24 @@ from fastllm.database.crud import (
     update_samples
 )
 
-# fastllm dev fastllm_client:client
+FASTLLM_DEV_FILENAME = os.path.join(os.getcwd(), "fastllm_dev.py")
+FASTLLM_DEV_STARTER_FILENAME = "STARTER.py"
 
-def dev(fastllm_client_identifier: str):
+def dev():
     """Creates a new prompt development environment, and opens up FastLLM in the browser."""
     signal.signal(signal.SIGINT, dev_terminate_signal_handler)
+    import os
 
-    fastllm_client_filename, client_variable_name = fastllm_client_identifier.split(':')
+    if not os.path.exists(FASTLLM_DEV_FILENAME):
+        # Read the content from the source file
+        content = resources.read_text("fastllm", "STARTER.py")
+
+        # Write the content to the target file
+        with open(FASTLLM_DEV_FILENAME, "w") as target_file:
+            target_file.write(content)
+
+    fastllm_client_filename, client_variable_name = "fastllm_dev:app".split(":")
+    
     config = read_config()
     
     # Init local database & open

@@ -223,7 +223,7 @@ class DevWebsocketClient:
                                 "parsed_outputs": item
                             }
                         await ws.send(json.dumps(data))
-  
+
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
                         "raw_output": output["raw_output"],
@@ -313,7 +313,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             self.timer.start()
 
     def reload_code(self, modified_file_path: str):
-        print(f"Reloading {self.fastllm_client_filename} module due to changes...")
+        print(f"[violet]fastllm:dev:[/violet]  Reloading {self.fastllm_client_filename} module due to changes...")
         # Reload the client module
         module_name = modified_file_path.replace("./", "").replace("/", ".")[
             :-3
@@ -324,7 +324,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             importlib.reload(module)
 
         reloaded_module = importlib.reload(sys.modules[self.fastllm_client_filename])
-        print(f"{self.fastllm_client_filename} module reloaded successfully.")
+        print(f"[violet]fastllm:dev:[/violet]  {self.fastllm_client_filename} module reloaded successfully.")
 
         new_client_instance: FastLLM = getattr(
             reloaded_module, self.client_variable_name
