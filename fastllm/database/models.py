@@ -46,6 +46,7 @@ class LLMModuleVersion(BaseModel):
     )
     model = CharField()
     candidate_version = IntegerField(null=True)
+    is_published = BooleanField(default=False)
 
 
 class Prompt(BaseModel):
