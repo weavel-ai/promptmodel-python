@@ -9,3 +9,4 @@ python-dotenv
 websockets
 termcolor
 watchdog
+readerwriterlock

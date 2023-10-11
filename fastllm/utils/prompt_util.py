@@ -11,7 +11,7 @@ from fastllm.database.crud import (
 from fastllm.utils.config_utils import read_config, upsert_config
 from fastllm.apis.base import APIClient
 
-async def fetch_prompts(self, name) -> Tuple[List[Dict[str, str]], str]:
+async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
     # Check dev_branch activate
     config = read_config()
     if "dev_branch" in config and config["dev_branch"]['online'] == True:
@@ -23,10 +23,12 @@ async def fetch_prompts(self, name) -> Tuple[List[Dict[str, str]], str]:
         asyncio.create_task(update_deployed_db(config))
         # get prompt from local DB by ratio
         prompt_rows, model = get_deployed_prompts(name)
+        if prompt_rows is None:
+            return [], ""
         return [{"role": prompt.role, "content" : prompt.content} for prompt in prompt_rows], model
     
 
-async def update_deployed_db(self, config):
+async def update_deployed_db(config):
     if "project" not in config or "version" not in config["project"]:
         cached_project_version = "0.0.0"
     else:

@@ -40,7 +40,7 @@ class FastLLM:
             # print(instruction)
             if (
                 instruction.opname in ["LOAD_ATTR", "LOAD_METHOD"]
-                and instruction.argval == "llm"
+                and instruction.argval == "ai"
             ):
                 next_instruction = instructions[idx + 1]
 
@@ -63,7 +63,7 @@ class FastLLM:
     def include(self, client: FastLLM):
         self.llm_modules.extend(client.llm_modules)
     
-    def get_prompts(self, name: str):
+    def get_prompts(self, name: str) -> List[Dict[str, str]]:
         # add name to the list of llm_modules
         self.llm_modules.append(
             LLMModule(
@@ -71,7 +71,9 @@ class FastLLM:
                 default_model=self._default_model,
             )
         )
-        return asyncio.run(fetch_prompts(name))
+        
+        prompts, _ = asyncio.run(fetch_prompts(name))
+        return prompts
 
     def sample(self, name: str, content: Dict[str, Any]):
         self.samples.append(

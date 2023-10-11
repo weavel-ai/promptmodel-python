@@ -27,7 +27,6 @@ class LLMModule(BaseModel):
     local_usage = BooleanField(default=True)
     is_deployment = BooleanField(default=False) # mark if the module is published to the cloud
 
-
 class LLMModuleVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     created_at = DateTimeField(default=datetime.datetime.now)
@@ -47,8 +46,6 @@ class LLMModuleVersion(BaseModel):
     )
     model = CharField()
     candidate_version = IntegerField(null=True)
-    
-    
 
 
 class Prompt(BaseModel):

@@ -155,16 +155,16 @@ def get_latest_version_prompts(llm_module_name: str):
     try:
         with db.atomic():
             latest_run_log: RunLog = (RunLog
-                              .select()
-                              .join(LLMModuleVersion)
-                              .where(LLMModuleVersion.llm_module_uuid == LLMModule.get(LLMModule.name == llm_module_name).uuid)
-                              .order_by(RunLog.created_at.desc())
-                              .get())
+                            .select()
+                            .join(LLMModuleVersion)
+                            .where(LLMModuleVersion.llm_module_uuid == LLMModule.get(LLMModule.name == llm_module_name).uuid)
+                            .order_by(RunLog.created_at.desc())
+                            .get())
             
             prompts = (Prompt
-                       .select()
-                       .where(Prompt.version_uuid == latest_run_log.version_uuid)
-                       .order_by(Prompt.step.asc()))
+                        .select()
+                        .where(Prompt.version_uuid == latest_run_log.version_uuid)
+                        .order_by(Prompt.step.asc()))
             
             version: LLMModuleVersion = (
                 LLMModuleVersion
@@ -176,7 +176,6 @@ def get_latest_version_prompts(llm_module_name: str):
             return [prompt for prompt in prompts], version.model
             
     except Exception as e:
-        print(e)
         return None
 
 def get_deployed_prompts(llm_module_name: str):
@@ -200,10 +199,8 @@ def get_deployed_prompts(llm_module_name: str):
         selected_prompts = [prompt for prompt in prompts if prompt.version_uuid == selected_version['uuid']]
         
         return selected_prompts, selected_version['model']
-            
-    except Exception as e:
-        print(e)
-        return None
+    except Exception:
+        return None, None
 
 # Update
 def update_is_deployment_llm_module(llm_module_uuid: str, is_deployment: bool):
