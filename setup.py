@@ -20,7 +20,9 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     auther="weavel",
-    install_requires=["pydantic", "peewee", "typer[all]", "cryptography", "pyyaml", "InquirerPy", "litellm"],
+    install_requires=[
+        "pydantic", "peewee", "typer[all]", "cryptography", "pyyaml", "InquirerPy", "litellm", "python-dotenv", "websockets", "termcolor", "watchdog", "readerwriterlock" 
+    ],
     python_requires=">=3.7.1",
     keywords=["weavel", "agent", "llm", "tools", "fastllm", "llm agent", "prompt", "versioning"],
 )
