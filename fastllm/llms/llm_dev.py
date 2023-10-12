@@ -7,7 +7,7 @@ import openai
 from typing import Any, AsyncGenerator, List, Dict, Optional, Union, Generator
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from litellm import completion
+from litellm import acompletion
 
 import fastllm.utils.logger as logger
 
@@ -46,7 +46,7 @@ class LLMDev:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
-        response = await openai.ChatCompletion.acreate(
+        response = await acompletion(
             model=_model,
             messages=[
                 message.model_dump()
@@ -54,12 +54,14 @@ class LLMDev:
             ],
             stream=True,
         )
-        
+
         if parsing_type == ParsingType.DOUBLE_SQURE_BRACKET:
             async for chunk in response:
                 pause_stream = False
                 if "content" in chunk["choices"][0]["delta"]:
                     stream_value = chunk["choices"][0]["delta"]["content"]
+                    yield stream_value  # return raw output
+
                     raw_output += stream_value  # 지금까지 생성된 누적 output
                     pattern = (
                         r"\[\[.*?(\s*\(.+\))?\sstart\]\](.*?)\[\[.*?(\s*\(.+\))?\send\]\]"
@@ -94,7 +96,6 @@ class LLMDev:
                                 cache += "["
                         pause_stream = True
                     if not pause_stream:
-                        yield stream_value  # return raw output
                         yield {key: stream_value} # return parsed output
                     elif stream_value.find("]") != -1:
                         # Current stream_value (that includes ]) isn't yielded, but the next stream_values will be yielded.

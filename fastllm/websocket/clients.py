@@ -133,7 +133,7 @@ class DevWebsocketClient:
                         "parsed_outputs" : {}
                     }
                 try:
-                    logger.info(f"Started service: {llm_module_name}")
+                    logger.info(f"Started PromptModel: {llm_module_name}")
                     # create llm_module_dev_instance
                     llm_module_dev = LLMDev()
                     # fine llm_module_uuid from local db
@@ -153,7 +153,7 @@ class DevWebsocketClient:
                         for prompt in prompts:
                             create_prompt(
                                 version_uuid=llm_module_version_uuid,
-                                type=prompt["type"],
+                                role=prompt["role"],
                                 step=prompt["step"],
                                 content=prompt["content"],
                             )
@@ -162,7 +162,9 @@ class DevWebsocketClient:
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
                             "llm_module_version_uuid": llm_module_version_uuid,
                             "status": "running",
+                            "inputs" : sample_input if sample_input else {}
                         }
+                        data.update(response)
                         await ws.send(json.dumps(data))
                     
                     model = message['model']
@@ -171,10 +173,10 @@ class DevWebsocketClient:
                     
                     if sample_input:
                         messages_for_run = [{'content': prompt['content'].format(**sample_input), 'role': prompt['role']} for prompt in prompts]
-
                     else:
                         messages_for_run = prompts
-                    async for item in llm_module_dev.dev_generate(messages_for_run, parsing_type, model):
+                    res = llm_module_dev.dev_generate(messages_for_run, parsing_type, model)
+                    async for item in res:
                         # send item to backend
                         # save item & parse
                         # if type(item) == str: raw output, if type(item) == dict: parsed output
@@ -195,12 +197,14 @@ class DevWebsocketClient:
                                 "status": "running",
                                 "parsed_outputs": item
                             }
+                        data.update(response)
+                        logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data))
 
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
-                        "raw_output": output["raw_output"],
-                        "parsed_outputs": output["parsed_outputs"],
+                        # "raw_output": output["raw_output"],
+                        # "parsed_outputs": output["parsed_outputs"],
                         "status": "completed",
                     }
                 except Exception as error:

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import openai
 from ..utils import logger
-from litellm import completion
+from litellm import completion, acompletion
 
 load_dotenv()
 
@@ -75,7 +75,7 @@ class LLM:
     ):
         """Return the response from openai chat completion."""
         _model = model or self._model
-        response = await completion(
+        response = await acompletion(
             model=_model,
             messages=[
                 message.model_dump()
@@ -100,6 +100,7 @@ class LLM:
                 message.model_dump()
                 for message in self.__validate_openai_messages(messages)
             ],
+            stream=True
         ).choices[0]["message"]["content"]
         for chunk in response:
             if "content" in chunk["choices"][0]["delta"]:
@@ -215,7 +216,7 @@ class LLM:
         Now generate the output:
         """
         _model = model or self._model
-        result = await openai.ChatCompletion.acreate(
+        result = await acompletion(
             model=_model,
             messages=[
                 message.model_dump()
@@ -266,7 +267,7 @@ class LLM:
         """
         Parse by function call arguments
         """
-        response = await openai.ChatCompletion.acreate(
+        response = await acompletion(
             model=model,
             messages=[
                 message.model_dump()
@@ -289,7 +290,7 @@ class LLM:
     ) -> Generator[Dict[str, str], None, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
-        response = await openai.ChatCompletion.acreate(
+        response = await acompletion(
             model=_model,
             messages=[
                 message.model_dump()
@@ -310,7 +311,7 @@ class LLM:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
-        response = await openai.ChatCompletion.acreate(
+        response = await acompletion(
             model=_model,
             messages=[
                 message.model_dump()
@@ -382,7 +383,7 @@ class LLM:
         output_key: str,
         model: Optional[str] = "gpt-3.5-turbo-0613",
     ) -> Generator[str, None, None]:
-        response = await openai.ChatCompletion.acreate(
+        response = await acompletion(
             model=model,
             messages=[
                 message.model_dump()

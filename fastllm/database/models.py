@@ -58,7 +58,7 @@ class Prompt(BaseModel):
         backref="prompts",
         on_delete="CASCADE",
     )
-    type = CharField()
+    role = CharField()
     step = IntegerField()
     content = TextField()
 
@@ -117,6 +117,6 @@ class DeployedPrompt(BaseModel):
         backref="prompts",
         on_delete="CASCADE",
     )
-    type = CharField()
+    role = CharField()
     step = IntegerField()
     content = TextField()

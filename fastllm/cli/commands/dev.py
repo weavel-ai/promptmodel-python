@@ -188,7 +188,7 @@ def dev():
         only_in_local_llm_modules = [{"name" : x, "project_uuid" : project['uuid']} for x in only_in_local]
         create_llm_modules(only_in_local_llm_modules)
     
-    dev_url = f"{WEB_CLIENT_URL}/org/{org['slug']}/project/{project['uuid']}/dev/{branch_name}"
+    dev_url = f"{WEB_CLIENT_URL}/org/{org['slug']}/projects/{project['uuid']}/dev/{branch_name}"
     
     # Open websocket connection to backend server
     dev_websocket_client = DevWebsocketClient(fastllm_client=client_instance)
