@@ -26,7 +26,7 @@ import fastllm.utils.logger as logger
 from fastllm.utils.config_utils import read_config, upsert_config
 from fastllm.utils.crypto import generate_api_key, encrypt_message
 from fastllm.utils.enums import LLMModuleVersionStatus, ChangeLogAction
-from fastllm.websocket.clients import DevWebsocketClient, CodeReloadHandler
+from fastllm.websocket import DevWebsocketClient, CodeReloadHandler
 from fastllm.database.orm import initialize_db
 from fastllm.database.crud import (
     create_llm_modules,
