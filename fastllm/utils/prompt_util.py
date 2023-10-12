@@ -9,12 +9,15 @@ from fastllm.database.crud import (
     update_deployed_cache
 )
 from fastllm.utils.config_utils import read_config, upsert_config
+from fastllm.utils import logger
 from fastllm.apis.base import APIClient
 
 async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
     # Check dev_branch activate
     config = read_config()
-    if "dev_branch" in config and config["dev_branch"]['online'] == True:
+    if config["dev_branch"]["initializing"] == True:
+        return [], ""
+    elif "dev_branch" in config and config["dev_branch"]['online'] == True:
         # get prompt from local DB
         prompt_rows, model = get_latest_version_prompts(name)
         if prompt_rows is None:
@@ -35,13 +38,16 @@ async def update_deployed_db(config):
         cached_project_version = "0.0.0"
     else:
         cached_project_version = config["project"]["version"]
+    try:
+        res = APIClient.execute(
+            method="GET",
+            path="/check_update",
+            params={"cached_version": cached_project_version},
+            use_cli_key=False,
+        ).json()
+    except:
+        logger.error("You need API_KEY in .env file!")
     
-    res = APIClient.execute(
-        method="GET",
-        path="/check_update",
-        params={"cached_version": cached_project_version},
-        use_cli_key=False,
-    ).json()
     
     if res['need_update']:
         # update local DB with res['project_status']

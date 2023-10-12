@@ -48,6 +48,7 @@ FASTLLM_DEV_STARTER_FILENAME = "STARTER.py"
 
 def dev():
     """Creates a new prompt development environment, and opens up FastLLM in the browser."""
+    upsert_config({"initializing" : True}, "dev_branch")
     signal.signal(signal.SIGINT, dev_terminate_signal_handler)
     import os
 
@@ -61,16 +62,16 @@ def dev():
 
     fastllm_client_filename, client_variable_name = "fastllm_dev:app".split(":")
     
-    config = read_config()
-    
     # Init local database & open
     initialize_db()
+    
+    config = read_config()
     
     client_module = importlib.import_module(fastllm_client_filename)
     client_instance: FastLLM = getattr(client_module, client_variable_name)
 
     
-    if "dev_branch" not in config:
+    if "name" in config["dev_branch"]:
         org = get_org(config)
         project = get_project(config=config, org=org)
         validate_branch_name = lambda name: APIClient.execute(
@@ -215,7 +216,7 @@ def dev():
     )
     webbrowser.open(dev_url)
     
-    upsert_config({"online": True}, section="dev_branch")
+    upsert_config({"online": True, "initializing": False}, section="dev_branch")
     # save samples to local DB
     update_samples(client_instance.samples)
     
