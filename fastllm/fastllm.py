@@ -33,7 +33,7 @@ class FastLLM:
         self.samples: List[Dict[str, Any]] = []
         config = read_config()
         dev_branch = config["dev_branch"]
-        if ("online" in dev_branch and dev_branch["online"] == True) or ("initilizing" in dev_branch and dev_branch["initilizing"] == True):
+        if ("online" in dev_branch and dev_branch["online"] == True) or ("initializing" in dev_branch and dev_branch["initializing"] == True):
             self.cache_manager = None
         else:
             self.cache_manager = CacheManager()

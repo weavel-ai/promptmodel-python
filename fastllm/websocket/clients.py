@@ -166,7 +166,7 @@ class DevWebsocketClient:
                     # fine llm_module_uuid from local db
                     llm_module_uuid = get_llm_module_uuid(llm_module_name)['uuid']
                 
-                    llm_module_version_uuid = message['llm_module_version_uuid']
+                    llm_module_version_uuid = message['uuid']
                     # If llm_module_version_uuid is None, create new version & prompt
                     if llm_module_version_uuid is None:
                         llm_module_version: LLMModuleVersion = create_llm_module_version(
