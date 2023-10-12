@@ -98,7 +98,7 @@ class DevWebsocketClient:
         with self.rwlock.gen_wlock():
             self.fastllm_client = new_client
             if self.ws is not None:
-                asyncio.run(self.ws.send({"type" : ServerTask.LOCAL_UPDATE_ALERT.value}))
+                asyncio.run(self.ws.send(json.dumps({"type" : ServerTask.LOCAL_UPDATE_ALERT.value})))
 
     async def __handle_message(
         self, message: Dict[str, Any], ws: WebSocketClientProtocol
