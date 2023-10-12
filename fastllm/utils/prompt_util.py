@@ -17,6 +17,8 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
     if "dev_branch" in config and config["dev_branch"]['online'] == True:
         # get prompt from local DB
         prompt_rows, model = get_latest_version_prompts(name)
+        if prompt_rows is None:
+            return [], ""
         return [{"role": prompt.role, "content" : prompt.content} for prompt in prompt_rows], model
     else:
         # call update_local API in background task
