@@ -71,7 +71,7 @@ def dev():
     client_instance: FastLLM = getattr(client_module, client_variable_name)
 
     
-    if "name" in config["dev_branch"]:
+    if "name" not in config["dev_branch"]:
         org = get_org(config)
         project = get_project(config=config, org=org)
         validate_branch_name = lambda name: APIClient.execute(
