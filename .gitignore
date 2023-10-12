@@ -17,3 +17,10 @@ __pycache__
 
 test
 test/*
+
+build
+build/*
+dist
+dist/*
+promptmodel
+promptmodel/*
