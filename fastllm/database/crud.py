@@ -73,7 +73,7 @@ def create_run_log(
     inputs: str,
     raw_output: str,
     parsed_outputs: str,
-    is_deployment: bool,
+    is_deployment: bool = False,
 ):
     """Create a new run log with the given parameters."""
     return RunLog.create(

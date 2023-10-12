@@ -31,6 +31,12 @@ class LLMDev:
     def __init__(self):
         self._model: str
         
+    def __validate_openai_messages(
+        self, messages: List[Dict[str, str]]
+    ) -> List[OpenAIMessage]:
+        """Validate and convert list of dictionaries to list of OpenAIMessage."""
+        return [OpenAIMessage(**message) for message in messages]
+        
     async def dev_generate(
         self,
         messages: List[Dict[str, str]],
