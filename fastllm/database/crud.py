@@ -176,7 +176,7 @@ def get_latest_version_prompts(llm_module_name: str):
             return [prompt for prompt in prompts], version.model
             
     except Exception as e:
-        return None
+        return None, None
 
 def get_deployed_prompts(llm_module_name: str):
     try:

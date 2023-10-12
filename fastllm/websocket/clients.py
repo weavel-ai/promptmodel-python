@@ -97,6 +97,8 @@ class DevWebsocketClient:
     def update_client_instance(self, new_client):
         with self.rwlock.gen_wlock():
             self.fastllm_client = new_client
+            if self.ws is not None:
+                asyncio.run(self.ws.send(json.dumps({"type" : ServerTask.LOCAL_UPDATE_ALERT.value})))
 
     async def __handle_message(
         self, message: Dict[str, Any], ws: WebSocketClientProtocol
@@ -339,7 +341,6 @@ class CodeReloadHandler(FileSystemEventHandler):
             llm_module.name
             for llm_module in self.dev_websocket_client.fastllm_client.llm_modules
         ]
-        self.dev_websocket_client.update_client_instance(new_client_instance)
 
         # 사라진 llm_modules 에 대해 local db llm_module.local_usage False Update
         removed_name_list = list(
@@ -381,6 +382,7 @@ class CodeReloadHandler(FileSystemEventHandler):
                 
         # update samples in local DB
         update_samples(new_client_instance.samples)
+        self.dev_websocket_client.update_client_instance(new_client_instance)
 
 
 def update_by_changelog_for_reload(
