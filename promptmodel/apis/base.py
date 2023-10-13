@@ -35,13 +35,13 @@ class APIClient:
         if use_cli_key:
             if "user" not in config:
                 print(
-                    "User not logged in. Please run [violet] login[/violet] first."
+                    "User not logged in. Please run [violet]pmd login[/violet] first."
                 )
                 exit()
 
             encrypted_key = config["user"]["encrypted_api_key"]
             if encrypted_key is None:
-                raise Exception("No API key found. Please run ' login' first.")
+                raise Exception("No API key found. Please run 'pmd login' first.")
             decrypted_key = decrypt_message(encrypted_key)
         else:
             decrypted_key = os.environ.get("PROMPTMODEL_API_KEY")
@@ -103,7 +103,7 @@ class APIClient:
             elif response.status_code == 403:
                 if not ignore_auth_error:
                     print(
-                        "[red]Authentication failed. Please run [violet][bold] login[/bold][/violet] first.[/red]"
+                        "[red]Authentication failed. Please run [violet][bold]pmd login[/bold][/violet] first.[/red]"
                     )
                     exit()
             else:

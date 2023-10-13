@@ -45,7 +45,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             self.timer.start()
 
     def reload_code(self, modified_file_path: str):
-        print(f"[violet]:dev:[/violet]  Reloading {self._client_filename} module due to changes...")
+        print(f"[violet]promptmodel:dev:[/violet]  Reloading {self._client_filename} module due to changes...")
         # Reload the client module
         module_name = modified_file_path.replace("./", "").replace("/", ".")[
             :-3
@@ -56,7 +56,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             importlib.reload(module)
 
         reloaded_module = importlib.reload(sys.modules[self._client_filename])
-        print(f"[violet]:dev:[/violet]  {self._client_filename} module reloaded successfully.")
+        print(f"[violet]promptmodel:dev:[/violet]  {self._client_filename} module reloaded successfully.")
 
         new_client_instance: Client = getattr(
             reloaded_module, self.client_instance_name

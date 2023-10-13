@@ -206,7 +206,7 @@ def dev():
     reloader_thread.start()
     
     print(
-        f"\nOpening [violet]Client[/violet] prompt engineering environment with the following configuration:\n"
+        f"\nOpening [violet]PromptModel[/violet] prompt engineering environment with the following configuration:\n"
     )
     print(f"📌 Organization: [blue]{org['name']}[/blue]")
     print(f"📌 Project: [blue]{project['name']}[/blue]")
