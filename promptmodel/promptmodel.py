@@ -60,7 +60,7 @@ class PromptModel(metaclass=RegisteringMeta):
         self.name = name
         self.llm_proxy = LLMProxy(name)
         
-    def prompts(self) -> List[Dict[str, str]]:
+    def get_prompts(self) -> List[Dict[str, str]]:
         # add name to the list of llm_modules
         
         prompts, _ = asyncio.run(fetch_prompts(self.name))
