@@ -95,7 +95,7 @@ class Client:
             }
         )
 
-class ClientDev(Client):
+class DevApp(Client):
     def __init__(
         self, default_model: Optional[str] = "gpt-3.5-turbo"
     ):

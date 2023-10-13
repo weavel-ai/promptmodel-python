@@ -1,3 +1,3 @@
-from . import Client, ClientDev, PromptModel
+from . import Client, DevApp, PromptModel
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
