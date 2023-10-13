@@ -11,11 +11,11 @@ from typing import (
     Tuple,
     Union,
 )
-from fastllm.llms.llm import LLM
-from fastllm.utils.config_utils import read_config, upsert_config
-from fastllm.utils.prompt_util import fetch_prompts
-from fastllm.apis.base import APIClient
-from fastllm.database.crud import (
+from promptmodel.llms.llm import LLM
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.utils.prompt_util import fetch_prompts
+from promptmodel.apis.base import APIClient
+from promptmodel.database.crud import (
     get_latest_version_prompts,
     get_deployed_prompts,
     update_deployed_cache
@@ -94,7 +94,7 @@ class LLMProxy(LLM):
             # Call the method with the arguments
             result = await method(**call_args)
             self._log_to_cloud(result)
-            return result # return FastLLMOutput = {result, prompt_metadata, output_metadata (token_usage, cost, latency)}
+            return result # return ClientOutput = {result, prompt_metadata, output_metadata (token_usage, cost, latency)}
 
         return async_wrapper
 

@@ -11,29 +11,24 @@ from typing import Callable, Dict, Any, List, Optional
 from websockets.client import connect, WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
-import fastllm.utils.logger as logger
-from fastllm.llms.llm_proxy import LLMProxy
-from fastllm.utils.prompt_util import fetch_prompts, update_deployed_db
-from fastllm.utils.config_utils import read_config, upsert_config
-from fastllm.database.orm import initialize_db
+import promptmodel.utils.logger as logger
+from promptmodel.llms.llm_proxy import LLMProxy
+from promptmodel.utils.prompt_util import fetch_prompts, update_deployed_db
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.database.orm import initialize_db
 
 @dataclass
 class LLMModule:
     name: str
-    default_model: str = "gpt-3.5-turbo"
+    default_model: str
 
 class Client:
-    """PromptModel Client class (Singleton)"""
-    _instance = None
-    _lock = threading.Lock()
-    
-    def __new__(cls):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super(Client, cls).__new__(cls)
-        return cls._instance
+    """Client main class"""
 
-    def __init__(self):
+    def __init__(
+        self, default_model: Optional[str] = "gpt-3.5-turbo"
+    ):
+        self._default_model: str = default_model
         self.llm_modules: List[LLMModule] = []
         self.samples: List[Dict[str, Any]] = []
         config = read_config()
@@ -41,8 +36,12 @@ class Client:
         if ("online" in dev_branch and dev_branch["online"] == True) or ("initializing" in dev_branch and dev_branch["initializing"] == True):
             self.cache_manager = None
         else:
-            self.cache_manager = CacheManager() # only in deployment mode
-        # logger.debug("FastLLM initialized")
+            self.cache_manager = CacheManager()
+        logger.debug("Client initialized")
+
+
+    def fastmodel(self, name: str) -> LLMProxy:
+        return LLMProxy(name)
 
     def register(self, func):
         instructions = list(dis.get_instructions(func))
@@ -53,7 +52,7 @@ class Client:
             # print(instruction)
             if (
                 instruction.opname in ["LOAD_ATTR", "LOAD_METHOD"]
-                and instruction.argval == "PromptModel"
+                and instruction.argval == "fastmodel"
             ):
                 next_instruction = instructions[idx + 1]
 
@@ -63,7 +62,8 @@ class Client:
                 ):
                     self.llm_modules.append(
                         LLMModule(
-                            name=next_instruction.argval
+                            name=next_instruction.argval,
+                            default_model=self._default_model,
                         )
                     )
 
@@ -71,6 +71,21 @@ class Client:
             return func(*args, **kwargs)
 
         return wrapper
+
+    def include(self, client: Client):
+        self.llm_modules.extend(client.llm_modules)
+    
+    def get_prompts(self, name: str) -> List[Dict[str, str]]:
+        # add name to the list of llm_modules
+        self.llm_modules.append(
+            LLMModule(
+                name=name,
+                default_model=self._default_model,
+            )
+        )
+        
+        prompts, _ = asyncio.run(fetch_prompts(name))
+        return prompts
 
     def sample(self, name: str, content: Dict[str, Any]):
         self.samples.append(
@@ -80,15 +95,26 @@ class Client:
             }
         )
 
-class DevApp(Client):
+class ClientDev(Client):
     def __init__(
-        self
+        self, default_model: Optional[str] = "gpt-3.5-turbo"
     ):
-        super().__init__()
+        super().__init__(default_model)
     
+    def include(self, client: Client):
+        self.llm_modules.extend(client.llm_modules)
+        
+
 
 class CacheManager:
-    """CacheManager class to manage the cache of the deployed PromptModels"""    
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(CacheManager, cls).__new__(cls)
+        return cls._instance
     
     def __init__(self):
         self.last_update_time = 0 # to manage update frequency
@@ -104,7 +130,7 @@ class CacheManager:
     async def _update_cache_periodically(self):
         while True:
             await self.update_cache()
-            # logger.debug("Update cache")
+            logger.debug("Update cache")
             await asyncio.sleep(self.update_interval)  # Non-blocking sleep
     
     async def update_cache(self):

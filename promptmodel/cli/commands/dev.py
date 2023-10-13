@@ -17,18 +17,18 @@ from rich import print
 from InquirerPy import inquirer
 from watchdog.observers import Observer
 
-from fastllm.fastllm import FastLLM
-from fastllm.apis.base import APIClient
-from fastllm.constants import ENDPOINT_URL, WEB_CLIENT_URL
-from fastllm.cli.utils import get_org, get_project
-from fastllm.cli.signal_handler import dev_terminate_signal_handler
-import fastllm.utils.logger as logger
-from fastllm.utils.config_utils import read_config, upsert_config
-from fastllm.utils.crypto import generate_api_key, encrypt_message
-from fastllm.utils.enums import LLMModuleVersionStatus, ChangeLogAction
-from fastllm.websocket import DevWebsocketClient, CodeReloadHandler
-from fastllm.database.orm import initialize_db
-from fastllm.database.crud import (
+from promptmodel. import Client
+from promptmodel.apis.base import APIClient
+from promptmodel.constants import ENDPOINT_URL, WEB_CLIENT_URL
+from promptmodel.cli.utils import get_org, get_project
+from promptmodel.cli.signal_handler import dev_terminate_signal_handler
+import promptmodel.utils.logger as logger
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.utils.crypto import generate_api_key, encrypt_message
+from promptmodel.utils.enums import LLMModuleVersionStatus, ChangeLogAction
+from promptmodel.websocket import DevWebsocketClient, CodeReloadHandler
+from promptmodel.database.orm import initialize_db
+from promptmodel.database.crud import (
     create_llm_modules,
     create_llm_module_versions,
     create_prompts,
@@ -43,32 +43,32 @@ from fastllm.database.crud import (
     update_samples
 )
 
-FASTLLM_DEV_FILENAME = os.path.join(os.getcwd(), "fastllm_dev.py")
-FASTLLM_DEV_STARTER_FILENAME = "STARTER.py"
+PROMPTMODEL_DEV_FILENAME = os.path.join(os.getcwd(), "_dev.py")
+PROMPTMODEL_DEV_STARTER_FILENAME = "STARTER.py"
 
 def dev():
-    """Creates a new prompt development environment, and opens up FastLLM in the browser."""
+    """Creates a new prompt development environment, and opens up Client in the browser."""
     upsert_config({"initializing" : True}, "dev_branch")
     signal.signal(signal.SIGINT, dev_terminate_signal_handler)
     import os
 
-    if not os.path.exists(FASTLLM_DEV_FILENAME):
+    if not os.path.exists(PROMPTMODEL_DEV_FILENAME):
         # Read the content from the source file
-        content = resources.read_text("fastllm", "STARTER.py")
+        content = resources.read_text("", "STARTER.py")
 
         # Write the content to the target file
-        with open(FASTLLM_DEV_FILENAME, "w") as target_file:
+        with open(PROMPTMODEL_DEV_FILENAME, "w") as target_file:
             target_file.write(content)
 
-    fastllm_client_filename, client_variable_name = "fastllm_dev:app".split(":")
+    _client_filename, client_instance_name = "_dev:app".split(":")
     
     # Init local database & open
     initialize_db()
     
     config = read_config()
     
-    client_module = importlib.import_module(fastllm_client_filename)
-    client_instance: FastLLM = getattr(client_module, client_variable_name)
+    client_module = importlib.import_module(_client_filename)
+    client_instance: Client = getattr(client_module, client_instance_name)
 
     
     if "name" not in config["dev_branch"]:
@@ -191,14 +191,14 @@ def dev():
     dev_url = f"{WEB_CLIENT_URL}/org/{org['slug']}/projects/{project['uuid']}/dev/{branch_name}"
     
     # Open websocket connection to backend server
-    dev_websocket_client = DevWebsocketClient(fastllm_client=client_instance)
+    dev_websocket_client = DevWebsocketClient(_client=client_instance)
     
     import threading
     reloader_thread = threading.Thread(
         target=start_code_reloader, 
         args=(
-            fastllm_client_filename,
-            client_variable_name,
+            _client_filename,
+            client_instance_name,
             dev_websocket_client
             )
         )
@@ -206,7 +206,7 @@ def dev():
     reloader_thread.start()
     
     print(
-        f"\nOpening [violet]FastLLM[/violet] prompt engineering environment with the following configuration:\n"
+        f"\nOpening [violet]Client[/violet] prompt engineering environment with the following configuration:\n"
     )
     print(f"📌 Organization: [blue]{org['name']}[/blue]")
     print(f"📌 Project: [blue]{project['name']}[/blue]")
@@ -232,13 +232,13 @@ def dev():
 app = typer.Typer(invoke_without_command=True, callback=dev)
 
 def start_code_reloader(
-    fastllm_client_filename,
-    client_variable_name,
+    _client_filename,
+    client_instance_name,
     dev_websocket_client
 ):
     event_handler = CodeReloadHandler(
-    fastllm_client_filename,
-    client_variable_name,
+    _client_filename,
+    client_instance_name,
     dev_websocket_client
     )
     observer = Observer()

@@ -13,7 +13,7 @@ from ...utils.config_utils import read_config, upsert_config
 from ..utils import get_org
 from ...utils.crypto import generate_api_key, encrypt_message
 
-app = typer.Typer(no_args_is_help=True, short_help="Manage FastLLM projects.")
+app = typer.Typer(no_args_is_help=True, short_help="Manage Client projects.")
 
 
 @app.command()

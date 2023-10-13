@@ -6,6 +6,8 @@ venv
 
 .fastllm
 .fastllm/*
+.promptmodel
+.promptmodel/*
 
 */__pycache__
 __pycache__

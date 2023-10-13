@@ -11,12 +11,12 @@ from typing import Callable, Dict, Any, List, Optional
 from websockets.client import connect, WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
-import fastllm.utils.logger as logger
-from fastllm.llms.llm_proxy import LLMProxy
-from fastllm.utils.prompt_util import fetch_prompts, update_deployed_db
-from fastllm.utils.config_utils import read_config, upsert_config
-from fastllm.database.orm import initialize_db
-from fastllm.client import Client
+import promptmodel.utils.logger as logger
+from promptmodel.llms.llm_proxy import LLMProxy
+from promptmodel.utils.prompt_util import fetch_prompts, update_deployed_db
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.database.orm import initialize_db
+from promptmodel.client import Client
 
 @dataclass
 class LLMModule:
