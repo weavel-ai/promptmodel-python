@@ -5,5 +5,5 @@
 ## Installation
 
 ```bash
-pip install
+pip install promptmodel
 ```
