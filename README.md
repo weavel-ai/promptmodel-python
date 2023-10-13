@@ -1,6 +1,6 @@
 # PromptModel
 
-> Create LLM-powered services in a blink.
+> Prompt versioning on the cloud, built for developers.
 
 ## Installation
 
