@@ -17,7 +17,7 @@ from rich import print
 from InquirerPy import inquirer
 from watchdog.observers import Observer
 
-from promptmodel. import Client
+from promptmodel import Client
 from promptmodel.apis.base import APIClient
 from promptmodel.constants import ENDPOINT_URL, WEB_CLIENT_URL
 from promptmodel.cli.utils import get_org, get_project

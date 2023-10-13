@@ -16,7 +16,7 @@ from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.prompt_util import fetch_prompts, update_deployed_db
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.database.orm import initialize_db
-from promptmodel.client import Client
+from promptmodel import Client
 
 @dataclass
 class LLMModule:
