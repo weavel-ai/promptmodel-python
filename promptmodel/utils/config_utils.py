@@ -48,8 +48,8 @@ def upsert_config(new_config: Dict[str, Any], section: str = None):
         new_config = {section: merge_dict(config_section, new_config)}
     config = merge_dict(config, new_config)
     # If . directory does not exist, create it
-    if not os.path.exists("./."):
-        os.mkdir("./.")
+    if not os.path.exists("./.promptmodel"):
+        os.mkdir("./.promptmodel")
 
     with open(CONFIG_FILE, "w") as file:
         yaml.safe_dump(config, file, default_flow_style=False)
