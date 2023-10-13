@@ -1,6 +1,6 @@
 import signal
 import sys
-from fastllm.utils.config_utils import upsert_config, read_config
+from promptmodel.utils.config_utils import upsert_config, read_config
 
 def dev_terminate_signal_handler(sig, frame):
     config = read_config()

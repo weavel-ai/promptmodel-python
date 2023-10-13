@@ -1,6 +1,6 @@
 from typing import Optional
 from uuid import uuid4, UUID
-from fastllm.database.models import (
+from promptmodel.database.models import (
     LLMModule,
     LLMModuleVersion,
     Prompt,
@@ -11,9 +11,9 @@ from fastllm.database.models import (
     DeployedPrompt
 )
 from peewee import Model
-from fastllm.utils.enums import LLMModuleVersionStatus
-from fastllm.utils.random_utils import select_version
-from fastllm.database.config import db
+from promptmodel.utils.enums import LLMModuleVersionStatus
+from promptmodel.utils.random_utils import select_version
+from promptmodel.database.config import db
 
 # Insert
 def create_llm_module(name: str, project_uuid: str):

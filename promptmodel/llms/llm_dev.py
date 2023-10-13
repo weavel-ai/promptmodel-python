@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import completion
 
-import fastllm.utils.logger as logger
+from promptmodel.utils import logger
 
 load_dotenv()
 

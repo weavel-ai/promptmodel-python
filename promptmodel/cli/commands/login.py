@@ -11,7 +11,7 @@ from ...utils.crypto import generate_api_key, encrypt_message
 
 
 def login():
-    """Authenticate FastLLM CLI."""
+    """Authenticate Client CLI."""
     # TODO: Check if already logged in
     api_key = generate_api_key()
     encrypted_key = encrypt_message(api_key)
@@ -29,7 +29,7 @@ def login():
             res = APIClient.execute("/check_cli_access", ignore_auth_error=True)
             if res.json() == True:
                 print("[green]Access granted![/green] 🎉")
-                print("Run [violet][bold]fastllm dev[/bold][/violet] to start developing prompts.\n")
+                print("Run [violet][bold]promptmodel dev[/bold][/violet] to start developing prompts.\n")
                 return
         except Exception as err:
             print(f"[red]Error: {err}[/red]")

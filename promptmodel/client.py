@@ -8,17 +8,17 @@ from typing import Callable, Dict, Any, List, Optional
 from websockets.client import connect, WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
-import fastllm.utils.logger as logger
-from fastllm.llms.llm_proxy import LLMProxy
-from fastllm.utils.prompt_util import fetch_prompts
+import promptmodel.utils.logger as logger
+from promptmodel.llms.llm_proxy import LLMProxy
+from promptmodel.utils.prompt_util import fetch_prompts
 
 @dataclass
 class LLMModule:
     name: str
     default_model: str
 
-class FastLLM:
-    """FastLLM main class"""
+class Client:
+    """PromptModel Client Main class"""
 
     def __init__(
         self, default_model: Optional[str] = "gpt-3.5-turbo"
@@ -60,7 +60,7 @@ class FastLLM:
 
         return wrapper
 
-    def include(self, client: FastLLM):
+    def include(self, client: Client):
         self.llm_modules.extend(client.llm_modules)
     
     def get_prompts(self, name: str) -> List[Dict[str, str]]:
@@ -83,11 +83,11 @@ class FastLLM:
             }
         )
 
-class FastLLMDev(FastLLM):
+class DevApp(Client):
     def __init__(
         self, default_model: Optional[str] = "gpt-3.5-turbo"
     ):
         super().__init__(default_model)
     
-    def include(self, client: FastLLM):
+    def include(self, client: Client):
         self.llm_modules.extend(client.llm_modules)

@@ -11,7 +11,7 @@ def get_org(config: Dict[str, Any]) -> Dict[str, Any]:
     :return: A dictionary containing the current organization.
     """
     if "user" not in config:
-        print("User not logged in. Please run [violet]fastllm login[/violet] first.")
+        print("User not logged in. Please run [violet]promptmodel login[/violet] first.")
         exit()
     if "default_org" not in config["user"]:
         orgs = APIClient.execute(method="GET", path="/list_orgs").json()

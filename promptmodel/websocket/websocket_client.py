@@ -23,15 +23,15 @@ from websockets.client import connect, WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 from readerwriterlock import rwlock
 from watchdog.events import FileSystemEventHandler
-from fastllm.cli.utils import get_org, get_project
+from promptmodel.cli.utils import get_org, get_project
 
-from fastllm.apis.base import APIClient
-import fastllm.utils.logger as logger
-from fastllm.utils.config_utils import read_config, upsert_config
-from fastllm.fastllm import FastLLM
-from fastllm.utils.crypto import generate_api_key, encrypt_message
-from fastllm.llms.llm_dev import LLMDev
-from fastllm.database.crud import (
+from promptmodel.apis.base import APIClient
+import promptmodel.utils.logger as logger
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel import Client
+from promptmodel.utils.crypto import generate_api_key, encrypt_message
+from promptmodel.llms.llm_dev import LLMDev
+from promptmodel.database.crud import (
     create_llm_module_version,
     create_prompt,
     create_run_log,
@@ -48,14 +48,14 @@ from fastllm.database.crud import (
     create_run_logs,
     update_samples
 )
-from fastllm.database.models import (
+from promptmodel.database.models import (
     LLMModule,
     LLMModuleVersion,
     Prompt,
     RunLog,
     SampleInputs,
 )
-from fastllm.utils.enums import (
+from promptmodel.utils.enums import (
     ServerTask,
     LocalTask,
     LLMModuleVersionStatus,
@@ -77,8 +77,8 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 
 class DevWebsocketClient:
-    def __init__(self, fastllm_client: FastLLM):
-        self.fastllm_client: FastLLM = fastllm_client
+    def __init__(self, promptmodel_client: Client):
+        self.promptmodel_client: Client = promptmodel_client
         self.rwlock = rwlock.RWLockFair()
 
     async def _get_llm_modules(self, llm_module_name: str):
@@ -87,7 +87,7 @@ class DevWebsocketClient:
             llm_module = next(
                 (
                     llm_module
-                    for llm_module in self.fastllm_client.llm_modules
+                    for llm_module in self.promptmodel_client.llm_modules
                     if llm_module.name == llm_module_name
                 ),
                 None,
@@ -96,7 +96,7 @@ class DevWebsocketClient:
 
     def update_client_instance(self, new_client):
         with self.rwlock.gen_wlock():
-            self.fastllm_client = new_client
+            self.promptmodel_client = new_client
             if self.ws is not None:
                 asyncio.run(self.ws.send(json.dumps({"type" : ServerTask.LOCAL_UPDATE_ALERT.value})))
 
@@ -150,7 +150,7 @@ class DevWebsocketClient:
                 else:
                     sample_input = None
                 
-                llm_module_names = [llm_module.name for llm_module in self.fastllm_client.llm_modules]
+                llm_module_names = [llm_module.name for llm_module in self.promptmodel_client.llm_modules]
                 if llm_module_name not in llm_module_names:
                     logger.error(
                             f"There is no llm_module {llm_module_name}."
@@ -276,7 +276,7 @@ class DevWebsocketClient:
                     # timeout=3600 * 24,  # Timeout is set to 24 hours
                 ) as ws:
                     logger.success(
-                        "Connected to gateway. Your FastLLM Dev is now online! 🎉"
+                        "Connected to gateway. Your Client Dev is now online! 🎉"
                     )
                     self.ws = ws
                     while True:
@@ -298,12 +298,12 @@ class DevWebsocketClient:
 class CodeReloadHandler(FileSystemEventHandler):
     def __init__(
         self,
-        fastllm_client_filename: str,
-        fastllm_variable_name: str,
+        promptmodel_client_filename: str,
+        promptmodel_variable_name: str,
         dev_websocket_client: DevWebsocketClient,
     ):
-        self.fastllm_client_filename: str = fastllm_client_filename
-        self.client_variable_name: str = fastllm_variable_name
+        self.promptmodel_client_filename: str = promptmodel_client_filename
+        self.client_instance_name: str = promptmodel_variable_name
         self.dev_websocket_client: DevWebsocketClient = dev_websocket_client  # 저장
         self.timer = None
 
@@ -317,7 +317,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             self.timer.start()
 
     def reload_code(self, modified_file_path: str):
-        print(f"[violet]fastllm:dev:[/violet]  Reloading {self.fastllm_client_filename} module due to changes...")
+        print(f"[violet]promptmodel:dev:[/violet]  Reloading {self.promptmodel_client_filename} module due to changes...")
         # Reload the client module
         module_name = modified_file_path.replace("./", "").replace("/", ".")[
             :-3
@@ -327,11 +327,11 @@ class CodeReloadHandler(FileSystemEventHandler):
             module = sys.modules[module_name]
             importlib.reload(module)
 
-        reloaded_module = importlib.reload(sys.modules[self.fastllm_client_filename])
-        print(f"[violet]fastllm:dev:[/violet]  {self.fastllm_client_filename} module reloaded successfully.")
+        reloaded_module = importlib.reload(sys.modules[self.promptmodel_client_filename])
+        print(f"[violet]promptmodel:dev:[/violet]  {self.promptmodel_client_filename} module reloaded successfully.")
 
-        new_client_instance: FastLLM = getattr(
-            reloaded_module, self.client_variable_name
+        new_client_instance: Client = getattr(
+            reloaded_module, self.client_instance_name
         )
         # print(new_client_instance.llm_modules)
         new_llm_module_name_list = [
@@ -339,7 +339,7 @@ class CodeReloadHandler(FileSystemEventHandler):
         ]
         old_llm_module_name_list = [
             llm_module.name
-            for llm_module in self.dev_websocket_client.fastllm_client.llm_modules
+            for llm_module in self.dev_websocket_client.promptmodel_client.llm_modules
         ]
 
         # 사라진 llm_modules 에 대해 local db llm_module.local_usage False Update

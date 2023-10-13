@@ -14,8 +14,8 @@ from .config import db
 
 
 def initialize_db():
-    if not os.path.exists("./.fastllm"):
-        os.mkdir("./.fastllm")
+    if not os.path.exists("./.promptmodel"):
+        os.mkdir("./.promptmodel")
     db.connect()
     with db.atomic():
         if not LLMModule.table_exists():

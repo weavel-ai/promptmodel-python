@@ -1,6 +1,6 @@
 from peewee import SqliteDatabase, Model
 
-db = SqliteDatabase("./.fastllm/fastllm.db")
+db = SqliteDatabase("./.promptmodel/promptmodel.db")
 
 
 class BaseModel(Model):

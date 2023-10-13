@@ -16,8 +16,8 @@ from peewee import (
     Check,
 )
 
-from fastllm.database.config import BaseModel
-from fastllm.utils.enums import LLMModuleVersionStatus
+from promptmodel.database.config import BaseModel
+from promptmodel.utils.enums import LLMModuleVersionStatus
 
 class LLMModule(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)

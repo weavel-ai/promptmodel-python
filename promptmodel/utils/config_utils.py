@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict
 import yaml
 
-CONFIG_FILE = "./.fastllm/config.yaml"
+CONFIG_FILE = "./.promptmodel/config.yaml"
 
 
 def read_config():
@@ -47,9 +47,9 @@ def upsert_config(new_config: Dict[str, Any], section: str = None):
         config_section = config.get(section, {})
         new_config = {section: merge_dict(config_section, new_config)}
     config = merge_dict(config, new_config)
-    # If .fastllm directory does not exist, create it
-    if not os.path.exists("./.fastllm"):
-        os.mkdir("./.fastllm")
+    # If .promptmodel directory does not exist, create it
+    if not os.path.exists("./.promptmodel"):
+        os.mkdir("./.promptmodel")
 
     with open(CONFIG_FILE, "w") as file:
         yaml.safe_dump(config, file, default_flow_style=False)
