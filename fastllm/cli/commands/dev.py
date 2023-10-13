@@ -26,7 +26,7 @@ import fastllm.utils.logger as logger
 from fastllm.utils.config_utils import read_config, upsert_config
 from fastllm.utils.crypto import generate_api_key, encrypt_message
 from fastllm.utils.enums import LLMModuleVersionStatus, ChangeLogAction
-from fastllm.websocket.clients import DevWebsocketClient, CodeReloadHandler
+from fastllm.websocket import DevWebsocketClient, CodeReloadHandler
 from fastllm.database.orm import initialize_db
 from fastllm.database.crud import (
     create_llm_modules,
@@ -71,7 +71,7 @@ def dev():
     client_instance: FastLLM = getattr(client_module, client_variable_name)
 
     
-    if "name" in config["dev_branch"]:
+    if "name" not in config["dev_branch"]:
         org = get_org(config)
         project = get_project(config=config, org=org)
         validate_branch_name = lambda name: APIClient.execute(
@@ -188,7 +188,7 @@ def dev():
         only_in_local_llm_modules = [{"name" : x, "project_uuid" : project['uuid']} for x in only_in_local]
         create_llm_modules(only_in_local_llm_modules)
     
-    dev_url = f"{WEB_CLIENT_URL}/org/{org['slug']}/project/{project['uuid']}/dev/{branch_name}"
+    dev_url = f"{WEB_CLIENT_URL}/org/{org['slug']}/projects/{project['uuid']}/dev/{branch_name}"
     
     # Open websocket connection to backend server
     dev_websocket_client = DevWebsocketClient(fastllm_client=client_instance)

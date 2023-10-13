@@ -20,15 +20,20 @@ from fastllm.database.orm import initialize_db
 @dataclass
 class LLMModule:
     name: str
-    default_model: str
+    default_model: str = "gpt-3.5-turbo"
 
-class FastLLM:
-    """FastLLM main class"""
+class Client:
+    """PromptModel Client class (Singleton)"""
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(Client, cls).__new__(cls)
+        return cls._instance
 
-    def __init__(
-        self, default_model: Optional[str] = "gpt-3.5-turbo"
-    ):
-        self._default_model: str = default_model
+    def __init__(self):
         self.llm_modules: List[LLMModule] = []
         self.samples: List[Dict[str, Any]] = []
         config = read_config()
@@ -36,12 +41,8 @@ class FastLLM:
         if ("online" in dev_branch and dev_branch["online"] == True) or ("initializing" in dev_branch and dev_branch["initializing"] == True):
             self.cache_manager = None
         else:
-            self.cache_manager = CacheManager()
-        logger.debug("FastLLM initialized")
-
-
-    def fastmodel(self, name: str) -> LLMProxy:
-        return LLMProxy(name)
+            self.cache_manager = CacheManager() # only in deployment mode
+        # logger.debug("FastLLM initialized")
 
     def register(self, func):
         instructions = list(dis.get_instructions(func))
@@ -52,7 +53,7 @@ class FastLLM:
             # print(instruction)
             if (
                 instruction.opname in ["LOAD_ATTR", "LOAD_METHOD"]
-                and instruction.argval == "fastmodel"
+                and instruction.argval == "PromptModel"
             ):
                 next_instruction = instructions[idx + 1]
 
@@ -62,8 +63,7 @@ class FastLLM:
                 ):
                     self.llm_modules.append(
                         LLMModule(
-                            name=next_instruction.argval,
-                            default_model=self._default_model,
+                            name=next_instruction.argval
                         )
                     )
 
@@ -71,21 +71,6 @@ class FastLLM:
             return func(*args, **kwargs)
 
         return wrapper
-
-    def include(self, client: FastLLM):
-        self.llm_modules.extend(client.llm_modules)
-    
-    def get_prompts(self, name: str) -> List[Dict[str, str]]:
-        # add name to the list of llm_modules
-        self.llm_modules.append(
-            LLMModule(
-                name=name,
-                default_model=self._default_model,
-            )
-        )
-        
-        prompts, _ = asyncio.run(fetch_prompts(name))
-        return prompts
 
     def sample(self, name: str, content: Dict[str, Any]):
         self.samples.append(
@@ -95,26 +80,15 @@ class FastLLM:
             }
         )
 
-class FastLLMDev(FastLLM):
+class DevApp(Client):
     def __init__(
-        self, default_model: Optional[str] = "gpt-3.5-turbo"
+        self
     ):
-        super().__init__(default_model)
+        super().__init__()
     
-    def include(self, client: FastLLM):
-        self.llm_modules.extend(client.llm_modules)
-        
-
 
 class CacheManager:
-    _instance = None
-    _lock = threading.Lock()
-    
-    def __new__(cls):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super(CacheManager, cls).__new__(cls)
-        return cls._instance
+    """CacheManager class to manage the cache of the deployed PromptModels"""    
     
     def __init__(self):
         self.last_update_time = 0 # to manage update frequency
@@ -130,7 +104,7 @@ class CacheManager:
     async def _update_cache_periodically(self):
         while True:
             await self.update_cache()
-            logger.debug("Update cache")
+            # logger.debug("Update cache")
             await asyncio.sleep(self.update_interval)  # Non-blocking sleep
     
     async def update_cache(self):

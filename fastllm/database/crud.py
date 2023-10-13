@@ -50,14 +50,14 @@ def create_llm_module_versions(llm_module_version_list: list):
 
 def create_prompt(
     llm_module_version_uuid: str,
-    type: str,
+    role: str,
     step: int,
     content: str,
 ):
     """Create a new prompt with the given parameters."""
     return Prompt.create(
         version_uuid=llm_module_version_uuid,
-        type=type,
+        role=role,
         step=step,
         content=content,
     )
@@ -73,7 +73,7 @@ def create_run_log(
     inputs: str,
     raw_output: str,
     parsed_outputs: str,
-    is_deployment: bool,
+    is_deployment: bool = False,
 ):
     """Create a new run log with the given parameters."""
     return RunLog.create(
