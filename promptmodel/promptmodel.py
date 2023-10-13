@@ -39,7 +39,7 @@ class RegisteringMeta(type):
         # Find the global client instance in the current module
         client = cls.find_client_instance()
         if client is not None:
-            client.register_llm_module(instance)
+            client.register_llm_module(instance.name)
         return instance 
 
     @staticmethod
