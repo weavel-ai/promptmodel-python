@@ -8,12 +8,12 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name="",
+    name="promptmodel",
     version="0.0.1",
     packages=find_namespace_packages(),
         entry_points={
         "console_scripts": [
-            " = .cli.main:app",
+            "promptmodel = promptmodel.cli.main:app",
         ],
     },
     description=": Build LLM services in a blink",
@@ -24,5 +24,5 @@ setup(
         "pydantic", "peewee", "typer[all]", "cryptography", "pyyaml", "InquirerPy", "litellm", "python-dotenv", "websockets", "termcolor", "watchdog", "readerwriterlock" 
     ],
     python_requires=">=3.7.1",
-    keywords=["weavel", "agent", "llm", "tools", "", "llm agent", "prompt", "versioning"],
+    keywords=["weavel", "agent", "llm", "tools", "promptmodel", "llm agent", "prompt", "versioning"],
 )
