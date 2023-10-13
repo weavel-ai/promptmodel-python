@@ -10,10 +10,10 @@ from websockets.client import connect, WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 from readerwriterlock import rwlock
 
-import fastllm.utils.logger as logger
-from fastllm.fastllm import FastLLM
-from fastllm.llms.llm_dev import LLMDev
-from fastllm.database.crud import (
+import promptmodel.utils.logger as logger
+from promptmodel import Client
+from promptmodel.llms.llm_dev import LLMDev
+from promptmodel.database.crud import (
     create_llm_module_version,
     create_prompt,
     create_run_log,
@@ -24,15 +24,15 @@ from fastllm.database.crud import (
     get_sample_input,
     get_llm_module_uuid,
 )
-from fastllm.database.models import (
+from promptmodel.database.models import (
     LLMModuleVersion,
 )
-from fastllm.utils.enums import (
+from promptmodel.utils.enums import (
     ServerTask,
     LocalTask,
     LLMModuleVersionStatus,
 )
-from fastllm.constants import ENDPOINT_URL
+from promptmodel.constants import ENDPOINT_URL
 
 load_dotenv()
 GATEWAY_URL = f"wss://{ENDPOINT_URL.split('://')[1]}/open_websocket"
@@ -48,8 +48,8 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 
 class DevWebsocketClient:
-    def __init__(self, fastllm_client: FastLLM):
-        self.fastllm_client: FastLLM = fastllm_client
+    def __init__(self, _client: Client):
+        self._client: Client = _client
         self.rwlock = rwlock.RWLockFair()
 
     async def _get_llm_modules(self, llm_module_name: str):
@@ -58,7 +58,7 @@ class DevWebsocketClient:
             llm_module = next(
                 (
                     llm_module
-                    for llm_module in self.fastllm_client.llm_modules
+                    for llm_module in self._client.llm_modules
                     if llm_module.name == llm_module_name
                 ),
                 None,
@@ -67,7 +67,7 @@ class DevWebsocketClient:
 
     def update_client_instance(self, new_client):
         with self.rwlock.gen_wlock():
-            self.fastllm_client = new_client
+            self._client = new_client
             if self.ws:
                 asyncio.run(self.ws.send(json.dumps({"type" : ServerTask.LOCAL_UPDATE_ALERT.value})))
 
@@ -121,7 +121,7 @@ class DevWebsocketClient:
                 else:
                     sample_input = None
                 
-                llm_module_names = [llm_module.name for llm_module in self.fastllm_client.llm_modules]
+                llm_module_names = [llm_module.name for llm_module in self._client.llm_modules]
                 if llm_module_name not in llm_module_names:
                     logger.error(
                             f"There is no llm_module {llm_module_name}."
@@ -250,7 +250,7 @@ class DevWebsocketClient:
                     # timeout=3600 * 24,  # Timeout is set to 24 hours
                 ) as ws:
                     logger.success(
-                        "Connected to gateway. Your FastLLM Dev is now online! 🎉"
+                        "Connected to gateway. Your Client Dev is now online! 🎉"
                     )
                     self.ws = ws
                     while True:

@@ -1,10 +1,10 @@
 import os
 import sys
 import typer
-from fastllm.cli.commands.login import app as login
-from fastllm.cli.commands.dev import app as dev
-from fastllm.cli.commands.project import app as project
-from fastllm.cli.commands.configure import app as configure
+from promptmodel.cli.commands.login import app as login
+from promptmodel.cli.commands.dev import app as dev
+from promptmodel.cli.commands.project import app as project
+from promptmodel.cli.commands.configure import app as configure
 
 
 # 현재 작업 디렉토리를 sys.path에 추가

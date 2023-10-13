@@ -5,10 +5,10 @@ from threading import Timer
 from rich import print
 from watchdog.events import FileSystemEventHandler
 
-from fastllm.apis.base import APIClient
-from fastllm.utils.config_utils import read_config, upsert_config
-from fastllm.fastllm import FastLLM
-from fastllm.database.crud import (
+from promptmodel.apis.base import APIClient
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel import Client
+from promptmodel.database.crud import (
     list_llm_modules,
     update_local_usage_llm_module_by_name,
     create_llm_modules,
@@ -17,21 +17,21 @@ from fastllm.database.crud import (
     create_run_logs,
     update_samples
 )
-from fastllm.utils.enums import (
+from promptmodel.utils.enums import (
     LLMModuleVersionStatus,
     ChangeLogAction,
 )
-from fastllm.websocket.clients import DevWebsocketClient
+from promptmodel.websocket.websocket_client import DevWebsocketClient
 
 class CodeReloadHandler(FileSystemEventHandler):
     def __init__(
         self,
-        fastllm_client_filename: str,
-        fastllm_variable_name: str,
+        _client_filename: str,
+        _instance_name: str,
         dev_websocket_client: DevWebsocketClient,
     ):
-        self.fastllm_client_filename: str = fastllm_client_filename
-        self.client_variable_name: str = fastllm_variable_name
+        self._client_filename: str = _client_filename
+        self.client_instance_name: str = _instance_name
         self.dev_websocket_client: DevWebsocketClient = dev_websocket_client  # 저장
         self.timer = None
 
@@ -45,7 +45,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             self.timer.start()
 
     def reload_code(self, modified_file_path: str):
-        print(f"[violet]fastllm:dev:[/violet]  Reloading {self.fastllm_client_filename} module due to changes...")
+        print(f"[violet]:dev:[/violet]  Reloading {self._client_filename} module due to changes...")
         # Reload the client module
         module_name = modified_file_path.replace("./", "").replace("/", ".")[
             :-3
@@ -55,11 +55,11 @@ class CodeReloadHandler(FileSystemEventHandler):
             module = sys.modules[module_name]
             importlib.reload(module)
 
-        reloaded_module = importlib.reload(sys.modules[self.fastllm_client_filename])
-        print(f"[violet]fastllm:dev:[/violet]  {self.fastllm_client_filename} module reloaded successfully.")
+        reloaded_module = importlib.reload(sys.modules[self._client_filename])
+        print(f"[violet]:dev:[/violet]  {self._client_filename} module reloaded successfully.")
 
-        new_client_instance: FastLLM = getattr(
-            reloaded_module, self.client_variable_name
+        new_client_instance: Client = getattr(
+            reloaded_module, self.client_instance_name
         )
         # print(new_client_instance.llm_modules)
         new_llm_module_name_list = [
@@ -67,7 +67,7 @@ class CodeReloadHandler(FileSystemEventHandler):
         ]
         old_llm_module_name_list = [
             llm_module.name
-            for llm_module in self.dev_websocket_client.fastllm_client.llm_modules
+            for llm_module in self.dev_websocket_client._client.llm_modules
         ]
 
         # 사라진 llm_modules 에 대해 local db llm_module.local_usage False Update

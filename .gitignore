@@ -6,6 +6,8 @@ venv
 
 .fastllm
 .fastllm/*
+.promptmodel
+.promptmodel/*
 
 */__pycache__
 __pycache__
@@ -22,5 +24,3 @@ build
 build/*
 dist
 dist/*
-promptmodel
-promptmodel/*

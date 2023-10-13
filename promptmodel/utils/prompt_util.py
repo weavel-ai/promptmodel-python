@@ -3,14 +3,14 @@ import yaml
 import asyncio
 from typing import Any, Dict, Tuple, List
 
-from fastllm.database.crud import (
+from promptmodel.database.crud import (
     get_latest_version_prompts,
     get_deployed_prompts,
     update_deployed_cache
 )
-from fastllm.utils.config_utils import read_config, upsert_config
-from fastllm.utils import logger
-from fastllm.apis.base import APIClient
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.utils import logger
+from promptmodel.apis.base import APIClient
 
 async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
     # Check dev_branch activate
