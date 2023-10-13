@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict
 import yaml
 
-CONFIG_FILE = "././config.yaml"
+CONFIG_FILE = "./.promptmodel/config.yaml"
 
 
 def read_config():
