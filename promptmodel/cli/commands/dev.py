@@ -173,6 +173,7 @@ def dev():
             },
         ).json()
         local_code_llm_module_name_list = [x.name for x in client_instance.llm_modules]
+        print(local_code_llm_module_name_list)
         res = update_by_changelog(changelogs, project_status, local_code_llm_module_name_list)
         if res is False:
             print("Update Dev Stopped.")

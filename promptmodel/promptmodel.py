@@ -39,14 +39,14 @@ class RegisteringMeta(type):
         # Find the global client instance in the current module
         client = cls.find_client_instance()
         if client is not None:
-            client.register_instance(instance)
+            client.register_llm_module(instance)
         return instance 
 
     @staticmethod
     def find_client_instance():
         import sys
         # Get the current frame
-        frame = sys._getframe(1)
+        frame = sys._getframe(2)
         # Get global variables in the current frame
         global_vars = frame.f_globals
         # Find an instance of Client among global variables
@@ -60,10 +60,10 @@ class PromptModel(metaclass=RegisteringMeta):
         self.name = name
         self.llm_proxy = LLMProxy(name)
         
-    def prompts(self, name: str) -> List[Dict[str, str]]:
+    def prompts(self) -> List[Dict[str, str]]:
         # add name to the list of llm_modules
         
-        prompts, _ = asyncio.run(fetch_prompts(name))
+        prompts, _ = asyncio.run(fetch_prompts(self.name))
         return prompts
     
     def generate(self, inputs: Dict[str, Any] = {}) -> str:

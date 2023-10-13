@@ -20,7 +20,7 @@ from promptmodel.database.orm import initialize_db
 @dataclass
 class LLMModule:
     name: str
-    default_model: str
+    default_model: str = "gpt-3.5-turbo"
 
 class Client:
     """Client main class"""
@@ -51,8 +51,8 @@ class Client:
             instruction = instructions[idx]
             # print(instruction)
             if (
-                instruction.opname in ["LOAD_ATTR", "LOAD_METHOD"]
-                and instruction.argval == "fastmodel"
+                instruction.opname in ["LOAD_ATTR", "LOAD_METHOD", "LOAD_GLOBAL"]
+                and instruction.argval == "PromptModel"
             ):
                 next_instruction = instructions[idx + 1]
 
@@ -71,6 +71,18 @@ class Client:
             return func(*args, **kwargs)
 
         return wrapper
+    
+    def register_llm_module(self, name):
+        for llm_module in self.llm_modules:
+            if llm_module.name == name:
+                return
+            
+        self.llm_modules.append(
+            LLMModule(
+                name=name,
+                default_model=self._default_model,
+            )
+        )
 
     def include(self, client: Client):
         self.llm_modules.extend(client.llm_modules)
