@@ -43,7 +43,7 @@ from promptmodel.database.crud import (
     update_samples
 )
 
-PROMPTMODEL_DEV_FILENAME = os.path.join(os.getcwd(), "_dev.py")
+PROMPTMODEL_DEV_FILENAME = os.path.join(os.getcwd(), "promptmodel_dev.py")
 PROMPTMODEL_DEV_STARTER_FILENAME = "STARTER.py"
 
 def dev():
@@ -54,13 +54,13 @@ def dev():
 
     if not os.path.exists(PROMPTMODEL_DEV_FILENAME):
         # Read the content from the source file
-        content = resources.read_text("", "STARTER.py")
+        content = resources.read_text("promptmodel", "STARTER.py")
 
         # Write the content to the target file
         with open(PROMPTMODEL_DEV_FILENAME, "w") as target_file:
             target_file.write(content)
 
-    _client_filename, client_instance_name = "_dev:app".split(":")
+    _client_filename, client_instance_name = "promptmodel_dev:app".split(":")
     
     # Init local database & open
     initialize_db()
