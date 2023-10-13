@@ -13,7 +13,7 @@ setup(
     packages=find_namespace_packages(),
         entry_points={
         "console_scripts": [
-            "promptmodel = promptmodel.cli.main:app",
+            "pmd = promptmodel.cli.main:app",
         ],
     },
     description=": Build LLM services in a blink",
@@ -27,3 +27,4 @@ setup(
     python_requires=">=3.7.1",
     keywords=["weavel", "agent", "llm", "tools", "promptmodel", "llm agent", "prompt", "versioning"],
 )
+

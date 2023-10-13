@@ -74,18 +74,6 @@ class Client:
 
     def include(self, client: Client):
         self.llm_modules.extend(client.llm_modules)
-    
-    def get_prompts(self, name: str) -> List[Dict[str, str]]:
-        # add name to the list of llm_modules
-        self.llm_modules.append(
-            LLMModule(
-                name=name,
-                default_model=self._default_model,
-            )
-        )
-        
-        prompts, _ = asyncio.run(fetch_prompts(name))
-        return prompts
 
     def sample(self, name: str, content: Dict[str, Any]):
         self.samples.append(
