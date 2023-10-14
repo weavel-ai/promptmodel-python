@@ -166,7 +166,7 @@ class DevWebsocketClient:
                             "inputs" : sample_input if sample_input else {}
                         }
                         data.update(response)
-                        await ws.send(json.dumps(data))
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                     
                     model = message['model']
                     prompts = message['prompts']
@@ -200,7 +200,7 @@ class DevWebsocketClient:
                             }
                         data.update(response)
                         logger.debug(f"Sent response: {data}")
-                        await ws.send(json.dumps(data))
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
