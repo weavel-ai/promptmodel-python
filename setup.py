@@ -11,9 +11,9 @@ setup(
     name="promptmodel",
     version="0.0.5",
     packages=find_namespace_packages(),
-        entry_points={
+    entry_points={
         "console_scripts": [
-            "pmd = promptmodel.cli.main:app",
+            "prompt = promptmodel.cli.main:app",
         ],
     },
     description="Prompt versioning on the cloud, built for developers.",
@@ -22,9 +22,28 @@ setup(
     author="weavel",
     url="https://github.com/weavel-ai/promptmodel",
     install_requires=[
-        "pydantic", "peewee", "typer[all]", "cryptography", "pyyaml", "InquirerPy", "litellm", "python-dotenv", "websockets", "termcolor", "watchdog", "readerwriterlock" 
+        "pydantic",
+        "peewee",
+        "typer[all]",
+        "cryptography",
+        "pyyaml",
+        "InquirerPy",
+        "litellm",
+        "python-dotenv",
+        "websockets",
+        "termcolor",
+        "watchdog",
+        "readerwriterlock",
     ],
     python_requires=">=3.7.1",
-    keywords=["weavel", "agent", "llm", "tools", "promptmodel", "llm agent", "prompt", "versioning"],
+    keywords=[
+        "weavel",
+        "agent",
+        "llm",
+        "tools",
+        "promptmodel",
+        "llm agent",
+        "prompt",
+        "versioning",
+    ],
 )
-

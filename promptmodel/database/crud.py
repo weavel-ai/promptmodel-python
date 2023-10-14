@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 from uuid import uuid4, UUID
 from promptmodel.database.models import (
     LLMModule,
@@ -11,6 +11,7 @@ from promptmodel.database.models import (
     DeployedPrompt,
 )
 from peewee import Model
+from playhouse.shortcuts import model_to_dict
 from promptmodel.utils.enums import LLMModuleVersionStatus
 from promptmodel.utils.random_utils import select_version
 from promptmodel.database.config import db
@@ -106,60 +107,60 @@ def update_llm_module_version(llm_module_version_uuid: str, status: str):
 
 
 # Select all
-def list_llm_modules():
+def list_llm_modules() -> List[Dict]:
     """List all LLM modules."""
-    response = list(LLMModule.select())
-    return [x.__data__ for x in response]
+    response: List[LLMModule] = list(LLMModule.select())
+    return [model_to_dict(x) for x in response]
 
 
-def list_llm_module_versions(llm_module_uuid: str):
+def list_llm_module_versions(llm_module_uuid: str) -> List[Dict]:
     """List all LLM module versions for the given LLM module."""
-    response = list(
+    response: List[LLMModuleVersion] = list(
         LLMModuleVersion.select().where(
             LLMModuleVersion.llm_module_uuid == llm_module_uuid
         )
     )
-    return [x.__data__ for x in response]
+    return [model_to_dict(x) for x in response]
 
 
-def list_prompts(llm_module_version_uuid: str):
+def list_prompts(llm_module_version_uuid: str) -> List[Dict]:
     """List all prompts for the given LLM module version."""
-    response = list(
+    response: List[Prompt] = list(
         Prompt.select()
         .where(Prompt.version_uuid == llm_module_version_uuid)
         .order_by(Prompt.step)
     )
-    return [x.__data__ for x in response]
+    return [model_to_dict(x) for x in response]
 
 
-def list_run_logs(llm_module_version_uuid: str):
+def list_run_logs(llm_module_version_uuid: str) -> List[RunLog]:
     """List all run logs for the given LLM module version."""
-    response = list(
+    response: List[RunLog] = list(
         RunLog.select().where(RunLog.version_uuid == llm_module_version_uuid)
     )
-    return [x.__data__ for x in response]
+    return [model_to_dict(x) for x in response]
 
 
 # Select one
-def get_llm_module_uuid(llm_module_name: str):
+def get_llm_module_uuid(llm_module_name: str) -> Dict:
     """Get uuid of llm module by name"""
     try:
         response = LLMModule.get(LLMModule.name == llm_module_name)
-        return response.__data__
+        return model_to_dict(response)
     except:
         return None
 
 
-def get_sample_input(sample_name: str):
+def get_sample_input(sample_name: str) -> Dict:
     """Get sample input from local DB"""
     try:
         response = SampleInputs.get(SampleInputs.name == sample_name)
-        return response.__data__
+        return model_to_dict(response)
     except:
         return None
 
 
-def get_latest_version_prompts(llm_module_name: str):
+def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]:
     try:
         with db.atomic():
             latest_run_log: RunLog = (
@@ -173,7 +174,7 @@ def get_latest_version_prompts(llm_module_name: str):
                 .get()
             )
 
-            prompts = (
+            prompts: List[Prompt] = (
                 Prompt.select()
                 .where(Prompt.version_uuid == latest_run_log.version_uuid)
                 .order_by(Prompt.step.asc())
@@ -185,16 +186,16 @@ def get_latest_version_prompts(llm_module_name: str):
                 .get()
             )
 
-            return [prompt for prompt in prompts], version.model
+            return prompts, version.model
 
     except Exception as e:
         return None, None
 
 
-def get_deployed_prompts(llm_module_name: str):
+def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], str]:
     try:
         with db.atomic():
-            versions: list[DeployedLLMModuleVersion] = (
+            versions: List[DeployedLLMModuleVersion] = (
                 DeployedLLMModuleVersion.select()
                 .join(DeployedLLMModule)
                 .where(
@@ -205,7 +206,7 @@ def get_deployed_prompts(llm_module_name: str):
                 )
                 .get()
             )
-            prompts: list[DeployedPrompt] = (
+            prompts: List[DeployedPrompt] = (
                 DeployedPrompt.select()
                 .where(
                     DeployedPrompt.version_uuid.in_(
@@ -216,11 +217,11 @@ def get_deployed_prompts(llm_module_name: str):
             )
         # select version by ratio
         selected_version = select_version([version.__data__ for version in versions])
-        selected_prompts = [
-            prompt
-            for prompt in prompts
-            if prompt.version_uuid == selected_version["uuid"]
-        ]
+        selected_prompts = list(
+            filter(
+                lambda prompt: prompt.version_uuid == selected_version["uuid"], prompts
+            )
+        )
 
         return selected_prompts, selected_version["model"]
     except Exception:
