@@ -29,7 +29,9 @@ def login():
             res = APIClient.execute("/check_cli_access", ignore_auth_error=True)
             if res.json() == True:
                 print("[green]Access granted![/green] 🎉")
-                print("Run [violet][bold]pmd dev[/bold][/violet] to start developing prompts.\n")
+                print(
+                    "Run [violet][bold]prompt dev[/bold][/violet] to start developing prompts.\n"
+                )
                 return
         except Exception as err:
             print(f"[red]Error: {err}[/red]")
