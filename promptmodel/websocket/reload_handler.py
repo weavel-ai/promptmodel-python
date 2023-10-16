@@ -7,6 +7,7 @@ from watchdog.events import FileSystemEventHandler
 
 from promptmodel.apis.base import APIClient
 from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.utils import logger
 from promptmodel import Client
 from promptmodel.database.crud import (
     list_llm_modules,
@@ -107,6 +108,13 @@ class CodeReloadHandler(FileSystemEventHandler):
         for llm_module in new_client_instance.llm_modules:
             if llm_module.name not in old_llm_module_name_list:
                 update_local_usage_llm_module_by_name(llm_module.name, True)
+                
+        # create llm_modules in local DB
+        db_llm_module_list = list_llm_modules()
+        db_llm_module_name_list = [x['name'] for x in db_llm_module_list]
+        only_in_local_names = list(set(new_llm_module_name_list) - set(db_llm_module_name_list))
+        only_in_local_llm_modules = [{"name" : x, "project_uuid" : project['uuid']} for x in only_in_local_names]
+        create_llm_modules(only_in_local_llm_modules)
                 
         # update samples in local DB
         update_samples(new_client_instance.samples)
