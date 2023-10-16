@@ -126,6 +126,10 @@ def list_prompts(llm_module_version_uuid: str):
     )
     return [x.__data__ for x in response]
 
+def list_samples():
+    """List all samples"""
+    response = list(SampleInputs.select())
+    return [x.__data__ for x in response]
 
 def list_run_logs(llm_module_version_uuid: str):
     """List all run logs for the given LLM module version."""
