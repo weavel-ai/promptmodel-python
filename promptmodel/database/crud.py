@@ -253,22 +253,25 @@ def update_local_usage_llm_module(llm_module_uuid: str, local_usage: bool):
 
 def update_local_usage_llm_module_by_name(llm_module_name: str, local_usage: bool):
     """Update the name of the given LLM module."""
-    return (
-        LLMModule.update(local_usage=local_usage)
-        .where(LLMModule.name == llm_module_name)
-        .execute()
-    )
+    return LLMModule.update(
+        local_usage=local_usage
+    ).where(
+        LLMModule.name == llm_module_name
+    ).execute()
 
-
-def hide_llm_module_not_in_code(local_llm_module_list: list):
-    return (
-        LLMModule.update(local_usage=False)
-        .where(LLMModule.name.not_in(local_llm_module_list))
-        .execute()
-    )
-
-
-async def update_deployed_cache(project_status: dict):
+    
+def hide_llm_module_not_in_code(
+    local_llm_module_list: list
+):
+    return LLMModule.update(
+        local_usage=False
+    ).where(
+        LLMModule.name.not_in(local_llm_module_list)
+    ).execute()
+    
+async def update_deployed_cache(
+    project_status: dict
+):
     """Update Deployed Prompts Cache"""
     # TODO: 효율적으로 수정
     # 현재는 delete all & insert all
@@ -293,3 +296,51 @@ def update_samples(samples: list[dict]):
         SampleInputs.delete().execute()
         SampleInputs.insert_many(samples).execute()
     return
+  
+def find_ancestor_version(
+    llm_module_version_uuid: str
+):
+    """Find ancestor version"""
+    
+    # get all versions
+    response = list(LLMModuleVersion.select())
+    versions = [x.__data__ for x in response]
+    
+    # find ancestor version
+    
+    # find target version
+    target = [version for version in versions if version['uuid'] == llm_module_version_uuid][0]
+    return _find_ancestor(target, versions)
+
+def find_ancestor_versions(
+):
+    """find ancestor versions for each versions in input"""
+    # get all versions
+    response = list(LLMModuleVersion.select())
+    versions = [x.__data__ for x in response]
+    
+    targets = [version for version in versions if version['status'] == LLMModuleVersionStatus.CANDIDATE.value and version['is_published'] is False]
+    
+    targets_with_real_ancestor = [find_ancestor_version(target, versions) for target in targets]
+    return targets_with_real_ancestor
+    
+def _find_ancestor(
+        target: dict,
+        versions: list[dict]
+    ):
+        ancestor = None
+        temp = target
+        if target['from_uuid'] is None:
+            ancestor = None
+        else:
+            while temp['from_uuid'] is not None:
+                new_temp = [version for version in versions if version['uuid'] == temp['from_uuid']][0]
+                if new_temp['is_published']:
+                    ancestor = new_temp
+                    break
+                else:
+                    temp = new_temp
+        
+        target['from_uuid'] = ancestor['uuid'] if ancestor is not None else None
+        return target
+
