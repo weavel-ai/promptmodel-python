@@ -213,7 +213,8 @@ class DevWebsocketClient:
                         llm_module_version: LLMModuleVersion = create_llm_module_version(
                             llm_module_uuid=llm_module_uuid,
                             status=LLMModuleVersionStatus.BROKEN.value,
-                            from_uuid=message['from_uuid']
+                            from_uuid=message['from_uuid'],
+                            model=message['model'],
                         )
                         llm_module_version_uuid = llm_module_version.uuid
 
@@ -233,7 +234,7 @@ class DevWebsocketClient:
                             "inputs" : sample_input if sample_input else {}
                         }
                         data.update(response)
-                        await ws.send(json.dumps(data))
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                     
                     model = message['model']
                     prompts = message['prompts']
@@ -267,7 +268,7 @@ class DevWebsocketClient:
                             }
                         data.update(response)
                         logger.debug(f"Sent response: {data}")
-                        await ws.send(json.dumps(data))
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,

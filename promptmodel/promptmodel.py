@@ -28,10 +28,12 @@ from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.database.orm import initialize_db
 from promptmodel import Client
 
+
 @dataclass
 class LLMModule:
     name: str
     default_model: str
+
 
 class RegisteringMeta(type):
     def __call__(cls, *args, **kwargs):
@@ -40,11 +42,12 @@ class RegisteringMeta(type):
         client = cls.find_client_instance()
         if client is not None:
             client.register_llm_module(instance.name)
-        return instance 
+        return instance
 
     @staticmethod
     def find_client_instance():
         import sys
+
         # Get the current frame
         frame = sys._getframe(2)
         # Get global variables in the current frame
@@ -55,17 +58,18 @@ class RegisteringMeta(type):
                 return var_val
         return None
 
+
 class PromptModel(metaclass=RegisteringMeta):
     def __init__(self, name):
         self.name = name
         self.llm_proxy = LLMProxy(name)
-        
-    def prompts(self) -> List[Dict[str, str]]:
+
+    def get_prompts(self) -> List[Dict[str, str]]:
         # add name to the list of llm_modules
-        
+
         prompts, _ = asyncio.run(fetch_prompts(self.name))
         return prompts
-    
+
     def generate(self, inputs: Dict[str, Any] = {}) -> str:
         return self.llm_proxy.generate(inputs)
 
@@ -79,7 +83,7 @@ class PromptModel(metaclass=RegisteringMeta):
     async def astream(
         self, inputs: Optional[Dict[str, Any]] = {}
     ) -> AsyncGenerator[str, None]:
-        async for item in  self.llm_proxy.astream(inputs):
+        async for item in self.llm_proxy.astream(inputs):
             yield item
 
     def generate_and_parse(
@@ -117,9 +121,7 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         function_list: List[Callable[..., Any]] = [],
     ) -> Generator[str, None, None]:
-        return self.llm_proxy.generate_and_parse_function_call(
-            inputs, function_list
-        )
+        return self.llm_proxy.generate_and_parse_function_call(inputs, function_list)
 
     async def agenerate_and_parse_function_call(
         self,
