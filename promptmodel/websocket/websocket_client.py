@@ -24,9 +24,13 @@ from promptmodel.database.crud import (
     list_samples,
     get_sample_input,
     get_llm_module_uuid,
+    update_llm_module_version,
+    find_ancestor_version,
+    find_ancestor_versions
 )
 from promptmodel.database.models import (
     LLMModuleVersion,
+    LLMModule
 )
 from promptmodel.utils.enums import (
     ServerTask,
@@ -110,6 +114,65 @@ class DevWebsocketClient:
                 llm_module_version_uuid = message["llm_module_version_uuid"]
                 res_from_local_db = list_run_logs(llm_module_version_uuid)
                 data = {"run_logs": res_from_local_db}
+                
+            elif message["type"] == LocalTask.CHANGE_VERSION_STATUS:
+                llm_module_version_uuid = message["llm_module_version_uuid"]
+                new_status = message["status"]
+                res_from_local_db = update_llm_module_version(
+                    llm_module_version_uuid=llm_module_version_uuid,
+                    status=new_status
+                )
+                data = {"llm_module_version_uuid": llm_module_version_uuid, "status": new_status}
+            
+            elif message["type"] == LocalTask.GET_VERSION_TO_SAVE:
+                llm_module_version_uuid = message["llm_module_version_uuid"]
+                # change from_uuid to candidate ancestor
+                llm_module_version : dict = find_ancestor_version(llm_module_version_uuid)
+                # delete status, candidate_version, is_published
+                del llm_module_version['status']
+                del llm_module_version['candidate_version']
+                del llm_module_version['is_published']
+                
+                llm_module = LLMModule.get(LLMModule.uuid == llm_module_version.llm_module_uuid).__data__
+                is_deployed = llm_module['is_deployment']
+                if is_deployed:
+                    data = {
+                        "llm_module" : {
+                            "uuid" : llm_module['uuid'],
+                            "name" : llm_module['name'],
+                            "project_uuid" : llm_module['project_uuid'],
+                        },
+                        "version" : llm_module_version
+                    }
+                else:
+                    data = {
+                        "llm_module" : None,
+                        "version" : llm_module_version
+                    }       
+            
+            elif message["type"] == LocalTask.GET_VERSIONS_TO_SAVE:
+                
+                llm_module_versions :list[dict] = find_ancestor_versions()
+                for llm_module_version in llm_module_versions:
+                    del llm_module_version['status']
+                    del llm_module_version['candidate_version']
+                    del llm_module_version['is_published']
+                    
+                llm_module_uuids = [version['llm_module_uuid'] for version in llm_module_versions]
+                llm_modules = list(LLMModule.select().where(LLMModule.uuid.in_(llm_module_uuids)))
+                llm_modules = [llm_module.__data__ for llm_module in llm_modules]
+                # find llm_module which is not deployed
+                llm_modules_only_in_local = []
+                for llm_module in llm_modules:
+                    if llm_module['is_deployment'] is False:
+                        del llm_module['is_deployment']
+                        del llm_module['local_usage']
+                        llm_modules_only_in_local.append(llm_module)
+                        
+                data = {
+                    "llm_modules" : llm_modules,
+                    "versions" : llm_module_versions
+                }
 
             elif message["type"] == LocalTask.RUN_LLM_MODULE:
                 llm_module_name = message["llm_module_name"]
