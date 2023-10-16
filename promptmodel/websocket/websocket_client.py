@@ -21,6 +21,7 @@ from promptmodel.database.crud import (
     list_llm_module_versions,
     list_prompts,
     list_run_logs,
+    list_samples,
     get_sample_input,
     get_llm_module_uuid,
 )
@@ -96,6 +97,10 @@ class DevWebsocketClient:
                 res_from_local_db = list_llm_module_versions(llm_module_uuid)
                 data = {"llm_module_versions": res_from_local_db}
 
+            elif message["type"] == LocalTask.LIST_SAMPLES:
+                res_from_local_db = list_samples()
+                data = {"samples": res_from_local_db}
+            
             elif message["type"] == LocalTask.GET_PROMPTS:
                 llm_module_version_uuid = message["llm_module_version_uuid"]
                 res_from_local_db = list_prompts(llm_module_version_uuid)
