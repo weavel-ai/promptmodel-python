@@ -203,6 +203,36 @@ class DevWebsocketClient:
                 if llm_module_name not in llm_module_names:
                     logger.error(f"There is no llm_module {llm_module_name}.")
                     return
+                
+                # check variable matching
+                prompt_variables = []
+                for prompt in message["prompts"]:
+                    fstring_input_pattern = r'(?<!\\)(?<!{{)\{([^}]+)\}(?!\\)(?!}})'
+                    prompt_variables += re.findall(fstring_input_pattern, prompt['content'])
+                prompt_variables = list(set(prompt_variables))
+                if len(prompt_variables) != 0:
+                    if sample_input is None:
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_RUN.value,
+                            "status": "failed",
+                            "log": f"Prompts have variables {prompt_variables}. You should select sample input.",
+                        }
+                        data.update(response)
+                        logger.debug(f"Sent response: {data}")
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                        return
+                        
+                    if not all(variable in sample_input.keys() for variable in prompt_variables):
+                        missing_variables = [variable for variable in prompt_variables if variable not in sample_input.keys()]
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_RUN.value,
+                            "status": "failed",
+                            "log": f"Sample input does not have variables {missing_variables} in prompts.",
+                        }
+                        data.update(response)
+                        logger.debug(f"Sent response: {data}")
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                        return
 
                 output = {"raw_output": "", "parsed_outputs": {}}
                 try:
@@ -255,36 +285,6 @@ class DevWebsocketClient:
                     model = message['model']
                     prompts = message['prompts']
                     parsing_type = message['parsing_type']
-                    
-                    # check variable matching
-                    prompt_variables = []
-                    for prompt in prompts:
-                        fstring_input_pattern = r'(?<!\\)(?<!{{)\{([^}]+)\}(?!\\)(?!}})'
-                        prompt_variables += re.findall(fstring_input_pattern, prompt['content'])
-                    prompt_variables = list(set(prompt_variables))
-                    if len(prompt_variables) != 0:
-                        if sample_input is None:
-                            data = {
-                                "type": ServerTask.UPDATE_RESULT_RUN.value,
-                                "status": "failed",
-                                "log": f"Prompts have variables {prompt_variables}. You should select sample input.",
-                            }
-                            data.update(response)
-                            logger.debug(f"Sent response: {data}")
-                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-                            return
-                            
-                        if not all(variable in sample_input.keys() for variable in prompt_variables):
-                            missing_variables = [variable for variable in prompt_variables if variable not in sample_input.keys()]
-                            data = {
-                                "type": ServerTask.UPDATE_RESULT_RUN.value,
-                                "status": "failed",
-                                "log": f"Sample input does not have variables {missing_variables} in prompts.",
-                            }
-                            data.update(response)
-                            logger.debug(f"Sent response: {data}")
-                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-                            return
                     
                     if sample_input:
                         messages_for_run = [
