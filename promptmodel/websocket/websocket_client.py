@@ -26,12 +26,9 @@ from promptmodel.database.crud import (
     get_llm_module_uuid,
     update_llm_module_version,
     find_ancestor_version,
-    find_ancestor_versions
+    find_ancestor_versions,
 )
-from promptmodel.database.models import (
-    LLMModuleVersion,
-    LLMModule
-)
+from promptmodel.database.models import LLMModuleVersion, LLMModule
 from promptmodel.utils.enums import (
     ServerTask,
     LocalTask,
@@ -41,6 +38,7 @@ from promptmodel.constants import ENDPOINT_URL
 
 load_dotenv()
 GATEWAY_URL = f"wss://{ENDPOINT_URL.split('://')[1]}/open_websocket"
+
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -74,7 +72,11 @@ class DevWebsocketClient:
         with self.rwlock.gen_wlock():
             self._client = new_client
             if self.ws:
-                asyncio.run(self.ws.send(json.dumps({"type" : ServerTask.LOCAL_UPDATE_ALERT.value})))
+                asyncio.run(
+                    self.ws.send(
+                        json.dumps({"type": ServerTask.LOCAL_UPDATE_ALERT.value})
+                    )
+                )
 
     async def __handle_message(
         self, message: Dict[str, Any], ws: WebSocketClientProtocol
@@ -93,7 +95,11 @@ class DevWebsocketClient:
         try:
             if message["type"] == LocalTask.LIST_MODULES:
                 res_from_local_db = list_llm_modules()
-                modules_with_local_usage = [module for module in res_from_local_db if module['local_usage'] == True]
+                modules_with_local_usage = [
+                    module
+                    for module in res_from_local_db
+                    if module["local_usage"] == True
+                ]
                 data = {"llm_modules": modules_with_local_usage}
 
             elif message["type"] == LocalTask.LIST_VERSIONS:
@@ -104,7 +110,7 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.LIST_SAMPLES:
                 res_from_local_db = list_samples()
                 data = {"samples": res_from_local_db}
-            
+
             elif message["type"] == LocalTask.GET_PROMPTS:
                 llm_module_version_uuid = message["llm_module_version_uuid"]
                 res_from_local_db = list_prompts(llm_module_version_uuid)
@@ -114,65 +120,68 @@ class DevWebsocketClient:
                 llm_module_version_uuid = message["llm_module_version_uuid"]
                 res_from_local_db = list_run_logs(llm_module_version_uuid)
                 data = {"run_logs": res_from_local_db}
-                
+
             elif message["type"] == LocalTask.CHANGE_VERSION_STATUS:
                 llm_module_version_uuid = message["llm_module_version_uuid"]
                 new_status = message["status"]
                 res_from_local_db = update_llm_module_version(
-                    llm_module_version_uuid=llm_module_version_uuid,
-                    status=new_status
+                    llm_module_version_uuid=llm_module_version_uuid, status=new_status
                 )
-                data = {"llm_module_version_uuid": llm_module_version_uuid, "status": new_status}
-            
+                data = {
+                    "llm_module_version_uuid": llm_module_version_uuid,
+                    "status": new_status,
+                }
+
             elif message["type"] == LocalTask.GET_VERSION_TO_SAVE:
                 llm_module_version_uuid = message["llm_module_version_uuid"]
                 # change from_uuid to candidate ancestor
-                llm_module_version : dict = find_ancestor_version(llm_module_version_uuid)
+                llm_module_version: dict = find_ancestor_version(
+                    llm_module_version_uuid
+                )
                 # delete status, candidate_version, is_published
-                del llm_module_version['status']
-                del llm_module_version['candidate_version']
-                del llm_module_version['is_published']
-                
-                llm_module = LLMModule.get(LLMModule.uuid == llm_module_version.llm_module_uuid).__data__
-                is_deployed = llm_module['is_deployment']
+                del llm_module_version["status"]
+                del llm_module_version["candidate_version"]
+                del llm_module_version["is_published"]
+
+                llm_module = LLMModule.get(
+                    LLMModule.uuid == llm_module_version.llm_module_uuid
+                ).__data__
+                is_deployed = llm_module["is_deployment"]
                 if is_deployed:
                     data = {
-                        "llm_module" : {
-                            "uuid" : llm_module['uuid'],
-                            "name" : llm_module['name'],
-                            "project_uuid" : llm_module['project_uuid'],
+                        "llm_module": {
+                            "uuid": llm_module["uuid"],
+                            "name": llm_module["name"],
+                            "project_uuid": llm_module["project_uuid"],
                         },
-                        "version" : llm_module_version
+                        "version": llm_module_version,
                     }
                 else:
-                    data = {
-                        "llm_module" : None,
-                        "version" : llm_module_version
-                    }       
-            
+                    data = {"llm_module": None, "version": llm_module_version}
+
             elif message["type"] == LocalTask.GET_VERSIONS_TO_SAVE:
-                
-                llm_module_versions :list[dict] = find_ancestor_versions()
+                llm_module_versions: list[dict] = find_ancestor_versions()
                 for llm_module_version in llm_module_versions:
-                    del llm_module_version['status']
-                    del llm_module_version['candidate_version']
-                    del llm_module_version['is_published']
-                    
-                llm_module_uuids = [version['llm_module_uuid'] for version in llm_module_versions]
-                llm_modules = list(LLMModule.select().where(LLMModule.uuid.in_(llm_module_uuids)))
+                    del llm_module_version["status"]
+                    del llm_module_version["candidate_version"]
+                    del llm_module_version["is_published"]
+
+                llm_module_uuids = [
+                    version["llm_module_uuid"] for version in llm_module_versions
+                ]
+                llm_modules = list(
+                    LLMModule.select().where(LLMModule.uuid.in_(llm_module_uuids))
+                )
                 llm_modules = [llm_module.__data__ for llm_module in llm_modules]
                 # find llm_module which is not deployed
                 llm_modules_only_in_local = []
                 for llm_module in llm_modules:
-                    if llm_module['is_deployment'] is False:
-                        del llm_module['is_deployment']
-                        del llm_module['local_usage']
+                    if llm_module["is_deployment"] is False:
+                        del llm_module["is_deployment"]
+                        del llm_module["local_usage"]
                         llm_modules_only_in_local.append(llm_module)
-                        
-                data = {
-                    "llm_modules" : llm_modules,
-                    "versions" : llm_module_versions
-                }
+
+                data = {"llm_modules": llm_modules, "versions": llm_module_versions}
 
             elif message["type"] == LocalTask.RUN_LLM_MODULE:
                 llm_module_name = message["llm_module_name"]
@@ -180,41 +189,38 @@ class DevWebsocketClient:
                 # get sample from db
                 if sample_name:
                     sample_input_row = get_sample_input(sample_name)
-                    if sample_input_row is None or 'contents' not in sample_input_row:
-                        logger.error(
-                                f"There is no sample input {sample_name}."
-                            )
+                    if sample_input_row is None or "contents" not in sample_input_row:
+                        logger.error(f"There is no sample input {sample_name}.")
                         return
-                    sample_input = sample_input_row['contents']
+                    sample_input = json.loads(sample_input_row["contents"])
                 else:
                     sample_input = None
-                
-                llm_module_names = [llm_module.name for llm_module in self._client.llm_modules]
+
+                llm_module_names = [
+                    llm_module.name for llm_module in self._client.llm_modules
+                ]
                 if llm_module_name not in llm_module_names:
-                    logger.error(
-                            f"There is no llm_module {llm_module_name}."
-                        )
+                    logger.error(f"There is no llm_module {llm_module_name}.")
                     return
-                
-                output = {
-                        "raw_output" : "",
-                        "parsed_outputs" : {}
-                    }
+
+                output = {"raw_output": "", "parsed_outputs": {}}
                 try:
                     logger.info(f"Started PromptModel: {llm_module_name}")
                     # create llm_module_dev_instance
                     llm_module_dev = LLMDev()
                     # fine llm_module_uuid from local db
-                    llm_module_uuid = get_llm_module_uuid(llm_module_name)['uuid']
-                
-                    llm_module_version_uuid = message['uuid']
+                    llm_module_uuid = get_llm_module_uuid(llm_module_name)["uuid"]
+
+                    llm_module_version_uuid = message["uuid"]
                     # If llm_module_version_uuid is None, create new version & prompt
                     if llm_module_version_uuid is None:
-                        llm_module_version: LLMModuleVersion = create_llm_module_version(
-                            llm_module_uuid=llm_module_uuid,
-                            status=LLMModuleVersionStatus.BROKEN.value,
-                            from_uuid=message['from_uuid'],
-                            model=message['model'],
+                        llm_module_version: LLMModuleVersion = (
+                            create_llm_module_version(
+                                llm_module_uuid=llm_module_uuid,
+                                status=LLMModuleVersionStatus.BROKEN.value,
+                                from_uuid=message["from_uuid"],
+                                model=message["model"],
+                            )
                         )
                         llm_module_version_uuid = llm_module_version.uuid
 
@@ -231,41 +237,53 @@ class DevWebsocketClient:
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
                             "llm_module_version_uuid": llm_module_version_uuid,
                             "status": "running",
-                            "inputs" : sample_input if sample_input else {}
+                            "inputs": sample_input if sample_input else {},
                         }
                         data.update(response)
                         logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-                    
-                    model = message['model']
-                    prompts = message['prompts']
-                    parsing_type = message['parsing_type']
-                    
+
+                    model = message["model"]
+                    prompts = message["prompts"]
+                    parsing_type = message["parsing_type"]
+
                     if sample_input:
-                        messages_for_run = [{'content': prompt['content'].format(**sample_input), 'role': prompt['role']} for prompt in prompts]
+                        messages_for_run = [
+                            {
+                                "content": prompt["content"].format(**sample_input),
+                                "role": prompt["role"],
+                            }
+                            for prompt in prompts
+                        ]
                     else:
                         messages_for_run = prompts
-                    res = llm_module_dev.dev_generate(messages_for_run, parsing_type, model)
+                    res = llm_module_dev.dev_generate(
+                        messages_for_run, parsing_type, model
+                    )
                     async for item in res:
                         # send item to backend
                         # save item & parse
                         # if type(item) == str: raw output, if type(item) == dict: parsed output
                         if type(item) == str:
-                            output['raw_output'] += item
+                            output["raw_output"] += item
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
-                                "raw_output": item
+                                "raw_output": item,
                             }
                         elif type(item) == dict:
-                            if list(item.keys())[0] not in output['parsed_outputs']:
-                                output['parsed_outputs'][list(item.keys())[0]] = list(item.values())[0]
+                            if list(item.keys())[0] not in output["parsed_outputs"]:
+                                output["parsed_outputs"][list(item.keys())[0]] = list(
+                                    item.values()
+                                )[0]
                             else:
-                                output['parsed_outputs'][list(item.keys())[0]] += list(item.values())[0]
+                                output["parsed_outputs"][list(item.keys())[0]] += list(
+                                    item.values()
+                                )[0]
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
-                                "parsed_outputs": item
+                                "parsed_outputs": item,
                             }
                         data.update(response)
                         logger.debug(f"Sent response: {data}")
