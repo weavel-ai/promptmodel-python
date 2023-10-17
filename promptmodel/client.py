@@ -17,28 +17,29 @@ from promptmodel.utils.prompt_util import update_deployed_db
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.database.orm import initialize_db
 
+
 @dataclass
 class LLMModule:
     name: str
     default_model: str = "gpt-3.5-turbo"
 
+
 class Client:
     """Client main class"""
 
-    def __init__(
-        self, default_model: Optional[str] = "gpt-3.5-turbo"
-    ):
+    def __init__(self, default_model: Optional[str] = "gpt-3.5-turbo"):
         self._default_model: str = default_model
         self.llm_modules: List[LLMModule] = []
         self.samples: List[Dict[str, Any]] = []
         config = read_config()
         dev_branch = config["dev_branch"]
-        if ("online" in dev_branch and dev_branch["online"] == True) or ("initializing" in dev_branch and dev_branch["initializing"] == True):
+        if ("online" in dev_branch and dev_branch["online"] == True) or (
+            "initializing" in dev_branch and dev_branch["initializing"] == True
+        ):
             self.cache_manager = None
         else:
             self.cache_manager = CacheManager()
         # logger.debug("Client initialized")
-
 
     def fastmodel(self, name: str) -> LLMProxy:
         return LLMProxy(name)
@@ -71,12 +72,12 @@ class Client:
             return func(*args, **kwargs)
 
         return wrapper
-    
+
     def register_llm_module(self, name):
         for llm_module in self.llm_modules:
             if llm_module.name == name:
                 return
-            
+
         self.llm_modules.append(
             LLMModule(
                 name=name,
@@ -87,44 +88,41 @@ class Client:
     def include(self, client: Client):
         self.llm_modules.extend(client.llm_modules)
         # delete duplicated llm_modules
-        self.llm_modules = list({llm_module.name:llm_module for llm_module in self.llm_modules}.values())
-        
-        self.samples.extend(client.samples)
-        # delete duplicated samples
-        self.samples = list({sample["name"]:sample for sample in self.samples}.values())
-
-    def sample(self, name: str, content: Dict[str, Any]):
-        self.samples.append(
-            {
-                "name": name,
-                "contents": content
-            }
+        self.llm_modules = list(
+            {llm_module.name: llm_module for llm_module in self.llm_modules}.values()
         )
 
+        self.samples.extend(client.samples)
+        # delete duplicated samples
+        self.samples = list(
+            {sample["name"]: sample for sample in self.samples}.values()
+        )
+
+    def register_sample(self, name: str, content: Dict[str, Any]):
+        self.samples.append({"name": name, "contents": content})
+
+
 class DevApp(Client):
-    def __init__(
-        self, default_model: Optional[str] = "gpt-3.5-turbo"
-    ):
+    def __init__(self, default_model: Optional[str] = "gpt-3.5-turbo"):
         super().__init__(default_model)
-    
+
     def include(self, client: Client):
         self.llm_modules.extend(client.llm_modules)
-        
 
 
 class CacheManager:
     _instance = None
     _lock = threading.Lock()
-    
+
     def __new__(cls):
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super(CacheManager, cls).__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
-        self.last_update_time = 0 # to manage update frequency
-        self.update_interval = 5 # seconds, consider tuning this value
+        self.last_update_time = 0  # to manage update frequency
+        self.update_interval = 5  # seconds, consider tuning this value
         self.program_alive = True
         initialize_db()
         atexit.register(self._terminate)
@@ -132,18 +130,18 @@ class CacheManager:
         loop = asyncio.new_event_loop()
         loop.run_until_complete(self._update_cache_periodically())
         loop.close()
-    
+
     async def _update_cache_periodically(self):
         while True:
             await self.update_cache()
             # logger.debug("Update cache")
             await asyncio.sleep(self.update_interval)  # Non-blocking sleep
-    
+
     async def update_cache(self):
         # Current time
         current_time = time.time()
         config = read_config()
-        
+
         # Check if we need to update the cache
         if current_time - self.last_update_time > self.update_interval:
             # Update cache logic
