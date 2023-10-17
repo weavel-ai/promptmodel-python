@@ -143,7 +143,9 @@ def list_samples():
 def list_run_logs(llm_module_version_uuid: str) -> List[RunLog]:
     """List all run logs for the given LLM module version."""
     response: List[RunLog] = list(
-        RunLog.select().where(RunLog.version_uuid == llm_module_version_uuid)
+        RunLog.select()
+        .where(RunLog.version_uuid == llm_module_version_uuid)
+        .order_by(RunLog.created_at.desc())
     )
     return [model_to_dict(x) for x in response]
 
@@ -295,8 +297,8 @@ async def update_deployed_cache(project_status: dict):
 def update_samples(samples: list[dict]):
     """Update samples"""
     for sample in samples:
-        sample['contents'] = json.dumps(sample['contents'])
-        
+        sample["contents"] = json.dumps(sample["contents"])
+
     with db.atomic():
         SampleInputs.delete().execute()
         SampleInputs.insert_many(samples).execute()
