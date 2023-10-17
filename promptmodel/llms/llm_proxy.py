@@ -127,7 +127,7 @@ class LLMProxy(LLM):
         res = APIClient.execute(
             method="POST",
             path="/log_deployment_run",
-            params={"version_uuid": version_uuid, "inputs" : inputs, "raw_response": raw_response, "parsed_outputs": parsed_outputs},
+            params={"version_uuid": version_uuid, "inputs" : inputs, "raw_response": raw_response.to_dict_recursive, "parsed_outputs": parsed_outputs},
             use_cli_key=False,
         )
         if res.status_code != 200:
