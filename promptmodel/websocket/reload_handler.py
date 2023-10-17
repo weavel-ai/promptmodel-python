@@ -1,4 +1,4 @@
-
+import os
 import sys
 import importlib
 from threading import Timer
@@ -16,13 +16,14 @@ from promptmodel.database.crud import (
     create_llm_module_versions,
     create_prompts,
     create_run_logs,
-    update_samples
+    update_samples,
 )
 from promptmodel.utils.enums import (
     LLMModuleVersionStatus,
     ChangeLogAction,
 )
 from promptmodel.websocket.websocket_client import DevWebsocketClient
+
 
 class CodeReloadHandler(FileSystemEventHandler):
     def __init__(
@@ -46,18 +47,26 @@ class CodeReloadHandler(FileSystemEventHandler):
             self.timer.start()
 
     def reload_code(self, modified_file_path: str):
-        print(f"[violet]promptmodel:dev:[/violet]  Reloading {self._client_filename} module due to changes...")
+        print(
+            f"[violet]promptmodel:dev:[/violet]  Reloading {self._client_filename} module due to changes..."
+        )
+        relative_modified_path = os.path.relpath(modified_file_path, os.getcwd())
         # Reload the client module
-        module_name = modified_file_path.replace("./", "").replace("/", ".")[
+        module_name = relative_modified_path.replace("./", "").replace("/", ".")[
             :-3
         ]  # assuming the file is in the PYTHONPATH
+        print(module_name)
+        print(relative_modified_path)
+        # print(sys.modules)
+
         if module_name in sys.modules:
-            # print(module_name)
             module = sys.modules[module_name]
             importlib.reload(module)
 
         reloaded_module = importlib.reload(sys.modules[self._client_filename])
-        print(f"[violet]promptmodel:dev:[/violet]  {self._client_filename} module reloaded successfully.")
+        print(
+            f"[violet]promptmodel:dev:[/violet]  {self._client_filename} module reloaded successfully."
+        )
 
         new_client_instance: Client = getattr(
             reloaded_module, self.client_instance_name
@@ -66,10 +75,12 @@ class CodeReloadHandler(FileSystemEventHandler):
         new_llm_module_name_list = [
             llm_module.name for llm_module in new_client_instance.llm_modules
         ]
+        print(f"New list: {new_llm_module_name_list}")
         old_llm_module_name_list = [
             llm_module.name
             for llm_module in self.dev_websocket_client._client.llm_modules
         ]
+        print(f"Old list: {old_llm_module_name_list}")
 
         # 사라진 llm_modules 에 대해 local db llm_module.local_usage False Update
         removed_name_list = list(
@@ -108,14 +119,18 @@ class CodeReloadHandler(FileSystemEventHandler):
         for llm_module in new_client_instance.llm_modules:
             if llm_module.name not in old_llm_module_name_list:
                 update_local_usage_llm_module_by_name(llm_module.name, True)
-                
+
         # create llm_modules in local DB
         db_llm_module_list = list_llm_modules()
-        db_llm_module_name_list = [x['name'] for x in db_llm_module_list]
-        only_in_local_names = list(set(new_llm_module_name_list) - set(db_llm_module_name_list))
-        only_in_local_llm_modules = [{"name" : x, "project_uuid" : project['uuid']} for x in only_in_local_names]
+        db_llm_module_name_list = [x["name"] for x in db_llm_module_list]
+        only_in_local_names = list(
+            set(new_llm_module_name_list) - set(db_llm_module_name_list)
+        )
+        only_in_local_llm_modules = [
+            {"name": x, "project_uuid": project["uuid"]} for x in only_in_local_names
+        ]
         create_llm_modules(only_in_local_llm_modules)
-                
+
         # update samples in local DB
         update_samples(new_client_instance.samples)
         self.dev_websocket_client.update_client_instance(new_client_instance)
