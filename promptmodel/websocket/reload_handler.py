@@ -55,9 +55,6 @@ class CodeReloadHandler(FileSystemEventHandler):
         module_name = relative_modified_path.replace("./", "").replace("/", ".")[
             :-3
         ]  # assuming the file is in the PYTHONPATH
-        print(module_name)
-        print(relative_modified_path)
-        # print(sys.modules)
 
         if module_name in sys.modules:
             module = sys.modules[module_name]
