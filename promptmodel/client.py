@@ -13,7 +13,7 @@ from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.prompt_util import fetch_prompts, update_deployed_db
+from promptmodel.utils.prompt_util import update_deployed_db
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.database.orm import initialize_db
 

@@ -11,7 +11,9 @@ from typing import (
     Tuple,
     Union,
 )
+from litellm import RateLimitManager, ModelResponse
 from promptmodel.llms.llm import LLM
+from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.prompt_util import fetch_prompts
 from promptmodel.apis.base import APIClient
@@ -21,86 +23,91 @@ from promptmodel.database.crud import (
     update_deployed_cache
 )
 class LLMProxy(LLM):
-    def __init__(self, name: str):
-        super().__init__()
+    def __init__(self, name: str, rate_limit_manager: Optional[RateLimitManager] = None):
+        super().__init__(rate_limit_manager)
         self._name = name
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, model = asyncio.run(fetch_prompts(self._name))
+            prompts, model, version_uuid = asyncio.run(fetch_prompts(self._name))
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
-            call_args = self._prepare_call_args(prompts, model, inputs, kwargs)
+            call_args = self._prepare_call_args(prompts, model, inputs, True, kwargs)
             # Call the generator with the arguments
             gen_instance = gen(**call_args)
 
+            raw_response = None
             for item in gen_instance:
-                if isinstance(item, dict):
+                if isinstance(item, ModelResponse):
+                    raw_response = item
+                elif isinstance(item, dict):
                     for key, value in item.items():
                         dict_cache[key] = dict_cache.get(key, "") + value
                 elif isinstance(item, str):
                     string_cache += item
                 yield item
 
-            if dict_cache:
-                self._log_to_cloud(dict_cache)  # log the aggregated dictionary cache
-            if string_cache:
-                self._log_to_cloud(string_cache)  # log the aggregated string cache
+            self._log_to_cloud(version_uuid, inputs, raw_response, dict_cache)
 
         return wrapper
 
     def _wrap_async_gen(self, async_gen: Callable[..., Any]) -> Callable[..., Any]:
         async def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, model = await fetch_prompts(self._name)
+            prompts, model, version_uuid = await fetch_prompts(self._name)
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
-            call_args = self._prepare_call_args(prompts, model, inputs, kwargs)
+            call_args = self._prepare_call_args(prompts, model, inputs, True, kwargs)
 
             # Call async_gen with the arguments
             async_gen_instance = async_gen(**call_args)
 
+            raw_response = None
             async for item in async_gen_instance:
-                if isinstance(item, dict):
+                if isinstance(item, ModelResponse):
+                    raw_response = item
+                elif isinstance(item, dict):
                     for key, value in item.items():
                         dict_cache[key] = dict_cache.get(key, "") + value
                 elif isinstance(item, str):
                     string_cache += item
                 yield item
 
-            if dict_cache:
-                self._log_to_cloud(dict_cache)  # log the aggregated dictionary cache
-            if string_cache:
-                self._log_to_cloud(string_cache)  # log the aggregated string cache
-
+            self._log_to_cloud(version_uuid, inputs, raw_response, dict_cache)
+            
         return wrapper
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, model = asyncio.run(fetch_prompts(self._name))
-            call_args = self._prepare_call_args(prompts, model, inputs, kwargs)
-
+            prompts, model, version_uuid = asyncio.run(fetch_prompts(self._name))
+            call_args = self._prepare_call_args(prompts, model, inputs, True, kwargs)
+            
             # Call the method with the arguments
-            result = method(**call_args)
-            self._log_to_cloud(result)
+            result, raw_response = method(**call_args)
+            if isinstance(result, dict):
+                self._log_to_cloud(version_uuid, inputs, raw_response, result)
+            else:
+                self._log_to_cloud(version_uuid, inputs, raw_response, {})
             return result
 
         return wrapper
 
     def _wrap_async_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         async def async_wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, model = await fetch_prompts(self._name) # messages, model, prompt_metadata = self._fetch_prompts()
-            call_args = self._prepare_call_args(prompts, model, inputs, kwargs)
+            prompts, model, version_uuid = await fetch_prompts(self._name) # messages, model, uuid = self._fetch_prompts()
+            call_args = self._prepare_call_args(prompts, model, inputs, True, kwargs)
 
             # Call the method with the arguments
-            result = await method(**call_args)
-            self._log_to_cloud(result)
-            return result # return ClientOutput = {result, prompt_metadata, output_metadata (token_usage, cost, latency)}
-
+            result, raw_response = await method(**call_args)
+            if isinstance(result, dict):
+                self._log_to_cloud(version_uuid, inputs, raw_response, result)
+            else:
+                self._log_to_cloud(version_uuid, inputs, raw_response, {})
+            return result 
         return async_wrapper
 
-    def _prepare_call_args(self, prompts, model, inputs, kwargs):
+    def _prepare_call_args(self, prompts, model, inputs, show_response, kwargs):
         messages = [{'content': prompt['content'].format(**inputs), 'role': prompt['role']} for prompt in prompts]
-        call_args = {"messages": messages, "model": model}
+        call_args = {"messages": messages, "model": model, "show_response": show_response}
 
         if "output_keys" in kwargs:
             call_args["output_keys"] = kwargs["output_keys"]
@@ -109,9 +116,23 @@ class LLMProxy(LLM):
             
         return call_args
 
-    def _log_to_cloud(self, output: Union[str, Dict[str, str]]):
-        # TODO: Log to cloud
-        print(f"Logging to cloud: {output}")
+    def _log_to_cloud(self, version_uuid: str, inputs: dict, raw_response: ModelResponse, parsed_outputs: dict):
+        # Log to cloud
+        # logging if only status = deployed
+        config = read_config()
+        if "dev_branch" in config and (config["dev_branch"]["initializing"] or config["dev_branch"]["online"]):
+            return
+        
+        logger.debug(f"Logging to cloud: {version_uuid, inputs, raw_response, parsed_outputs}")
+        res = APIClient.execute(
+            method="POST",
+            path="/log_deployment_run",
+            params={"version_uuid": version_uuid, "inputs" : inputs, "raw_response": raw_response, "parsed_outputs": parsed_outputs},
+            use_cli_key=False,
+        )
+        if res.status_code != 200:
+            logger.error(f"Failed to log to cloud: {res}")
+        return
 
     def generate(self, inputs: Dict[str, Any] = {}) -> str:
         return self._wrap_method(super().generate)(inputs)
