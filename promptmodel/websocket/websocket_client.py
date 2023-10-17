@@ -253,7 +253,7 @@ class DevWebsocketClient:
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "failed",
-                                "log": "Prompts have variables. You should select sample input.",
+                                "log": f"Prompts have variables {prompt_variables}. You should select sample input.",
                             }
                             data.update(response)
                             logger.debug(f"Sent response: {data}")
@@ -261,10 +261,11 @@ class DevWebsocketClient:
                             return
                             
                         if not all(variable in sample_input.keys() for variable in prompt_variables):
+                            missing_variables = [variable for variable in prompt_variables if variable not in sample_input.keys()]
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "failed",
-                                "log": "Sample input does not have variables in prompts.",
+                                "log": f"Sample input does not have variables {missing_variables} in prompts.",
                             }
                             data.update(response)
                             logger.debug(f"Sent response: {data}")
