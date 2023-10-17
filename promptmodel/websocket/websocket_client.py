@@ -1,6 +1,7 @@
 import asyncio
 import json
 import datetime
+import re
 
 from uuid import UUID
 from typing import Dict, Any
@@ -240,6 +241,35 @@ class DevWebsocketClient:
                     model = message['model']
                     prompts = message['prompts']
                     parsing_type = message['parsing_type']
+                    
+                    # check variable matching
+                    prompt_variables = []
+                    for prompt in prompts:
+                        fstring_input_pattern = r'(?<!\\)(?<!{{)\{([^}]+)\}(?!\\)(?!}})'
+                        prompt_variables += re.findall(fstring_input_pattern, prompt['content'])
+                    prompt_variables = list(set(prompt_variables))
+                    if len(prompt_variables) != 0:
+                        if sample_input is None:
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_RUN.value,
+                                "status": "failed",
+                                "log": "Prompts have variables. You should select sample input.",
+                            }
+                            data.update(response)
+                            logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                            return
+                            
+                        if not all(variable in sample_input.keys() for variable in prompt_variables):
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_RUN.value,
+                                "status": "failed",
+                                "log": "Sample input does not have variables in prompts.",
+                            }
+                            data.update(response)
+                            logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                            return
                     
                     if sample_input:
                         messages_for_run = [{'content': prompt['content'].format(**sample_input), 'role': prompt['role']} for prompt in prompts]

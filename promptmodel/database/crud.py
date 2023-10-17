@@ -1,3 +1,4 @@
+import json
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4, UUID
 from promptmodel.database.models import (
@@ -159,7 +160,10 @@ def get_sample_input(sample_name: str) -> Dict:
     """Get sample input from local DB"""
     try:
         response = SampleInputs.get(SampleInputs.name == sample_name)
-        return model_to_dict(response)
+        response = model_to_dict(response)
+        response['contents'] = json.loads(response['contents'])
+        
+        return response
     except:
         return None
 
@@ -292,6 +296,9 @@ async def update_deployed_cache(
 
 def update_samples(samples: list[dict]):
     """Update samples"""
+    for sample in samples:
+        sample['contents'] = json.dumps(sample['contents'])
+        
     with db.atomic():
         SampleInputs.delete().execute()
         SampleInputs.insert_many(samples).execute()
