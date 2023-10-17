@@ -295,8 +295,8 @@ async def update_deployed_cache(project_status: dict):
 def update_samples(samples: list[dict]):
     """Update samples"""
     for sample in samples:
-        sample["contents"] = json.dumps(sample["contents"])
-
+        sample['contents'] = json.dumps(sample['contents'])
+        
     with db.atomic():
         SampleInputs.delete().execute()
         SampleInputs.insert_many(samples).execute()
