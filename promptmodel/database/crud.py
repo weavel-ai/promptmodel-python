@@ -117,9 +117,9 @@ def list_llm_modules() -> List[Dict]:
 def list_llm_module_versions(llm_module_uuid: str) -> List[Dict]:
     """List all LLM module versions for the given LLM module."""
     response: List[LLMModuleVersion] = list(
-        LLMModuleVersion.select().where(
-            LLMModuleVersion.llm_module_uuid == llm_module_uuid
-        )
+        LLMModuleVersion.select()
+        .where(LLMModuleVersion.llm_module_uuid == llm_module_uuid)
+        .order_by(LLMModuleVersion.created_at)
     )
     return [model_to_dict(x) for x in response]
 
