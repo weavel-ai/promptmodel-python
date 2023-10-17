@@ -1,14 +1,19 @@
-"""Base module for interacting with OpenAI's Language Model API."""
-"""Base module for interacting with OpenAI's Language Model API."""
+"""Base module for interacting with LLM APIs."""
 import re
 import os
 import json
+import time
+import datetime
 from typing import Any, AsyncGenerator, List, Dict, Optional, Union, Generator
+
+import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import openai
-from ..utils import logger
 from litellm import completion, acompletion
+from litellm import ModelResponse, RateLimitManager
+from litellm.utils import prompt_token_calculator, token_counter
+
+from promptmodel.utils import logger
 
 load_dotenv()
 
@@ -25,8 +30,11 @@ class OpenAIMessage(BaseModel):
 
 
 class LLM:
-    def __init__(self):
+    def __init__(
+        self, rate_limit_manager: Optional[RateLimitManager] = None
+    ):
         self._model: str
+        self._rate_limit_manager = rate_limit_manager
 
     @classmethod
     def __parse_output__(cls, raw_output: str, key: str) -> Union[str, None]:
@@ -55,6 +63,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
+        show_response: bool = False,
     ):
         """Return the response from openai chat completion."""
         _model = model or self._model
@@ -64,36 +73,51 @@ class LLM:
                 message.model_dump()
                 for message in self.__validate_openai_messages(messages)
             ],
-        ).choices[0]["message"]["content"]
-
-        return response
+        )
+        res = response.choices[0]["message"]["content"]
+        if show_response:
+            return res, response
+        return res
 
     async def agenerate(
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
+        show_response: bool = False,
     ):
         """Return the response from openai chat completion."""
         _model = model or self._model
-        response = await acompletion(
-            model=_model,
-            messages=[
-                message.model_dump()
-                for message in self.__validate_openai_messages(messages)
-            ],
-        )
+        if self._rate_limit_manager:
+            response = await self._rate_limit_manager.acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+            )
+        else:
+            response = await acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+            )
         res = response.choices[0]["message"]["content"]
-
+        if show_response:
+            return res, response
         return res
 
     def stream(
         self,
         messages: List[Dict[str, str]],  # input
         model: Optional[str] = None,
+        show_response: bool = False,
     ):
         """Stream openai chat completion."""
         _model = model or self._model
         # load_prompt()
+        start_time =  datetime.datetime.now()
         response = completion(
             model=_model,
             messages=[
@@ -102,30 +126,42 @@ class LLM:
             ],
             stream=True
         ).choices[0]["message"]["content"]
+        
+        raw_output = ""
         for chunk in response:
             if "content" in chunk["choices"][0]["delta"]:
+                raw_output += chunk["choices"][0]["delta"]["content"]
                 yield chunk["choices"][0]["delta"]["content"]
+            if chunk['choices'][0]['finish_reason'] != None:
+                if show_response:
+                    end_time =  datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield self.make_model_response(chunk, response_ms, messages, raw_output)
 
     def generate_and_parse(
         self,
         messages: List[Dict[str, str]],
         output_keys: List[str],
         model: Optional[str] = None,
+        show_response: bool = False,
     ) -> Dict[str, str]:
         """Parse and return output from openai chat completion."""
         _model = model or self._model
-        raw_output = completion(
+        response = completion(
             model=_model,
             messages=[
                 message.model_dump()
                 for message in self.__validate_openai_messages(messages)
             ],
-        ).choices[0]["message"]["content"]
+        )
+        raw_output = response.choices[0]["message"]["content"]
 
         parsed_output = {}
         for key in output_keys:
             parsed_output[key] = self.__parse_output__(raw_output, key)
 
+        if show_response:
+            return parsed_output, response
         return parsed_output
 
     def stream_and_parse(
@@ -133,11 +169,13 @@ class LLM:
         messages: List[Dict[str, str]],
         output_keys: List[str],
         model: Optional[str] = None,
+        show_response: bool = False,
         **kwargs,
     ) -> Generator[Dict[str, str], None, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
+        start_time =  datetime.datetime.now()
         response = completion(
             model=_model,
             messages=[
@@ -192,12 +230,18 @@ class LLM:
                     continue
 
                 yield {key: stream_value}
+            if chunk['choices'][0]['finish_reason'] != None:
+                if show_response:
+                    end_time =  datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield self.make_model_response(chunk, response_ms, messages, raw_output)
 
     async def agenerate_and_parse(
         self,
         messages: List[Dict[str, str]],
         output_keys: List[str],
         model: Optional[str] = None,
+        show_response: bool = False,
     ) -> Dict[str, str]:
         """Generate openai chat completion asynchronously, and parse the output.
         Example prompt is as follows:
@@ -216,14 +260,23 @@ class LLM:
         Now generate the output:
         """
         _model = model or self._model
-        result = await acompletion(
-            model=_model,
-            messages=[
-                message.model_dump()
-                for message in self.__validate_openai_messages(messages)
-            ],
-        )
-        raw_output = result.choices[0]["message"]["content"]
+        if self._rate_limit_manager:
+            response = await self._rate_limit_manager.acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+            )
+        else:
+            response = await acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+            )
+        raw_output = response.choices[0]["message"]["content"]
         logger.debug(f"Output:\n{raw_output}")
         parsed_output = {}
         for key in output_keys:
@@ -231,6 +284,8 @@ class LLM:
             if output:
                 parsed_output[key] = output
 
+        if show_response:
+            return parsed_output, response
         return parsed_output
 
     def generate_and_parse_function_call(
@@ -238,6 +293,7 @@ class LLM:
         messages: List[Dict[str, str]],
         function_list: [],
         model: Optional[str] = "gpt-3.5-turbo-0613",
+        show_response: bool = False,
     ) -> Generator[str, None, None]:
         """
         Parse by function call arguments
@@ -256,6 +312,9 @@ class LLM:
         # make function_args to dict
         function_args = function_args.replace("'", '"')
         function_args = json.loads(function_args)
+        
+        if show_response:
+            return function_args, response
         return function_args
 
     async def agenerate_and_parse_function_call(
@@ -263,62 +322,107 @@ class LLM:
         messages: List[Dict[str, str]],
         function_list: [],
         model: Optional[str] = "gpt-3.5-turbo-0613",
+        show_response: bool = False,
     ) -> Generator[str, None, None]:
         """
         Parse by function call arguments
         """
-        response = await acompletion(
-            model=model,
-            messages=[
-                message.model_dump()
-                for message in self.__validate_openai_messages(messages)
-            ],
-            functions=function_list,
-            function_call="auto",
-        )
-        print(response)
+        if self._rate_limit_manager:
+            response = await self._rate_limit_manager.acompletion(
+                model=model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                functions=function_list,
+                function_call="auto",
+            )
+        else:
+            response = await acompletion(
+                model=model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                functions=function_list,
+                function_call="auto",
+            )
         function_args = response["choices"][0]["message"]["function_call"]["arguments"]
         # make function_args to dict
         function_args = function_args.replace("'", '"')
         function_args = json.loads(function_args)
+        
+        if show_response:
+            return function_args, response
         return function_args
 
     async def astream(
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
+        show_response: bool = False,
     ) -> Generator[Dict[str, str], None, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
-        response = await acompletion(
-            model=_model,
-            messages=[
-                message.model_dump()
-                for message in self.__validate_openai_messages(messages)
-            ],
-            stream=True,
-        )
+        start_time = datetime.datetime.now()
+        if self._rate_limit_manager:
+            response = await self._rate_limit_manager.acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                stream=True,
+            )
+        else:
+            response = await acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                stream=True,
+            )
+        raw_output = ""
         async for chunk in response:
             if "content" in chunk["choices"][0]["delta"]:
+                raw_output += chunk["choices"][0]["delta"]["content"]
                 yield chunk["choices"][0]["delta"]["content"]
+            if chunk['choices'][0]['finish_reason'] != None:
+                if show_response:
+                    end_time =  datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield self.make_model_response(chunk, response_ms, messages, raw_output)
 
     async def astream_and_parse(
         self,
         messages: List[Dict[str, str]],
         output_keys: List[str],
         model: Optional[str] = None,
+        show_response: bool = False
     ) -> AsyncGenerator[Dict[str, str], None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
-        response = await acompletion(
-            model=_model,
-            messages=[
-                message.model_dump()
-                for message in self.__validate_openai_messages(messages)
-            ],
-            stream=True,
-        )
+        start_time = datetime.datetime.now()
+        if self._rate_limit_manager:
+            response = await self._rate_limit_manager.acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                stream=True,
+            )
+        else:
+            response = await acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                stream=True,
+            )
 
         async for chunk in response:
             pause_stream = False
@@ -364,6 +468,11 @@ class LLM:
                     # Current stream_value (that includes ]) isn't yielded, but the next stream_values will be yielded.
                     cache = ""
                     pause_stream = False
+            if chunk['choices'][0]['finish_reason'] != None:
+                if show_response:
+                    end_time =  datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield self.make_model_response(chunk, response_ms, messages, raw_output)
 
     async def aget_embedding(self, context: str) -> List[float]:
         """
@@ -382,8 +491,11 @@ class LLM:
         function_list: [],
         output_key: str,
         model: Optional[str] = "gpt-3.5-turbo-0613",
+        show_response: bool = False,
     ) -> Generator[str, None, None]:
-        response = await acompletion(
+        start_time = datetime.datetime.now()
+        if self._rate_limit_manager:
+            response = await self._rate_limit_manager.acompletion(
             model=model,
             messages=[
                 message.model_dump()
@@ -392,33 +504,90 @@ class LLM:
             functions=function_list,
             function_call="auto",
             stream=True,
-        )
+            )
+        else:
+            response = await acompletion(
+            model=model,
+            messages=[
+                message.model_dump()
+                for message in self.__validate_openai_messages(messages)
+            ],
+            functions=function_list,
+            function_call="auto",
+            stream=True,
+            )   
+
+        function_call = {
+            "name" : "",
+            "arguments" : ""
+        }
         function_args = ""
         start_to_stream = False
+        raw_output = ""
         async for chunk in response:
+            if "content" in chunk["choices"][0]["delta"]:
+                raw_output += chunk["choices"][0]["delta"]["content"]
             if "function_call" in chunk["choices"][0]["delta"]:
-                if chunk["choices"][0]["delta"]["function_call"]:
-                    # if "name" in chunk["choices"][0]["delta"]["function_call"]:
-                    #     function_name = chunk["choices"][0]["delta"]["function_call"][
-                    #         "name"
-                    #     ]
-                    function_args += chunk["choices"][0]["delta"]["function_call"][
-                        "arguments"
+                if "name" in chunk["choices"][0]["delta"]["function_call"]:
+                    function_name = chunk["choices"][0]["delta"]["function_call"][
+                        "name"
                     ]
-                    if f'"{output_key}":' in function_args:
-                        if not start_to_stream:
-                            start_to_stream = True
-                            # yield function_args without output_key
-                            yield {
-                                output_key: function_args.replace(
-                                    f'"{output_key}":', ""
-                                )
-                            }
-                        else:
-                            yield {
-                                output_key: chunk["choices"][0]["delta"][
-                                    "function_call"
-                                ]["arguments"]
-                            }
-            else:
-                continue
+                    function_call['name'] += function_name
+                
+                function_args += chunk["choices"][0]["delta"]["function_call"][
+                    "arguments"
+                ]
+                if f'"{output_key}":' in function_args:
+                    if not start_to_stream:
+                        start_to_stream = True
+                        # yield function_args without output_key
+                        yield {
+                            output_key: function_args.replace(
+                                f'"{output_key}":', ""
+                            )
+                        }
+                    else:
+                        yield {
+                            output_key: chunk["choices"][0]["delta"][
+                                "function_call"
+                            ]["arguments"]
+                        }
+            if chunk['choices'][0]['finish_reason'] != None:
+                if show_response:
+                    end_time =  datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    function_call['arguments'] = function_args
+                    yield self.make_model_response(chunk, response_ms, messages, raw_output, function_call)
+    
+    
+    def make_model_response(
+        chunk: dict, response_ms, messages: List[Dict[str, str]], raw_output: str, function_call: Optional[dict]
+    ) -> ModelResponse:
+        choices = [
+            {
+                "index": 0,
+                "message" : {
+                    "role": "assistant",
+                    "content": raw_output
+                },
+                "finish_reason" : chunk['choices'][0]['finish_reason']
+            }
+        ]
+        if function_call:
+            choices[0]['message']['function_call'] = function_call
+        prompt_token: int = prompt_token_calculator(chunk['model'], messages)
+        completion_token: int = token_counter(chunk['model'], raw_output)
+        usage = {
+            "prompt_tokens": prompt_token,
+            "completion_tokens": completion_token,
+            "total_tokens" : prompt_token + completion_token
+        }
+        res = ModelResponse(
+            id=chunk['id'],
+            choices=choices,
+            created=chunk['created'],
+            model=chunk['model'],
+            usage=usage,
+            response_ms=response_ms,
+        )
+        return res

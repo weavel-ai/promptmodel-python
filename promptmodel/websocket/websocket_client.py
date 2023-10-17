@@ -234,6 +234,7 @@ class DevWebsocketClient:
                             "inputs" : sample_input if sample_input else {}
                         }
                         data.update(response)
+                        logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                     
                     model = message['model']

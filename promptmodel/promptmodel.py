@@ -20,6 +20,7 @@ from typing import (
 )
 from websockets.client import connect, WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
+from litellm import RateLimitManager
 
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
@@ -60,14 +61,14 @@ class RegisteringMeta(type):
 
 
 class PromptModel(metaclass=RegisteringMeta):
-    def __init__(self, name):
+    def __init__(self, name, rate_limit_manager: Optional[RateLimitManager] = None):
         self.name = name
-        self.llm_proxy = LLMProxy(name)
+        self.llm_proxy = LLMProxy(name, rate_limit_manager)
 
     def get_prompts(self) -> List[Dict[str, str]]:
         # add name to the list of llm_modules
 
-        prompts, _ = asyncio.run(fetch_prompts(self.name))
+        prompts, _, _ = asyncio.run(fetch_prompts(self.name))
         return prompts
 
     def generate(self, inputs: Dict[str, Any] = {}) -> str:

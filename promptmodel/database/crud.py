@@ -190,10 +190,10 @@ def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]
                 .get()
             )
 
-            return prompts, version.model
+            return prompts, version.model, version.uuid
 
     except Exception as e:
-        return None, None
+        return None, None, None
 
 
 def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], str]:
@@ -227,9 +227,9 @@ def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], st
             )
         )
 
-        return selected_prompts, selected_version["model"]
+        return selected_prompts, selected_version["model"], selected_version["uuid"]
     except Exception:
-        return None, None
+        return None, None, None
 
 
 # Update
