@@ -185,7 +185,10 @@ class DevWebsocketClient:
                         del llm_module["local_usage"]
                         llm_modules_only_in_local.append(llm_module)
 
-                data = {"llm_modules": llm_modules, "versions": llm_module_versions}
+                data = {
+                    "llm_modules": llm_modules_only_in_local,
+                    "versions": llm_module_versions,
+                }
 
             elif message["type"] == LocalTask.RUN_LLM_MODULE:
                 llm_module_name = message["llm_module_name"]

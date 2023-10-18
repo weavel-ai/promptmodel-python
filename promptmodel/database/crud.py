@@ -330,10 +330,12 @@ def find_ancestor_versions():
     response = list(LLMModuleVersion.select())
     versions = [model_to_dict(x) for x in response]
 
+    print(versions)
+
     targets = list(
         filter(
             lambda version: version["status"] == LLMModuleVersionStatus.CANDIDATE.value
-            and version["is_published"] is False,
+            and version["candidate_version"] is None,
             versions,
         )
     )
@@ -347,7 +349,6 @@ def find_ancestor_versions():
 def _find_ancestor(target: dict, versions: list[dict]):
     ancestor = None
     temp = target
-    print(target)
     if target["from_uuid"] is None:
         ancestor = None
     else:
@@ -355,12 +356,12 @@ def _find_ancestor(target: dict, versions: list[dict]):
             new_temp = [
                 version for version in versions if version["uuid"] == temp["from_uuid"]
             ][0]
-            if new_temp["is_published"]:
+            if new_temp["candidate_version"] is not None:
                 ancestor = new_temp
                 break
             else:
                 temp = new_temp
+        target["from_uuid"] = ancestor["uuid"] if ancestor is not None else None
 
     print(f"temp: {temp}")
-    target["from_uuid"] = ancestor["uuid"] if ancestor is not None else None
     return target
