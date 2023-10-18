@@ -14,7 +14,6 @@ from promptmodel.utils import logger
 
 load_dotenv()
 
-
 class OpenAIMessage(BaseModel):
     role: str
     content: str

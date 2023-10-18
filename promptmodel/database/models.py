@@ -26,7 +26,6 @@ class JSONField(TextField):
     def python_value(self, value):
         return json.loads(value)
 
-
 class LLMModule(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     created_at = DateTimeField(default=datetime.datetime.now)
