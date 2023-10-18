@@ -328,10 +328,17 @@ def find_ancestor_version(
     return target, prompts
 
 
-def find_ancestor_versions():
+def find_ancestor_versions(target_llm_module_uuid: Optional[str] = None):
     """find ancestor versions for each versions in input"""
     # get all versions
-    response = list(LLMModuleVersion.select())
+    if target_llm_module_uuid is not None:
+        response = list(
+            LLMModuleVersion.select().where(
+                LLMModuleVersion.llm_module_uuid == target_llm_module_uuid
+            )
+        )
+    else:
+        response = list(LLMModuleVersion.select())
     versions = [model_to_dict(x) for x in response]
 
     print(versions)
@@ -344,10 +351,12 @@ def find_ancestor_versions():
         )
     )
 
-    targets_with_real_ancestor = [
-        find_ancestor_version(target["uuid"], versions) for target in targets
+    target_and_prompts = [
+        find_ancestor_version(target["uuid"], versions)[0] for target in targets
     ]
-    target_prompts = list(Prompt.select().where(Prompt.version_uuid.in_([target['uuid'] for target in targets_with_real_ancestor])))
+    targets_with_real_ancestor = [target_and_prompt[0] for target_and_prompt in target_and_prompts]
+    
+    target_prompts = [target_and_prompt[1] for target_and_prompt in target_and_prompts]
     
     return targets_with_real_ancestor, target_prompts
 
