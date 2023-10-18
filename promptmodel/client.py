@@ -101,6 +101,9 @@ class Client:
 
     def register_sample(self, name: str, content: Dict[str, Any]):
         self.samples.append({"name": name, "contents": content})
+        
+    def _get_llm_module_name_list(self) -> List[str]:
+        return [llm_module.name for llm_module in self.llm_modules]
 
 
 class DevApp(Client):

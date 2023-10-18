@@ -2,7 +2,7 @@ import os
 import sys
 import yaml
 import asyncio
-from typing import Any, Dict, Tuple, List
+from typing import Any, Dict, Tuple, List, Union
 
 from promptmodel.database.crud import (
     get_latest_version_prompts,
@@ -22,33 +22,19 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
             return [], "", None
         elif config["dev_branch"]["online"] == True:
             # get prompt from local DB
-            prompt_rows, model, version_uuid = get_latest_version_prompts(name)
+            prompt_rows, version_detail = get_latest_version_prompts(name)
             if prompt_rows is None:
-                return [], "", None
-            return (
-                [
-                    {"role": prompt.role, "content": prompt.content}
-                    for prompt in prompt_rows
-                ],
-                model,
-                version_uuid,
-            )
+                return [], None
+            return [{"role": prompt.role, "content" : prompt.content} for prompt in prompt_rows], version_detail
     else:
         # call update_local API in background task
         asyncio.create_task(update_deployed_db(config))
         # get prompt from local DB by ratio
-        prompt_rows, model, version_uuid = get_deployed_prompts(name)
+        prompt_rows, version_detail = get_deployed_prompts(name)
         if prompt_rows is None:
-            return [], "", None
-        return (
-            [
-                {"role": prompt.role, "content": prompt.content}
-                for prompt in prompt_rows
-            ],
-            model,
-            version_uuid,
-        )
-
+            return [], None
+        return [{"role": prompt.role, "content" : prompt.content} for prompt in prompt_rows], version_detail
+    
 
 async def update_deployed_db(config):
     if "project" not in config or "version" not in config["project"]:

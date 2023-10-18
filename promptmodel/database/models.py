@@ -67,7 +67,7 @@ class LLMModuleVersion(BaseModel):
             )
         ]
     )
-    output_keys = JSONField(null=True, default={})
+    output_keys = JSONField(null=True, default=None)
 
 
 class Prompt(BaseModel):
@@ -132,7 +132,7 @@ class DeployedLLMModuleVersion(BaseModel):
             )
         ]
     )
-    output_keys = JSONField(null=True, default={})
+    output_keys = JSONField(null=True, default=None)
 
     
 

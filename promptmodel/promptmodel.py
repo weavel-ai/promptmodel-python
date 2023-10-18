@@ -68,7 +68,7 @@ class PromptModel(metaclass=RegisteringMeta):
     def get_prompts(self) -> List[Dict[str, str]]:
         # add name to the list of llm_modules
 
-        prompts, _, _ = asyncio.run(fetch_prompts(self.name))
+        prompts, _ = asyncio.run(fetch_prompts(self.name))
         return prompts
 
     def run(self, inputs: Dict[str, Any] = {}) -> str:

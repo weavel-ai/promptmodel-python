@@ -13,7 +13,7 @@ from promptmodel.database.models import (
 )
 from peewee import Model, Case
 from playhouse.shortcuts import model_to_dict
-from promptmodel.utils.enums import LLMModuleVersionStatus
+from promptmodel.utils.enums import LLMModuleVersionStatus, ParsingType
 from promptmodel.utils.random_utils import select_version
 from promptmodel.database.config import db
 from rich import print
@@ -33,7 +33,11 @@ def create_llm_modules(llm_module_list: list):
 
 
 def create_llm_module_version(
-    llm_module_uuid: str, from_uuid: Optional[str], status: str, model: str
+    llm_module_uuid: str,
+    from_uuid: Optional[str],
+    status: str, model: str,
+    parsing_type: Optional[ParsingType] = None,
+    output_keys: Optional[List[str]] = None
 ):
     """Create a new LLM module version with the given parameters."""
     return LLMModuleVersion.create(
@@ -42,6 +46,8 @@ def create_llm_module_version(
         llm_module_uuid=llm_module_uuid,
         status=status,
         model=model,
+        parsing_type=parsing_type,
+        output_keys=output_keys,
     )
 
 
@@ -197,11 +203,18 @@ def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]
                 .where(LLMModuleVersion.uuid == latest_run_log.version_uuid)
                 .get()
             )
+        
+        version_details = {
+            "model": version.model,
+            "uuid": version.uuid,
+            "parsing_type" : version.parsing_type,
+            "output_keys" : version.output_keys
+        }
 
-            return prompts, version.model, version.uuid
+        return prompts, version_details
 
     except Exception as e:
-        return None, None, None
+        return None, None
 
 
 def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], str, str]:
@@ -235,13 +248,17 @@ def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], st
                 prompts,
             )
         )
+        
+        version_details = {
+            "model": selected_version['model'],
+            "uuid": selected_version['uuid'],
+            "parsing_type" : selected_version['parsing_type'],
+            "output_keys" : selected_version['output_keys']
+        }
 
-        return selected_prompts, selected_version["model"], selected_version["uuid"]
-    except Exception as exception:
-        print(
-            f"[yellow]Published prompt for {llm_module_name} wasn't found in local cache.[/yellow]"
-        )
-        return None, None, None
+        return selected_prompts, version_details
+    except Exception:
+        return None, None
 
 
 # Update
