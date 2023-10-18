@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from websockets.client import connect, WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 from readerwriterlock import rwlock
+from playhouse.shortcuts import model_to_dict
 
 import promptmodel.utils.logger as logger
 from promptmodel import Client
@@ -167,13 +168,15 @@ class DevWebsocketClient:
                     del llm_module_version["candidate_version"]
                     del llm_module_version["is_published"]
 
+                print(llm_module_versions)
                 llm_module_uuids = [
-                    version["llm_module_uuid"] for version in llm_module_versions
+                    version["llm_module_uuid"]["uuid"]
+                    for version in llm_module_versions
                 ]
                 llm_modules = list(
                     LLMModule.select().where(LLMModule.uuid.in_(llm_module_uuids))
                 )
-                llm_modules = [llm_module.__data__ for llm_module in llm_modules]
+                llm_modules = [model_to_dict(llm_module) for llm_module in llm_modules]
                 # find llm_module which is not deployed
                 llm_modules_only_in_local = []
                 for llm_module in llm_modules:
@@ -203,12 +206,14 @@ class DevWebsocketClient:
                 if llm_module_name not in llm_module_names:
                     logger.error(f"There is no llm_module {llm_module_name}.")
                     return
-                
+
                 # check variable matching
                 prompt_variables = []
                 for prompt in message["prompts"]:
-                    fstring_input_pattern = r'(?<!\\)(?<!{{)\{([^}]+)\}(?!\\)(?!}})'
-                    prompt_variables += re.findall(fstring_input_pattern, prompt['content'])
+                    fstring_input_pattern = r"(?<!\\)(?<!{{)\{([^}]+)\}(?!\\)(?!}})"
+                    prompt_variables += re.findall(
+                        fstring_input_pattern, prompt["content"]
+                    )
                 prompt_variables = list(set(prompt_variables))
                 if len(prompt_variables) != 0:
                     if sample_input is None:
@@ -221,9 +226,15 @@ class DevWebsocketClient:
                         logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
-                        
-                    if not all(variable in sample_input.keys() for variable in prompt_variables):
-                        missing_variables = [variable for variable in prompt_variables if variable not in sample_input.keys()]
+
+                    if not all(
+                        variable in sample_input.keys() for variable in prompt_variables
+                    ):
+                        missing_variables = [
+                            variable
+                            for variable in prompt_variables
+                            if variable not in sample_input.keys()
+                        ]
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
                             "status": "failed",
@@ -272,7 +283,7 @@ class DevWebsocketClient:
                         data.update(response)
                         logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-                    
+
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
                         "status": "running",
@@ -282,10 +293,10 @@ class DevWebsocketClient:
                     logger.debug(f"Sent response: {data}")
                     await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
-                    model = message['model']
-                    prompts = message['prompts']
-                    parsing_type = message['parsing_type']
-                    
+                    model = message["model"]
+                    prompts = message["prompts"]
+                    parsing_type = message["parsing_type"]
+
                     if sample_input:
                         messages_for_run = [
                             {

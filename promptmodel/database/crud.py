@@ -16,6 +16,7 @@ from playhouse.shortcuts import model_to_dict
 from promptmodel.utils.enums import LLMModuleVersionStatus
 from promptmodel.utils.random_utils import select_version
 from promptmodel.database.config import db
+from rich import print
 
 
 # Insert
@@ -305,19 +306,21 @@ def update_samples(samples: list[dict]):
     return
 
 
-def find_ancestor_version(llm_module_version_uuid: str):
+def find_ancestor_version(
+    llm_module_version_uuid: str, versions: Optional[list] = None
+):
     """Find ancestor version"""
 
     # get all versions
-    response = list(LLMModuleVersion.select())
-    versions = [x.__data__ for x in response]
-
-    # find ancestor version
+    if versions is None:
+        response = list(LLMModuleVersion.select())
+        versions = [model_to_dict(x) for x in response]
 
     # find target version
-    target = [
-        version for version in versions if version["uuid"] == llm_module_version_uuid
-    ][0]
+    target = list(
+        filter(lambda version: version["uuid"] == llm_module_version_uuid, versions)
+    )[0]
+
     return _find_ancestor(target, versions)
 
 
@@ -325,17 +328,18 @@ def find_ancestor_versions():
     """find ancestor versions for each versions in input"""
     # get all versions
     response = list(LLMModuleVersion.select())
-    versions = [x.__data__ for x in response]
+    versions = [model_to_dict(x) for x in response]
 
-    targets = [
-        version
-        for version in versions
-        if version["status"] == LLMModuleVersionStatus.CANDIDATE.value
-        and version["is_published"] is False
-    ]
+    targets = list(
+        filter(
+            lambda version: version["status"] == LLMModuleVersionStatus.CANDIDATE.value
+            and version["is_published"] is False,
+            versions,
+        )
+    )
 
     targets_with_real_ancestor = [
-        find_ancestor_version(target, versions) for target in targets
+        find_ancestor_version(target["uuid"], versions) for target in targets
     ]
     return targets_with_real_ancestor
 
@@ -343,6 +347,7 @@ def find_ancestor_versions():
 def _find_ancestor(target: dict, versions: list[dict]):
     ancestor = None
     temp = target
+    print(target)
     if target["from_uuid"] is None:
         ancestor = None
     else:
@@ -356,5 +361,6 @@ def _find_ancestor(target: dict, versions: list[dict]):
             else:
                 temp = new_temp
 
+    print(f"temp: {temp}")
     target["from_uuid"] = ancestor["uuid"] if ancestor is not None else None
     return target
