@@ -355,8 +355,10 @@ def find_ancestor_versions(target_llm_module_uuid: Optional[str] = None):
         find_ancestor_version(target["uuid"], versions)[0] for target in targets
     ]
     targets_with_real_ancestor = [target_and_prompt[0] for target_and_prompt in target_and_prompts]
+    target_prompts = []
+    for target_and_prompt in target_and_prompts:
+        target_prompts += target_and_prompt[1]
     
-    target_prompts = [target_and_prompt[1] for target_and_prompt in target_and_prompts]
     
     return targets_with_real_ancestor, target_prompts
 
