@@ -166,7 +166,7 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.GET_VERSIONS_TO_SAVE:
                 target_llm_module_uuid = message["llm_module_uuid"] if "llm_module_uuid" in message else None
                 
-                llm_module_versions, prompts = find_ancestor_versions()
+                llm_module_versions, prompts = find_ancestor_versions(target_llm_module_uuid)
                 for llm_module_version in llm_module_versions:
                     del llm_module_version["status"]
                     del llm_module_version["candidate_version"]
