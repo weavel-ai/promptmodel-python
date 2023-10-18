@@ -11,7 +11,7 @@ from promptmodel.database.models import (
     DeployedLLMModuleVersion,
     DeployedPrompt,
 )
-from peewee import Model
+from peewee import Model, Case
 from playhouse.shortcuts import model_to_dict
 from promptmodel.utils.enums import LLMModuleVersionStatus
 from promptmodel.utils.random_utils import select_version
@@ -321,7 +321,11 @@ def find_ancestor_version(
         filter(lambda version: version["uuid"] == llm_module_version_uuid, versions)
     )[0]
 
-    return _find_ancestor(target, versions)
+    target = _find_ancestor(target, versions)
+    
+    prompts = list(Prompt.select().where(Prompt.version_uuid == target["uuid"]))
+    prompts = [model_to_dict(x) for x in prompts]
+    return target, prompts
 
 
 def find_ancestor_versions():
@@ -343,7 +347,9 @@ def find_ancestor_versions():
     targets_with_real_ancestor = [
         find_ancestor_version(target["uuid"], versions) for target in targets
     ]
-    return targets_with_real_ancestor
+    target_prompts = list(Prompt.select().where(Prompt.version_uuid.in_([target['uuid'] for target in targets_with_real_ancestor])))
+    
+    return targets_with_real_ancestor, target_prompts
 
 
 def _find_ancestor(target: dict, versions: list[dict]):
@@ -365,3 +371,16 @@ def _find_ancestor(target: dict, versions: list[dict]):
 
     print(f"temp: {temp}")
     return target
+
+def update_candidate_version(
+    new_candidates: dict
+):
+    """Update candidate version"""
+    cases = [Case(LLMModuleVersion.uuid, ((uuid, version) for uuid, version in new_candidates.items()))]
+    with db.atomic():
+        # Create a CASE expression for updating multiple rows in a single query
+        (LLMModuleVersion
+            .update(candidate_version=cases)
+            .where(LLMModuleVersion.uuid.in_(new_candidates.keys()))
+            .execute())
+    return

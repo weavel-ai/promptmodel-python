@@ -29,6 +29,7 @@ from promptmodel.database.crud import (
     update_llm_module_version,
     find_ancestor_version,
     find_ancestor_versions,
+    update_candidate_version
 )
 from promptmodel.database.models import LLMModuleVersion, LLMModule
 from promptmodel.utils.enums import (
@@ -137,7 +138,7 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.GET_VERSION_TO_SAVE:
                 llm_module_version_uuid = message["llm_module_version_uuid"]
                 # change from_uuid to candidate ancestor
-                llm_module_version: dict = find_ancestor_version(
+                llm_module_version, prompts = find_ancestor_version(
                     llm_module_version_uuid
                 )
                 # delete status, candidate_version, is_published
@@ -157,18 +158,18 @@ class DevWebsocketClient:
                             "project_uuid": llm_module["project_uuid"],
                         },
                         "version": llm_module_version,
+                        "prompts": prompts
                     }
                 else:
-                    data = {"llm_module": None, "version": llm_module_version}
+                    data = {"llm_module": None, "version": llm_module_version, "prompts": prompts}
 
             elif message["type"] == LocalTask.GET_VERSIONS_TO_SAVE:
-                llm_module_versions: list[dict] = find_ancestor_versions()
+                llm_module_versions, prompts = find_ancestor_versions()
                 for llm_module_version in llm_module_versions:
                     del llm_module_version["status"]
                     del llm_module_version["candidate_version"]
                     del llm_module_version["is_published"]
 
-                print(llm_module_versions)
                 llm_module_uuids = [
                     version["llm_module_uuid"]["uuid"]
                     for version in llm_module_versions
@@ -188,8 +189,13 @@ class DevWebsocketClient:
                 data = {
                     "llm_modules": llm_modules_only_in_local,
                     "versions": llm_module_versions,
+                    "prompts" : prompts
                 }
 
+            elif message["type"] == LocalTask.UPDATE_CANDIDATE_VERSION_ID:
+                new_candidates = message["new_candidates"]
+                update_candidate_version(new_candidates)
+                
             elif message["type"] == LocalTask.RUN_LLM_MODULE:
                 llm_module_name = message["llm_module_name"]
                 sample_name = message["sample_name"]
