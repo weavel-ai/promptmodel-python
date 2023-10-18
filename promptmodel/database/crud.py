@@ -322,7 +322,7 @@ def find_ancestor_version(
     )[0]
 
     target = _find_ancestor(target, versions)
-    
+
     prompts = list(Prompt.select().where(Prompt.version_uuid == target["uuid"]))
     prompts = [model_to_dict(x) for x in prompts]
     return target, prompts
@@ -352,14 +352,15 @@ def find_ancestor_versions(target_llm_module_uuid: Optional[str] = None):
     )
 
     target_and_prompts = [
-        find_ancestor_version(target["uuid"], versions)[0] for target in targets
+        find_ancestor_version(target["uuid"], versions) for target in targets
     ]
-    targets_with_real_ancestor = [target_and_prompt[0] for target_and_prompt in target_and_prompts]
+    targets_with_real_ancestor = [
+        target_and_prompt[0] for target_and_prompt in target_and_prompts
+    ]
     target_prompts = []
     for target_and_prompt in target_and_prompts:
         target_prompts += target_and_prompt[1]
-    
-    
+
     return targets_with_real_ancestor, target_prompts
 
 
@@ -383,15 +384,13 @@ def _find_ancestor(target: dict, versions: list[dict]):
     print(f"temp: {temp}")
     return target
 
-def update_candidate_version(
-    new_candidates: dict
-):
+
+def update_candidate_version(new_candidates: dict):
     """Update candidate version"""
-    cases = [Case(LLMModuleVersion.uuid, ((uuid, version) for uuid, version in new_candidates.items()))]
     with db.atomic():
-        # Create a CASE expression for updating multiple rows in a single query
-        (LLMModuleVersion
-            .update(candidate_version=cases)
-            .where(LLMModuleVersion.uuid.in_(new_candidates.keys()))
-            .execute())
-    return
+        for uuid, version in new_candidates.items():
+            (
+                LLMModuleVersion.update(candidate_version=version)
+                .where(LLMModuleVersion.uuid == uuid)
+                .execute()
+            )

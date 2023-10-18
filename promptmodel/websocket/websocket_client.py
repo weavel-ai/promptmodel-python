@@ -29,7 +29,7 @@ from promptmodel.database.crud import (
     update_llm_module_version,
     find_ancestor_version,
     find_ancestor_versions,
-    update_candidate_version
+    update_candidate_version,
 )
 from promptmodel.database.models import LLMModuleVersion, LLMModule
 from promptmodel.utils.enums import (
@@ -158,15 +158,23 @@ class DevWebsocketClient:
                             "project_uuid": llm_module["project_uuid"],
                         },
                         "version": llm_module_version,
-                        "prompts": prompts
+                        "prompts": prompts,
                     }
                 else:
-                    data = {"llm_module": None, "version": llm_module_version, "prompts": prompts}
+                    data = {
+                        "llm_module": None,
+                        "version": llm_module_version,
+                        "prompts": prompts,
+                    }
 
             elif message["type"] == LocalTask.GET_VERSIONS_TO_SAVE:
-                target_llm_module_uuid = message["llm_module_uuid"] if "llm_module_uuid" in message else None
-                
-                llm_module_versions, prompts = find_ancestor_versions(target_llm_module_uuid)
+                target_llm_module_uuid = (
+                    message["llm_module_uuid"] if "llm_module_uuid" in message else None
+                )
+
+                llm_module_versions, prompts = find_ancestor_versions(
+                    target_llm_module_uuid
+                )
                 for llm_module_version in llm_module_versions:
                     del llm_module_version["status"]
                     del llm_module_version["candidate_version"]
@@ -191,13 +199,13 @@ class DevWebsocketClient:
                 data = {
                     "llm_modules": llm_modules_only_in_local,
                     "versions": llm_module_versions,
-                    "prompts" : prompts
+                    "prompts": prompts,
                 }
 
             elif message["type"] == LocalTask.UPDATE_CANDIDATE_VERSION_ID:
                 new_candidates = message["new_candidates"]
                 update_candidate_version(new_candidates)
-                
+
             elif message["type"] == LocalTask.RUN_LLM_MODULE:
                 llm_module_name = message["llm_module_name"]
                 sample_name = message["sample_name"]
@@ -369,7 +377,8 @@ class DevWebsocketClient:
                     raw_output=json.dumps(output["raw_output"]),
                     parsed_outputs=json.dumps(output["parsed_outputs"]),
                 )
-            response.update(data)
+            if data:
+                response.update(data)
             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
             logger.info(f"Sent response: {response}")
         except Exception as error:
