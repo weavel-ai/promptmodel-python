@@ -28,4 +28,13 @@ class ChangeLogAction(str, Enum):
     DELETE: str = "DEL"
     CHANGE: str = "CHG"
     FIX: str = "FIX"
+
+class Role(str, Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
     
+class ParsingType(str, Enum):
+    COLON = "colon"
+    SQURE_BRACKET = "square_bracket"
+    DOUBLE_SQURE_BRACKET = "double_square_bracket"

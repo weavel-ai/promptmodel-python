@@ -379,9 +379,9 @@ class DevWebsocketClient:
                     }
                 create_run_log(
                     llm_module_version_uuid=llm_module_version_uuid,
-                    inputs=json.dumps(sample_input),
-                    raw_output=json.dumps(output["raw_output"]),
-                    parsed_outputs=json.dumps(output["parsed_outputs"]),
+                    inputs=sample_input,
+                    raw_output=output["raw_output"],
+                    parsed_outputs=output["parsed_outputs"],
                 )
             if data:
                 response.update(data)

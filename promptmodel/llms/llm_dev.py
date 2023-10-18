@@ -9,21 +9,10 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import acompletion
 
-import promptmodel.utils.logger as logger
+from promptmodel.utils.enums import ParsingType
+from promptmodel.utils import logger
 
 load_dotenv()
-
-
-class Role:
-    SYSTEM = "system"
-    USER = "user"
-    ASSISTANT = "assistant"
-
-
-class ParsingType:
-    COLON = "colon"
-    SQURE_BRACKET = "square_bracket"
-    DOUBLE_SQURE_BRACKET = "double_square_bracket"
 
 
 class OpenAIMessage(BaseModel):
