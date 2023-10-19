@@ -72,12 +72,10 @@ class CodeReloadHandler(FileSystemEventHandler):
         new_llm_module_name_list = [
             llm_module.name for llm_module in new_client_instance.llm_modules
         ]
-        print(f"New list: {new_llm_module_name_list}")
         old_llm_module_name_list = [
             llm_module.name
             for llm_module in self.dev_websocket_client._client.llm_modules
         ]
-        print(f"Old list: {old_llm_module_name_list}")
 
         # 사라진 llm_modules 에 대해 local db llm_module.local_usage False Update
         removed_name_list = list(
