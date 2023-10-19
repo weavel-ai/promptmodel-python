@@ -3,10 +3,10 @@
 from promptmodel import Client
 
 # Example imports
-# from <dirname> import < objectname>
+# from <dirname> import <objectname>
 
 app = Client()
 
 # Example usage
 # This is needed to integrate your codebase with the prompt engineering dashboard
-# app.include(< objectname>)
+# app.include(<objectname>)

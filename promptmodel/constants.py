@@ -9,4 +9,7 @@ if deployment_stage == "local":
 else:
     ENDPOINT_URL = "https://promptmodel.up.railway.app/api/cli"
     WEB_CLIENT_URL = "https://promptmodel.vercel.app"
+
 GRANT_ACCESS_URL = "https://promptmodel.vercel.app/cli/grant-access"
+PROMPTMODEL_DEV_FILENAME = os.path.join(os.getcwd(), "promptmodel_dev.py")
+PROMPTMODEL_DEV_STARTER_FILENAME = "STARTER.py"
