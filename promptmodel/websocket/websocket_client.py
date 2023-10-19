@@ -181,7 +181,7 @@ class DevWebsocketClient:
                     del llm_module_version["is_published"]
 
                 llm_module_uuids = [
-                    version["llm_module_uuid"]["uuid"]
+                    version["llm_module_uuid"]
                     for version in llm_module_versions
                 ]
                 llm_modules = list(

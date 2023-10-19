@@ -112,7 +112,7 @@ def update_llm_module_version(llm_module_version_uuid: str, status: str):
 def list_llm_modules() -> List[Dict]:
     """List all LLM modules."""
     response: List[LLMModule] = list(LLMModule.select())
-    return [model_to_dict(x) for x in response]
+    return [model_to_dict(x, recurse=False) for x in response]
 
 
 def list_llm_module_versions(llm_module_uuid: str) -> List[Dict]:
@@ -122,7 +122,7 @@ def list_llm_module_versions(llm_module_uuid: str) -> List[Dict]:
         .where(LLMModuleVersion.llm_module_uuid == llm_module_uuid)
         .order_by(LLMModuleVersion.created_at)
     )
-    return [model_to_dict(x) for x in response]
+    return [model_to_dict(x, recurse=False) for x in response]
 
 
 def list_prompts(llm_module_version_uuid: str) -> List[Dict]:
@@ -132,7 +132,7 @@ def list_prompts(llm_module_version_uuid: str) -> List[Dict]:
         .where(Prompt.version_uuid == llm_module_version_uuid)
         .order_by(Prompt.step)
     )
-    return [model_to_dict(x) for x in response]
+    return [model_to_dict(x, recurse=False) for x in response]
 
 
 def list_samples():
@@ -148,7 +148,7 @@ def list_run_logs(llm_module_version_uuid: str) -> List[RunLog]:
         .where(RunLog.version_uuid == llm_module_version_uuid)
         .order_by(RunLog.created_at.desc())
     )
-    return [model_to_dict(x) for x in response]
+    return [model_to_dict(x, recurse=False) for x in response]
 
 
 # Select one
@@ -156,7 +156,7 @@ def get_llm_module_uuid(llm_module_name: str) -> Dict:
     """Get uuid of llm module by name"""
     try:
         response = LLMModule.get(LLMModule.name == llm_module_name)
-        return model_to_dict(response)
+        return model_to_dict(response, recurse=False)
     except:
         return None
 
@@ -165,7 +165,7 @@ def get_sample_input(sample_name: str) -> Dict:
     """Get sample input from local DB"""
     try:
         response = SampleInputs.get(SampleInputs.name == sample_name)
-        sample = model_to_dict(response)
+        sample = model_to_dict(response, recurse=False)
         # sample["contents"] = json.loads(sample["contents"])
         return sample
     except:
@@ -314,7 +314,7 @@ def find_ancestor_version(
     # get all versions
     if versions is None:
         response = list(LLMModuleVersion.select())
-        versions = [model_to_dict(x) for x in response]
+        versions = [model_to_dict(x, recurse=False) for x in response]
 
     # find target version
     target = list(
@@ -324,7 +324,7 @@ def find_ancestor_version(
     target = _find_ancestor(target, versions)
 
     prompts = list(Prompt.select().where(Prompt.version_uuid == target["uuid"]))
-    prompts = [model_to_dict(x) for x in prompts]
+    prompts = [model_to_dict(x, recurse=False) for x in prompts]
     return target, prompts
 
 
@@ -339,7 +339,7 @@ def find_ancestor_versions(target_llm_module_uuid: Optional[str] = None):
         )
     else:
         response = list(LLMModuleVersion.select())
-    versions = [model_to_dict(x) for x in response]
+    versions = [model_to_dict(x, recurse=False) for x in response]
 
     print(versions)
 
