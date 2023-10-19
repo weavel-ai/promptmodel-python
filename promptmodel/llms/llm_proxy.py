@@ -140,6 +140,12 @@ class LLMProxy(LLM):
     def agenerate(self, inputs: Dict[str, Any] = {}) -> str:
         return self._wrap_async_method(super().agenerate)(inputs)
 
+    def generate_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
+        return self._wrap_method(super().generate_function_call)(inputs)
+
+    def agenerate_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
+        return self._wrap_async_method(super().agenerate_function_call)(inputs)
+
     def stream(self, inputs: Dict[str, Any] = {}) -> Generator[str, None, None]:
         return self._wrap_gen(super().stream)(inputs)
 

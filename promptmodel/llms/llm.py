@@ -78,6 +78,30 @@ class LLM:
         if show_response:
             return res, response
         return res
+    
+    def generate_function_call(
+        self,
+        messages: List[Dict[str, str]],
+        functions: List[Any],
+        model: Optional[str] = None,
+        show_response: bool = False,
+    ):
+        """Return the response from openai chat completion."""
+        _model = model or self._model
+        response = completion(
+            model=_model,
+            messages=[
+                message.model_dump()
+                for message in self.__validate_openai_messages(messages)
+            ],
+            function_call=True,
+            functions=functions
+        )
+        content = response.choices[0]["message"]["content"]
+        call_func = response.choices[0]["message"]["function_call"] if "function_call" in response.choices[0]["message"] else None
+        if show_response:
+            return content, call_func, response
+        return content, call_func
 
     async def agenerate(
         self,
@@ -107,6 +131,41 @@ class LLM:
         if show_response:
             return res, response
         return res
+
+    async def agenerate_function_call(
+        self,
+        messages: List[Dict[str, str]],
+        functions: List[Any],
+        model: Optional[str] = None,
+        show_response: bool = False,
+    ):
+        """Return the response from openai chat completion."""
+        _model = model or self._model
+        if self._rate_limit_manager:
+            response = await self._rate_limit_manager.acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                function_call=True,
+                functions=functions
+            )
+        else:
+            response = await acompletion(
+                model=_model,
+                messages=[
+                    message.model_dump()
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                function_call=True,
+                functions=functions
+            )
+        content = response.choices[0]["message"]["content"] if "content" in response.choices[0]["message"] else None
+        call_func = response.choices[0]["message"]["function_call"] if "function_call" in response.choices[0]["message"] else None
+        if show_response:
+            return content, call_func, response
+        return content, call_func
 
     def stream(
         self,
