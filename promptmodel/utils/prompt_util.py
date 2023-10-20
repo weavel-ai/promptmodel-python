@@ -10,7 +10,7 @@ from promptmodel.database.crud import (
 )
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
-from promptmodel.apis.base import APIClient
+from promptmodel.apis.base import APIClient, AsyncAPIClient
 
 async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
     # Check dev_branch activate
@@ -39,7 +39,7 @@ async def update_deployed_db(config):
     else:
         cached_project_version = config["project"]["version"]
     try:
-        res = APIClient.execute(
+        res = await AsyncAPIClient.execute(
             method="GET",
             path="/check_update",
             params={"cached_version": cached_project_version},
