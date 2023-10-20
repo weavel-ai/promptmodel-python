@@ -1,7 +1,8 @@
 <div align="center">
     <a href="https://www.promptmodel.run">
-        <h1>Promptmodel</h1>
+        <img src="https://i.imgur.com/f3MHyH3.png" title="Logo" style="width: 160px; margin-bottom: 16px;" />
     </a>
+    <h1>Promptmodel</h1>
     <p>
         <h3>Prompt & model versioning on the cloud, built for developers.</h3>
         <p>
@@ -10,7 +11,7 @@
         </p>
     </p>
     <div>
-        <a href="https://pypi.org/project/fastrepl" target="_blank">
+        <a href="https://pypi.org/project/promptmodel" target="_blank">
             <img src="https://img.shields.io/pypi/v/promptmodel.svg" alt="PyPI Version">
         </a>
         <a href="https://discord.gg/4pUM3C4rbA" target="_blank">
