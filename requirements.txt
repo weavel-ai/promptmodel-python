@@ -10,3 +10,4 @@ websockets
 termcolor
 watchdog
 readerwriterlock
+httpx

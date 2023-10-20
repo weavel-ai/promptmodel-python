@@ -16,7 +16,7 @@ from promptmodel.llms.llm import LLM
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.prompt_util import fetch_prompts
-from promptmodel.apis.base import APIClient
+from promptmodel.apis.base import APIClient, AsyncAPIClient
 from promptmodel.database.crud import (
     get_latest_version_prompts,
     get_deployed_prompts,
@@ -124,11 +124,13 @@ class LLMProxy(LLM):
             return
         
         logger.debug(f"Logging to cloud: {version_uuid, inputs, raw_response, parsed_outputs}")
-        res = APIClient.execute(
-            method="POST",
-            path="/log_deployment_run",
-            params={"version_uuid": version_uuid, "inputs" : inputs, "raw_response": raw_response.to_dict_recursive, "parsed_outputs": parsed_outputs},
-            use_cli_key=False,
+        res = asyncio.run(
+            AsyncAPIClient.execute(
+                method="POST",
+                path="/log_deployment_run",
+                params={"version_uuid": version_uuid, "inputs" : inputs, "raw_response": raw_response.to_dict_recursive, "parsed_outputs": parsed_outputs},
+                use_cli_key=False,
+            )
         )
         if res.status_code != 200:
             logger.error(f"Failed to log to cloud: {res}")
