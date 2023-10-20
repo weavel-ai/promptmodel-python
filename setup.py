@@ -1,5 +1,5 @@
 """
-: Build LLM services in a blink
+Prompt & model versioning on the cloud, built for developers.
 """
 from setuptools import setup, find_namespace_packages
 
@@ -9,14 +9,14 @@ with open("README.md", "r") as fh:
 
 setup(
     name="promptmodel",
-    version="0.0.5",
+    version="0.0.4",
     packages=find_namespace_packages(),
     entry_points={
         "console_scripts": [
             "prompt = promptmodel.cli.main:app",
         ],
     },
-    description="Prompt versioning on the cloud, built for developers.",
+    description="Prompt & model versioning on the cloud, built for developers.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="weavel",
@@ -45,5 +45,7 @@ setup(
         "llm agent",
         "prompt",
         "versioning",
+        "eval",
+        "evaluation",
     ],
 )
