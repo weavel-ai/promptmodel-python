@@ -1,6 +1,7 @@
 import os
 import sys
 import importlib
+from typing import Any, Dict, List
 from threading import Timer
 from rich import print
 from watchdog.events import FileSystemEventHandler
@@ -17,6 +18,8 @@ from promptmodel.database.crud import (
     create_prompts,
     create_run_logs,
     update_samples,
+    get_llm_module_uuid,
+    update_llm_module_uuid,
 )
 from promptmodel.utils.enums import (
     LLMModuleVersionStatus,
@@ -143,105 +146,118 @@ def update_by_changelog_for_reload(
 
     for changelog in changelogs:
         level: int = changelog["level"]
-        action: str = changelog["changelog"]["action"]
-        # table:str = changelog['changelog']['object']
-        uuid_list: list = changelog["changelog"]["identifiers"]
+        logs = changelog['logs']
         if level == 1:
-            if action == ChangeLogAction.ADD.value:
-                llm_module_list = [
-                    x for x in project_status["llm_modules"] if x["uuid"] in uuid_list
-                ]
-                for llm_module in llm_module_list:
-                    local_db_llm_module_name_list = [
-                        x["name"] for x in local_db_llm_module_list
-                    ]
-
-                    if llm_module["name"] not in local_db_llm_module_name_list:
-                        # IF llm_module not in Local DB
-                        if llm_module["name"] in local_code_llm_module_name_list:
-                            # IF llm_module in Local Code
-                            llm_module["local_usage"] = True
-                            llm_module["is_deployment"] = True
-                            create_llm_modules([llm_module])
-                        else:
-                            llm_module["local_usage"] = False
-                            llm_module["is_deployment"] = True
-                            create_llm_modules([llm_module])
-            else:
-                # TODO: add code DELETE, CHANGE, FIX later
-                pass
-            previous_version_levels = changelog["previous_version"].split(".")
-            current_version_levels = [
-                str(int(previous_version_levels[0]) + 1),
-                "0",
-                "0",
-            ]
+            for log in logs:
+                subject = log['subject']
+                action:str = log['action']
+                if subject == "llm_module":
+                    update_llm_module_changelog(
+                        action=action,
+                        project_status=project_status,
+                        uuid_list=log['identifiers'],
+                        local_db_llm_module_list=local_db_llm_module_list,
+                        local_code_llm_module_name_list=local_code_llm_module_name_list
+                    )
+                elif subject == "llm_module_version":
+                    local_db_llm_module_list = update_llm_module_version_changelog(
+                        action=action,
+                        project_status=project_status,
+                        uuid_list=log['identifiers'],
+                        local_db_llm_module_list=local_db_llm_module_list,
+                        local_code_llm_module_name_list=local_code_llm_module_name_list
+                    )
+                else:
+                    pass
+            previous_version_levels = changelog['previous_version'].split(".")
+            current_version_levels = [str(int(previous_version_levels[0]) + 1), "0", "0"]
             current_version = ".".join(current_version_levels)
         elif level == 2:
-            if action == ChangeLogAction.ADD.value:
-                # find llm_module_version in project_status['llm_module_versions'] where uuid in uuid_list
-                llm_module_version_list = [
-                    x
-                    for x in project_status["llm_module_versions"]
-                    if x["uuid"] in uuid_list
-                ]
-                # check if llm_module_version['name'] is in local_code_llm_module_list
-                llm_module_version_list_to_update = [
-                    x
-                    for x in llm_module_version_list
-                    if x["name"] in local_code_llm_module_name_list
-                ]
-                update_uuid_list = [
-                    x["uuid"] for x in llm_module_version_list_to_update
-                ]
-
-                # find prompts and run_logs to update
-                prompts_to_update = [
-                    x
-                    for x in project_status["prompts"]
-                    if x["version_uuid"] in update_uuid_list
-                ]
-                run_logs_to_update = [
-                    x
-                    for x in project_status["run_logs"]
-                    if x["version_uuid"] in update_uuid_list
-                ]
-
-                for llm_module_version in llm_module_version_list_to_update:
-                    llm_module_version["candidate_version"] = llm_module_version[
-                        "version"
-                    ]
-                    del llm_module_version["version"]
-                    llm_module_version[
-                        "status"
-                    ] = LLMModuleVersionStatus.CANDIDATE.value
-
-                create_llm_module_versions(llm_module_version_list_to_update)
-                create_prompts(prompts_to_update)
-                create_run_logs(run_logs_to_update)
-
-                local_db_llm_module_list += [
-                    {"name": x["name"], "uuid": x["uuid"]}
-                    for x in llm_module_version_list_to_update
-                ]
-            else:
-                pass
-            previous_version_levels = changelog["previous_version"].split(".")
-            current_version_levels = [
-                previous_version_levels[0],
-                str(int(previous_version_levels[1]) + 1),
-                "0",
-            ]
+            for log in logs:
+                subject = log['subject']
+                action:str = log['action']
+                uuid_list:list = log['identifiers']
+                if subject == "llm_module_version":
+                    local_db_llm_module_list = update_llm_module_version_changelog(
+                        action=action,
+                        project_status=project_status,
+                        uuid_list=log['identifiers'],
+                        local_db_llm_module_list=local_db_llm_module_list,
+                        local_code_llm_module_name_list=local_code_llm_module_name_list
+                    )
+                else:
+                    pass
+            previous_version_levels = changelog['previous_version'].split(".")
+            current_version_levels = [previous_version_levels[0], str(int(previous_version_levels[1]) + 1), "0"]
             current_version = ".".join(current_version_levels)
         else:
-            pass
-            previous_version_levels = changelog["previous_version"].split(".")
-            current_version_levels = [
-                previous_version_levels[0],
-                previous_version_levels[1],
-                str(int(previous_version_levels[2]) + 1),
-            ]
+            previous_version_levels = changelog['previous_version'].split(".")
+            current_version_levels = [previous_version_levels[0], previous_version_levels[1], str(int(previous_version_levels[2]) + 1)]
             current_version = ".".join(current_version_levels)
 
         upsert_config({"project_version": current_version}, section="dev_branch")
     return True
+
+def update_llm_module_changelog(
+    action: ChangeLogAction,
+    project_status: dict,
+    uuid_list: list[str],
+    local_db_llm_module_list : list[dict],
+    local_code_llm_module_name_list : list[str]
+):
+    if action == ChangeLogAction.ADD.value:
+        llm_module_list = [x for x in project_status["llm_modules"] if x["uuid"] in uuid_list]
+        for llm_module in llm_module_list:
+            local_db_llm_module_name_list = [x["name"] for x in local_db_llm_module_list]
+
+            if llm_module["name"] not in local_db_llm_module_name_list:
+                # IF llm_module not in Local DB
+                if llm_module["name"] in local_code_llm_module_name_list:
+                    # IF llm_module in Local Code
+                    llm_module["local_usage"] = True
+                    llm_module["is_deployment"] = True
+                    create_llm_modules([llm_module])
+                else:
+                    llm_module["local_usage"] = False
+                    llm_module["is_deployment"] = True
+                    create_llm_modules([llm_module])
+            else:
+                # TODO: Fix UUID of llm_module
+                local_uuid = get_llm_module_uuid(llm_module["name"])
+                update_llm_module_uuid(local_uuid, llm_module["uuid"])
+                local_db_llm_module_list : list = list_llm_modules() 
+    else:
+        # TODO: add code DELETE, CHANGE, FIX later
+        pass
+                    
+def update_llm_module_version_changelog(
+    action: ChangeLogAction,
+    project_status: dict,
+    uuid_list: list[str],
+    local_db_llm_module_list : list[dict],
+    local_code_llm_module_name_list : list[str]
+) -> List[Dict[str, Any]]:
+    if action == ChangeLogAction.ADD.value:            
+        # find llm_module_version in project_status['llm_module_versions'] where uuid in uuid_list
+        llm_module_version_list = [x for x in project_status['llm_module_versions'] if x['uuid'] in uuid_list]
+        # check if llm_module_version['name'] is in local_code_llm_module_list
+        llm_module_version_list_to_update = [x for x in llm_module_version_list if x['name'] in local_code_llm_module_name_list]
+        update_uuid_list = [x['uuid'] for x in llm_module_version_list_to_update]
+        
+        # find prompts and run_logs to update
+        prompts_to_update = [x for x in project_status['prompts'] if x['version_uuid'] in update_uuid_list]
+        run_logs_to_update = [x for x in project_status['run_logs'] if x['version_uuid'] in update_uuid_list]
+        
+        for llm_module_version in llm_module_version_list_to_update:
+            llm_module_version['candidate_version'] = llm_module_version['version']
+            del llm_module_version['version']
+            llm_module_version['status'] = LLMModuleVersionStatus.CANDIDATE.value
+            
+        create_llm_module_versions(llm_module_version_list_to_update)
+        create_prompts(prompts_to_update)
+        create_run_logs(run_logs_to_update)
+        
+        local_db_llm_module_list += [{"name" : x['name'], "uuid" : x['uuid']} for x in llm_module_version_list_to_update]
+        return local_db_llm_module_list
+    else:
+        pass
