@@ -326,6 +326,7 @@ class DevWebsocketClient:
                     model = message["model"]
                     prompts = message["prompts"]
                     parsing_type = message["parsing_type"]
+                    output_keys = message["output_keys"]
 
                     if sample_input:
                         messages_for_run = [
@@ -337,7 +338,9 @@ class DevWebsocketClient:
                         ]
                     else:
                         messages_for_run = prompts
-                    res = llm_module_dev.dev_run(messages_for_run, parsing_type, model)
+                    res = llm_module_dev.dev_generate(
+                        messages_for_run, parsing_type, model, output_keys
+                    )
                     async for item in res:
                         # send item to backend
                         # save item & parse

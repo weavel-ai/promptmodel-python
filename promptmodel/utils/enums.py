@@ -35,6 +35,40 @@ class Role(str, Enum):
     ASSISTANT = "assistant"
     
 class ParsingType(str, Enum):
-    COLON = "colon"
-    SQURE_BRACKET = "square_bracket"
-    DOUBLE_SQURE_BRACKET = "double_square_bracket"
+    COLON = "colon" 
+    SQUARE_BRACKET = "square_bracket"
+    DOUBLE_SQUARE_BRACKET = "double_square_bracket"
+    HTML = "html"
+    
+class ParsingPattern(dict, Enum):
+    COLON = {
+        "start" : r"({key}): \n",
+        "end": None,
+        "whole": r"({key}): \n(.*?)",
+        "end_flag" : None,
+        "refresh_flag" : None
+    }
+    SQUARE_BRACKET = {
+        "start" : r"\[({key})\]",
+        "end": r"[/{key}]",
+        "whole": r"\[({key})\](.*?)\[/\1\]",
+        "end_flag" : r"[",
+        "refresh_flag" : r"]"
+    }
+    DOUBLE_SQUARE_BRACKET = {
+        "start" : r"\[\[({key})\]\]",
+        "end" : r"\[\[/{key}\]\]",
+        "whole" : r"\[\[({key})\]\](.*?)\[\[/\1\]\]",
+        "end_flag" : r"[",
+        "refresh_flag" : r"]"
+    }
+    HTML = {
+        "start" : r"<({key})>",
+        "end" : r"</{key}>",
+        "whole" : r"<({key})>(.*?)</\1>",
+        "end_flag" : r"<",
+        "refresh_flag" : r">"
+    }
+
+def get_pattern_by_type(parsing_type_value):
+    return ParsingPattern[ParsingType(parsing_type_value).name].value

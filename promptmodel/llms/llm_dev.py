@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import acompletion
 
-from promptmodel.utils.enums import ParsingType
+from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
 from promptmodel.utils import logger
 
 load_dotenv()
@@ -33,8 +33,9 @@ class LLMDev:
     async def dev_run(
         self,
         messages: List[Dict[str, str]],
-        parsing_type: ParsingType,
+        parsing_type: Optional[ParsingType] = None,
         model: Optional[str] = None,
+        output_keys: List[str] = [],
     ) -> AsyncGenerator[Dict[str, str], None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
@@ -47,51 +48,141 @@ class LLMDev:
             ],
             stream=True,
         )
-
-        if parsing_type == ParsingType.DOUBLE_SQURE_BRACKET:
+        if not parsing_type:
             async for chunk in response:
-                pause_stream = False
-                if "content" in chunk["choices"][0]["delta"]:
+               if "content" in chunk["choices"][0]["delta"]:
                     stream_value = chunk["choices"][0]["delta"]["content"]
-                    yield stream_value  # return raw output
-
-                    raw_output += stream_value  # 지금까지 생성된 누적 output
-                    pattern = r"\[\[.*?(\s*\(.+\))?\sstart\]\](.*?)\[\[.*?(\s*\(.+\))?\send\]\]"
-                    stripped_output = re.sub(
-                        pattern, "", raw_output, flags=re.DOTALL
-                    )  # 누적 output에서 [key start] ~ [key end] 부분을 제거한 output
-                    streaming_key = re.findall(
-                        r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
-                        stripped_output,
-                        flags=re.DOTALL,  # stripped output에서 [key start] 부분을 찾음
-                    )
-                    if not streaming_key:  # 아직 output value를 streaming 중이 아님
-                        continue
-
-                    if len(streaming_key) > 1:
-                        raise ValueError("Multiple Matches")
-                    # key = streaming_key[0].lower()
-                    key = streaming_key[0]
-
-                    if stream_value.find("]") != -1 or "[" in re.sub(
-                        r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
-                        "",
-                        stripped_output.split(f"[[{key} start]]")[-1],
-                        flags=re.DOTALL,
-                    ):  # 현재 stream 중인 output이 [[key end]] 부분일 경우에는 pause_stream을 True로 설정
-                        if stream_value.find("[") != -1:
-                            if cache.find("[[") != -1:
-                                # logger.info("[[ in cache")
-                                pause_stream = True
-                            else:
-                                cache += "["
-                        pause_stream = True
-                    if not pause_stream:
-                        yield {key: stream_value}  # return parsed output
-                    elif stream_value.find("]") != -1:
-                        # Current stream_value (that includes ]) isn't yielded, but the next stream_values will be yielded.
-                        cache = ""
-                        pause_stream = False
+                    yield stream_value  # return raw output 
         else:
-            # TODO: add other parsing types
-            pass
+            if parsing_type == ParsingType.COLON.value:
+                # TODO: implement colon parsing
+                pass
+            else:
+                parsing_pattern : Dict[str, str] = get_pattern_by_type(parsing_type)
+                expected_pattern_keys = "|".join(map(re.escape, output_keys))
+                whole_pattern: str = parsing_pattern["whole"].format(key=expected_pattern_keys)
+                start_pattern: str = parsing_pattern["start"].format(key=expected_pattern_keys)
+                end_pattern_raw: str = parsing_pattern["end"]
+                end_flag: str = parsing_pattern["end_flag"]
+                refresh_flag: str = parsing_pattern["refresh_flag"]
+                if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
+                    terminate_flag = "]]"
+                    end_identifier = "[["
+                    
+                    pause_stream = False
+                    pause_cache = ""
+                    streaming_key = None
+                    async for chunk in response:
+                        if "content" in chunk["choices"][0]["delta"]:
+                            stream_value = chunk["choices"][0]["delta"]["content"]
+                            yield stream_value  # return raw output
+
+                            raw_output += stream_value  # 지금까지 생성된 누적 output
+
+                            stripped_output = re.sub(
+                                whole_pattern, "", raw_output, flags=re.DOTALL
+                            )  # 누적 output에서 [key start] ~ [key end] 부분을 제거한 output
+                            
+                            new_streaming_key = re.findall(
+                                start_pattern,
+                                stripped_output,
+                                flags=re.DOTALL,  # Find start pattern in stripped output
+                            )
+
+                            if len(streaming_key) > 1:
+                                raise ValueError("Multiple Matches")
+                            
+                            if not streaming_key:
+                                if not new_streaming_key: # If no start pattern found, continue
+                                    continue
+                                streaming_key = new_streaming_key[0]
+                            
+                            end_pattern = end_pattern_raw.format(key=streaming_key) # end pattern should have same key with start pattern
+                            
+                            if stream_value.find(end_flag) != -1: # if 1st token of end pattern apears in stream value, pause stream
+                                pause_stream = True
+                            
+                            if pause_stream: # if pause stream, cache stream value
+                                pause_cache += stream_value
+                            else:
+                                yield {streaming_key : stream_value}
+                                
+                            if stream_value.find(refresh_flag) != -1: # if last token of end pattern apears in stream value,
+                                if pause_cache.find(end_identifier) == -1: # if "[[" is not in pause cache
+                                    if stream_value.find(end_flag) != -1: # if stream_value is like "]["
+                                        # yield only before end_flag & save after end_flag to pause cache (save with end_flag)
+                                        yield {streaming_key : pause_cache.split(end_flag)[0].replace(end_flag, "")}
+                                        pause_cache = end_flag + pause_cache.split(end_flag)[1]
+                                        pause_stream = True
+                                    else:
+                                        yield {streaming_key : pause_cache}
+                                        pause_cache = ""
+                                        pause_stream = False
+                                elif terminate_flag in pause_cache: # if ]] is in pause cache
+                                    if pause_cache.find(end_pattern) != -1: # if there is end pattern
+                                        yield {streaming_key : pause_cache.split(end_pattern)[0].replace(end_pattern, "")}
+                                        streaming_key = None
+                                        pause_cache = ""
+                                        pause_stream = False
+                                    else:
+                                        raise ValueError(f"Parsing Error, \"{pause_cache}\" is forbidden.")
+                                else: # generating psuedo end pattern
+                                    continue
+                                                            
+                    # if streaming end but there is still pause stream, parsing error
+                    if streaming_key:
+                        raise ValueError("Parsing Error. End pattern did not be generated properly.")
+                    
+                else:
+                    
+                    pause_stream = False
+                    pause_cache = ""
+                    streaming_key = None
+                    async for chunk in response:
+                        if "content" in chunk["choices"][0]["delta"]:
+                            stream_value = chunk["choices"][0]["delta"]["content"]
+                            yield stream_value  # return raw output
+
+                            raw_output += stream_value  # 지금까지 생성된 누적 output
+
+                            stripped_output = re.sub(
+                                whole_pattern, "", raw_output, flags=re.DOTALL
+                            )  # 누적 output에서 [key start] ~ [key end] 부분을 제거한 output
+                            
+                            new_streaming_key = re.findall(
+                                start_pattern,
+                                stripped_output,
+                                flags=re.DOTALL,  # Find start pattern in stripped output
+                            )
+
+                            if len(streaming_key) > 1:
+                                raise ValueError("Multiple Matches")
+                            
+                            if not streaming_key:
+                                if not new_streaming_key: # If no start pattern found, continue
+                                    continue
+                                streaming_key = new_streaming_key[0]
+                            
+                            end_pattern = end_pattern_raw.format(key=streaming_key) # end pattern should have same key with start pattern
+                            
+                            if stream_value.find(end_flag) != -1: # if 1st token of end pattern apears in stream value, pause stream
+                                pause_stream = True
+                            
+                            if pause_stream: # if pause stream, cache stream value
+                                pause_cache += stream_value
+                            else:
+                                yield {streaming_key : stream_value}
+                                
+                            if stream_value.find(refresh_flag) != -1: # if last token of end pattern apears in stream value,
+                                if pause_cache.find(end_pattern) != -1: # if there is end pattern
+                                    yield {streaming_key : pause_cache.split(end_pattern)[0].replace(end_pattern, "")}
+                                    streaming_key = None
+                                    pause_cache = ""
+                                    pause_stream = False
+                                else:
+                                    raise ValueError(f"Parsing Error, \"{pause_cache}\" is forbidden.")
+                                                            
+                    # if streaming end but there is still pause stream, parsing error
+                    if streaming_key:
+                        raise ValueError("Parsing Error. End pattern did not be generated properly.")
+                    

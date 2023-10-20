@@ -299,22 +299,25 @@ class LLM:
                 if output_keys is not None:
                     if key not in output_keys:  # 미리 정해둔 output key가 아님
                         continue
-                if stream_value.find("]") != -1 or "[" in re.sub(
+                if stream_value.find("]") != -1 or "[" in re.sub(  # 닫히는 중이거나 시작했거나, 열리기 시작하고 있으면 일단 멈춘다.
                     r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
                     "",
                     stripped_output,
                     flags=re.DOTALL,
                 ):  # 현재 stream 중인 output이 [[key end]] 부분일 경우에는 pause_stream을 True로 설정
-                    if stream_value.find("[") != -1:
-                        if cache.find("[[") != -1:
-                            pause_stream = True
+                    pause_stream = True 
+                    
+                    if stream_value.find("[") != -1: # 열리기 시작한 상태면
+                        if cache.find("[[") != -1: # end_identifier 가 존재하면
+                            pause_stream = True # 멈춘다
                         else:
-                            cache += "["
-                    pause_stream = True
-                if pause_stream:
-                    if stream_value.find("]") != -1:
-                        cache = ""
-                        pause_stream = False
+                            cache += "[" # end_identifier 가 존재하지 않으면, 일단 캐시에 기록한다
+                
+                    
+                if pause_stream: # 멈춘상태에서
+                    if stream_value.find("]") != -1: # 닫히기 시작하거나 닫히는 중이면,
+                        cache = "" # 캐시를 초기화하고
+                        pause_stream = False # stream 을 재시작한다
                     continue
 
                 yield {key: stream_value}

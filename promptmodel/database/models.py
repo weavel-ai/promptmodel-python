@@ -63,7 +63,7 @@ class LLMModuleVersion(BaseModel):
         default=None,
         constraints=[
             Check(
-                f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQURE_BRACKET.value}', '{ParsingType.DOUBLE_SQURE_BRACKET.value}')"
+                f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQUARE_BRACKET.value}', '{ParsingType.DOUBLE_SQUARE_BRACKET.value}')"
             )
         ]
     )
@@ -128,7 +128,7 @@ class DeployedLLMModuleVersion(BaseModel):
         default=None,
         constraints=[
             Check(
-                f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQURE_BRACKET.value}', '{ParsingType.DOUBLE_SQURE_BRACKET.value}')"
+                f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQUARE_BRACKET.value}', '{ParsingType.DOUBLE_SQUARE_BRACKET.value}')"
             )
         ]
     )
