@@ -305,6 +305,22 @@ def update_samples(samples: list[dict]):
         SampleInputs.insert_many(samples).execute()
     return
 
+def update_llm_module_uuid(local_uuid, new_uuid):
+    """Update llm_module_uuid"""
+    with db.atomic():
+        local_llm_module : LLMModule = LLMModule.get(LLMModule.uuid == local_uuid)
+        LLMModule.create(
+            uuid=new_uuid,
+            name=local_llm_module.name,
+            project_uuid=local_llm_module.project_uuid,
+            created_at=local_llm_module.created_at,
+            local_usage=local_llm_module.local_usage,
+            is_deployment=True
+        )
+        LLMModuleVersion.update(llm_module_uuid=new_uuid).where(LLMModuleVersion.llm_module_uuid == local_uuid).execute()
+        LLMModule.delete().where(LLMModule.uuid == local_uuid).execute()
+    return
+
 
 def find_ancestor_version(
     llm_module_version_uuid: str, versions: Optional[list] = None
