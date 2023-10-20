@@ -13,31 +13,35 @@ import promptmodel.utils.logger as logger
 
 load_dotenv()
 
+
 class Role:
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
-    
+
+
 class ParsingType:
     COLON = "colon"
     SQURE_BRACKET = "square_bracket"
     DOUBLE_SQURE_BRACKET = "double_square_bracket"
 
+
 class OpenAIMessage(BaseModel):
     role: str
     content: str
-    
+
+
 class LLMDev:
     def __init__(self):
         self._model: str
-        
+
     def __validate_openai_messages(
         self, messages: List[Dict[str, str]]
     ) -> List[OpenAIMessage]:
         """Validate and convert list of dictionaries to list of OpenAIMessage."""
         return [OpenAIMessage(**message) for message in messages]
-        
-    async def dev_generate(
+
+    async def dev_run(
         self,
         messages: List[Dict[str, str]],
         parsing_type: ParsingType,
@@ -63,9 +67,7 @@ class LLMDev:
                     yield stream_value  # return raw output
 
                     raw_output += stream_value  # 지금까지 생성된 누적 output
-                    pattern = (
-                        r"\[\[.*?(\s*\(.+\))?\sstart\]\](.*?)\[\[.*?(\s*\(.+\))?\send\]\]"
-                    )
+                    pattern = r"\[\[.*?(\s*\(.+\))?\sstart\]\](.*?)\[\[.*?(\s*\(.+\))?\send\]\]"
                     stripped_output = re.sub(
                         pattern, "", raw_output, flags=re.DOTALL
                     )  # 누적 output에서 [key start] ~ [key end] 부분을 제거한 output
@@ -81,7 +83,7 @@ class LLMDev:
                         raise ValueError("Multiple Matches")
                     # key = streaming_key[0].lower()
                     key = streaming_key[0]
-                    
+
                     if stream_value.find("]") != -1 or "[" in re.sub(
                         r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
                         "",
@@ -96,7 +98,7 @@ class LLMDev:
                                 cache += "["
                         pause_stream = True
                     if not pause_stream:
-                        yield {key: stream_value} # return parsed output
+                        yield {key: stream_value}  # return parsed output
                     elif stream_value.find("]") != -1:
                         # Current stream_value (that includes ]) isn't yielded, but the next stream_values will be yielded.
                         cache = ""

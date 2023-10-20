@@ -71,11 +71,11 @@ class PromptModel(metaclass=RegisteringMeta):
         prompts, _, _ = asyncio.run(fetch_prompts(self.name))
         return prompts
 
-    def generate(self, inputs: Dict[str, Any] = {}) -> str:
-        return self.llm_proxy.generate(inputs)
+    def run(self, inputs: Dict[str, Any] = {}) -> str:
+        return self.llm_proxy.run(inputs)
 
-    async def agenerate(self, inputs: Dict[str, Any] = {}) -> str:
-        return await self.agenerate(inputs)
+    async def arun(self, inputs: Dict[str, Any] = {}) -> str:
+        return await self.arun(inputs)
 
     def stream(self, inputs: Dict[str, Any] = {}) -> Generator[str, None, None]:
         for item in self.llm_proxy.stream(inputs):
@@ -87,19 +87,19 @@ class PromptModel(metaclass=RegisteringMeta):
         async for item in self.llm_proxy.astream(inputs):
             yield item
 
-    def generate_and_parse(
+    def run_and_parse(
         self,
         inputs: Dict[str, Any] = {},
         output_keys: List[str] = [],
     ) -> Dict[str, str]:
-        return self.llm_proxy.generate_and_parse(inputs, output_keys)
+        return self.llm_proxy.run_and_parse(inputs, output_keys)
 
-    async def agenerate_and_parse(
+    async def arun_and_parse(
         self,
         inputs: Dict[str, Any] = {},
         output_keys: List[str] = [],
     ) -> Dict[str, str]:
-        return await self.llm_proxy.agenerate_and_parse(inputs, output_keys)
+        return await self.llm_proxy.arun_and_parse(inputs, output_keys)
 
     def stream_and_parse(
         self,
@@ -117,21 +117,19 @@ class PromptModel(metaclass=RegisteringMeta):
         async for item in self.llm_proxy.astream_and_parse(inputs, output_keys):
             yield item
 
-    def generate_and_parse_function_call(
+    def run_and_parse_function_call(
         self,
         inputs: Dict[str, Any] = {},
         function_list: List[Callable[..., Any]] = [],
     ) -> Generator[str, None, None]:
-        return self.llm_proxy.generate_and_parse_function_call(inputs, function_list)
+        return self.llm_proxy.run_and_parse_function_call(inputs, function_list)
 
-    async def agenerate_and_parse_function_call(
+    async def arun_and_parse_function_call(
         self,
         inputs: Dict[str, Any] = {},
         function_list: List[Callable[..., Any]] = [],
     ) -> Generator[str, None, None]:
-        return await self.llm_proxy.agenerate_and_parse_function_call(
-            inputs, function_list
-        )
+        return await self.llm_proxy.arun_and_parse_function_call(inputs, function_list)
 
     async def astream_and_parse_function_call(
         self,

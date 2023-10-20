@@ -181,8 +181,7 @@ class DevWebsocketClient:
                     del llm_module_version["is_published"]
 
                 llm_module_uuids = [
-                    version["llm_module_uuid"]
-                    for version in llm_module_versions
+                    version["llm_module_uuid"] for version in llm_module_versions
                 ]
                 llm_modules = list(
                     LLMModule.select().where(LLMModule.uuid.in_(llm_module_uuids))
@@ -326,9 +325,7 @@ class DevWebsocketClient:
                         ]
                     else:
                         messages_for_run = prompts
-                    res = llm_module_dev.dev_generate(
-                        messages_for_run, parsing_type, model
-                    )
+                    res = llm_module_dev.dev_run(messages_for_run, parsing_type, model)
                     async for item in res:
                         # send item to backend
                         # save item & parse
