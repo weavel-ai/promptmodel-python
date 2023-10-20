@@ -176,6 +176,7 @@ class DevWebsocketClient:
                     target_llm_module_uuid
                 )
                 for llm_module_version in llm_module_versions:
+                    del llm_module_version["id"]
                     del llm_module_version["status"]
                     del llm_module_version["candidate_version"]
                     del llm_module_version["is_published"]
@@ -193,6 +194,7 @@ class DevWebsocketClient:
                     if llm_module["is_deployment"] is False:
                         del llm_module["is_deployment"]
                         del llm_module["local_usage"]
+                        del llm_module["id"]
                         llm_modules_only_in_local.append(llm_module)
 
                 data = {
