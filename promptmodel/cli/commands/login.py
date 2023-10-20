@@ -30,7 +30,7 @@ def login():
             if res.json() == True:
                 print("[green]Access granted![/green] 🎉")
                 print(
-                    "Run [violet][bold]prompt dev[/bold][/violet] to start developing prompts.\n"
+                    "Run [violet][bold]prompt init[/bold][/violet] to start developing prompts.\n"
                 )
                 return
         except Exception as err:

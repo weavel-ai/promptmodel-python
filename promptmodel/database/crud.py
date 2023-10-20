@@ -267,6 +267,13 @@ def update_local_usage_llm_module_by_name(llm_module_name: str, local_usage: boo
         .execute()
     )
 
+def rename_llm_module(llm_module_uuid: str, new_name: str):
+    """Update the name of the given LLM module."""
+    return (
+        LLMModule.update(name=new_name)
+        .where(LLMModule.uuid == llm_module_uuid)
+        .execute()
+    )
 
 def hide_llm_module_not_in_code(local_llm_module_list: list):
     return (
