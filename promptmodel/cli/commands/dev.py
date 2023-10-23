@@ -391,7 +391,7 @@ def update_llm_module_version_changelog(
         llm_module_version_list_in_changelog = [x for x in project_status['llm_module_versions'] if x['uuid'] in uuid_list]
         
         # check if llm_module_version['uuid'] is in local_db_llm_module_list
-        local_db_version_uuid_list = [x.uuid for x in list(LLMModuleVersion.select())]
+        local_db_version_uuid_list = [str(x.uuid) for x in list(LLMModuleVersion.select())]
         version_list_to_update = [
             x for x in llm_module_version_list_in_changelog
             if x['uuid'] not in local_db_version_uuid_list
