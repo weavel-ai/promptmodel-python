@@ -29,12 +29,14 @@ from promptmodel.utils.crypto import generate_api_key, encrypt_message
 from promptmodel.utils.enums import LLMModuleVersionStatus, ChangeLogAction
 from promptmodel.websocket import DevWebsocketClient, CodeReloadHandler
 from promptmodel.database.orm import initialize_db
+from promptmodel.database.models import LLMModuleVersion
 from promptmodel.database.crud import (
     create_llm_modules,
     create_llm_module_versions,
     create_prompts,
     create_run_logs,
     list_llm_modules,
+    list_llm_module_versions,
     create_llm_module,
     create_llm_module_version,
     create_prompt,
@@ -386,23 +388,29 @@ def update_llm_module_version_changelog(
 ) -> List[Dict[str, Any]]:
     if action == ChangeLogAction.ADD.value:            
         # find llm_module_version in project_status['llm_module_versions'] where uuid in uuid_list
-        llm_module_version_list_to_update = [x for x in project_status['llm_module_versions'] if x['uuid'] in uuid_list]
-        # check if llm_module_version['name'] is in local_code_llm_module_list
+        llm_module_version_list_in_changelog = [x for x in project_status['llm_module_versions'] if x['uuid'] in uuid_list]
+        
+        # check if llm_module_version['uuid'] is in local_db_llm_module_list
+        local_db_version_uuid_list = [x.uuid for x in list(LLMModuleVersion.select())]
+        version_list_to_update = [
+            x for x in llm_module_version_list_in_changelog
+            if x['uuid'] not in local_db_version_uuid_list
+        ]
+        version_uuid_list_to_update = [x['uuid'] for x in version_list_to_update]
         
         # find prompts and run_logs to update
-        prompts_to_update = [x for x in project_status['prompts'] if x['version_uuid'] in uuid_list]
-        run_logs_to_update = [x for x in project_status['run_logs'] if x['version_uuid'] in uuid_list]
+        prompts_to_update = [x for x in project_status['prompts'] if x['version_uuid'] in version_uuid_list_to_update]
+        run_logs_to_update = [x for x in project_status['run_logs'] if x['version_uuid'] in version_uuid_list_to_update]
         
-        for llm_module_version in llm_module_version_list_to_update:
+        for llm_module_version in version_list_to_update:
             llm_module_version['candidate_version'] = llm_module_version['version']
             del llm_module_version['version']
             llm_module_version['status'] = LLMModuleVersionStatus.CANDIDATE.value
             
-        create_llm_module_versions(llm_module_version_list_to_update)
+        create_llm_module_versions(version_list_to_update)
         create_prompts(prompts_to_update)
         create_run_logs(run_logs_to_update)
         
-        # local_db_llm_module_list += [{"name" : x['name'], "uuid" : x['uuid']} for x in llm_module_version_list_to_update]
         return local_db_llm_module_list
     else:
         pass
