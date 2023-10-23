@@ -128,12 +128,11 @@ class CacheManager:
         atexit.register(self._terminate)
         # # logger.debug("CacheManager initialized")
         self.cache_thread = threading.Thread(target=self._run_cache_loop)
+        self.cache_thread.daemon = True
         self.cache_thread.start()
 
     def _run_cache_loop(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._update_cache_periodically())
+        asyncio.run(self._update_cache_periodically())
 
     async def _update_cache_periodically(self):
         while True:
