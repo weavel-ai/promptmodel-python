@@ -95,6 +95,7 @@ class DevWebsocketClient:
         if message.get("runner_id"):
             response["runner_id"] = message["runner_id"]
 
+        data = None
         try:
             if message["type"] == LocalTask.LIST_MODULES:
                 res_from_local_db = list_llm_modules()
@@ -378,7 +379,7 @@ class DevWebsocketClient:
                 )
             if data:
                 response.update(data)
-            await ws.send(json.dumps(response, cls=CustomJSONEncoder))
+                await ws.send(json.dumps(response, cls=CustomJSONEncoder))
             logger.info(f"Sent response: {response}")
         except Exception as error:
             logger.error(f"Error handling message: {error}")

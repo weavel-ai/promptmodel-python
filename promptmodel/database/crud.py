@@ -425,4 +425,5 @@ def update_candidate_version(new_candidates: dict):
         )
         llm_module_versions = model_to_dict(llm_module_versions, recurse=False)
         llm_module_uuids = [llm_module.llm_module_uuid for llm_module in llm_module_versions]
+        print(llm_module_uuids)
         LLMModule.update(is_deployment=True).where(LLMModule.uuid.in_(llm_module_uuids)).execute()
