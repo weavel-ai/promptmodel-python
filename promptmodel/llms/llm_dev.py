@@ -92,7 +92,7 @@ class LLMDev:
                     ):  # 현재 stream 중인 output이 [[key end]] 부분일 경우에는 pause_stream을 True로 설정
                         if stream_value.find("[") != -1:
                             if cache.find("[[") != -1:
-                                logger.info("[[ in cache")
+                                # logger.info("[[ in cache")
                                 pause_stream = True
                             else:
                                 cache += "["

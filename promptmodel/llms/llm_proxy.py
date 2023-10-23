@@ -145,9 +145,9 @@ class LLMProxy(LLM):
         ):
             return
 
-        logger.debug(
-            f"Logging to cloud: {version_uuid, inputs, raw_response, parsed_outputs}"
-        )
+        # logger.debug(
+        #     f"Logging to cloud: {version_uuid, inputs, raw_response, parsed_outputs}"
+        # )
         res = asyncio.run(
             AsyncAPIClient.execute(
                 method="POST",

@@ -39,7 +39,7 @@ class Client:
             self.cache_manager = None
         else:
             self.cache_manager = CacheManager()
-        # logger.debug("Client initialized")
+        # # logger.debug("Client initialized")
 
     def fastmodel(self, name: str) -> LLMProxy:
         return LLMProxy(name)
@@ -126,7 +126,7 @@ class CacheManager:
         self.program_alive = True
         initialize_db()
         atexit.register(self._terminate)
-        # logger.debug("CacheManager initialized")
+        # # logger.debug("CacheManager initialized")
         loop = asyncio.new_event_loop()
         loop.run_until_complete(self._update_cache_periodically())
         loop.close()
@@ -134,7 +134,7 @@ class CacheManager:
     async def _update_cache_periodically(self):
         while True:
             await self.update_cache()
-            # logger.debug("Update cache")
+            # # logger.debug("Update cache")
             await asyncio.sleep(self.update_interval)  # Non-blocking sleep
 
     async def update_cache(self):

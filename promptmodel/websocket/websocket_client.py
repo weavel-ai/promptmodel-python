@@ -84,7 +84,7 @@ class DevWebsocketClient:
     async def __handle_message(
         self, message: Dict[str, Any], ws: WebSocketClientProtocol
     ):
-        logger.info(f"Received message: {message}")
+        # logger.info(f"Received message: {message}")
         response: Dict[Any, str] = {}
         # If the message has a correlation_id, add it to the response
         # correlation_id is the unique ID of the function from backend to local
@@ -250,7 +250,7 @@ class DevWebsocketClient:
                             "log": f"Prompts have variables {prompt_variables}. You should select sample input.",
                         }
                         data.update(response)
-                        logger.debug(f"Sent response: {data}")
+                        # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
 
@@ -268,7 +268,7 @@ class DevWebsocketClient:
                             "log": f"Sample input does not have variables {missing_variables} in prompts.",
                         }
                         data.update(response)
-                        logger.debug(f"Sent response: {data}")
+                        # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
 
@@ -308,7 +308,7 @@ class DevWebsocketClient:
                             "status": "running",
                         }
                         data.update(response)
-                        logger.debug(f"Sent response: {data}")
+                        # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
                     data = {
@@ -317,7 +317,7 @@ class DevWebsocketClient:
                         "inputs": sample_input if sample_input else {},
                     }
                     data.update(response)
-                    logger.debug(f"Sent response: {data}")
+                    # logger.debug(f"Sent response: {data}")
                     await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
                     model = message["model"]
@@ -361,7 +361,7 @@ class DevWebsocketClient:
                                 "parsed_outputs": item,
                             }
                         data.update(response)
-                        logger.debug(f"Sent response: {data}")
+                        # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
                     data = {
