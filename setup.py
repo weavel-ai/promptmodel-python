@@ -22,6 +22,7 @@ setup(
     author="weavel",
     url="https://github.com/weavel-ai/promptmodel",
     install_requires=[
+        "httpx",
         "pydantic",
         "peewee",
         "typer[all]",

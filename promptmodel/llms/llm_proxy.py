@@ -11,6 +11,7 @@ from typing import (
     Tuple,
     Union,
 )
+from rich import print
 from litellm import RateLimitManager, ModelResponse
 from promptmodel.llms.llm import LLM
 from promptmodel.utils import logger
@@ -36,6 +37,7 @@ class LLMProxy(LLM):
             prompts, model, version_uuid = asyncio.run(fetch_prompts(self._name))
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
+
             call_args = self._prepare_call_args(prompts, model, inputs, True, kwargs)
             # Call the generator with the arguments
             gen_instance = gen(**call_args)
@@ -83,8 +85,9 @@ class LLMProxy(LLM):
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
             prompts, model, version_uuid = asyncio.run(fetch_prompts(self._name))
+            print(prompts, model, version_uuid)
             call_args = self._prepare_call_args(prompts, model, inputs, True, kwargs)
-
+            print(call_args)
             # Call the method with the arguments
             result, raw_response = method(**call_args)
             if isinstance(result, dict):
@@ -112,9 +115,20 @@ class LLMProxy(LLM):
 
         return async_wrapper
 
-    def _prepare_call_args(self, prompts, model, inputs, show_response, kwargs):
+    def _prepare_call_args(
+        self,
+        prompts: List[Dict[str, str]],
+        model: str,
+        inputs: Dict[str, Any],
+        show_response: bool,
+        kwargs,
+    ):
+        stringified_inputs = {key: str(value) for key, value in inputs.items()}
         messages = [
-            {"content": prompt["content"].format(**inputs), "role": prompt["role"]}
+            {
+                "content": prompt["content"].format(**stringified_inputs),
+                "role": prompt["role"],
+            }
             for prompt in prompts
         ]
         call_args = {
@@ -145,24 +159,25 @@ class LLMProxy(LLM):
         ):
             return
 
-        # logger.debug(
-        #     f"Logging to cloud: {version_uuid, inputs, raw_response, parsed_outputs}"
-        # )
+        raw_response_dict = raw_response.to_dict_recursive()
+        raw_response_dict.update({"response_ms": raw_response.response_ms})
         res = asyncio.run(
             AsyncAPIClient.execute(
                 method="POST",
                 path="/log_deployment_run",
                 params={
                     "version_uuid": version_uuid,
+                },
+                json={
                     "inputs": inputs,
-                    "raw_response": raw_response.to_dict_recursive,
+                    "raw_response": raw_response_dict,
                     "parsed_outputs": parsed_outputs,
                 },
                 use_cli_key=False,
             )
         )
         if res.status_code != 200:
-            logger.error(f"Failed to log to cloud: {res}")
+            print(f"[red]Failed to log to cloud: {res.json()}[/red]")
         return
 
     def run(self, inputs: Dict[str, Any] = {}) -> str:

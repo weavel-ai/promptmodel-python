@@ -204,10 +204,10 @@ def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]
         return None, None, None
 
 
-def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], str]:
+def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], str, str]:
     try:
         with db.atomic():
-            versions: List[DeployedLLMModuleVersion] = (
+            versions: List[DeployedLLMModuleVersion] = list(
                 DeployedLLMModuleVersion.select()
                 .join(DeployedLLMModule)
                 .where(
@@ -216,9 +216,9 @@ def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], st
                         DeployedLLMModule.name == llm_module_name
                     ).uuid
                 )
-                .get()
             )
-            prompts: List[DeployedPrompt] = (
+            print("yay")
+            prompts: List[DeployedPrompt] = list(
                 DeployedPrompt.select()
                 .where(
                     DeployedPrompt.version_uuid.in_(
@@ -231,12 +231,17 @@ def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], st
         selected_version = select_version([version.__data__ for version in versions])
         selected_prompts = list(
             filter(
-                lambda prompt: prompt.version_uuid == selected_version["uuid"], prompts
+                lambda prompt: str(prompt.version_uuid.uuid)
+                == str(selected_version["uuid"]),
+                prompts,
             )
         )
 
         return selected_prompts, selected_version["model"], selected_version["uuid"]
-    except Exception:
+    except Exception as exception:
+        print(
+            f"[yellow]Published prompt for {llm_module_name} wasn't found in local cache.[/yellow]"
+        )
         return None, None, None
 
 

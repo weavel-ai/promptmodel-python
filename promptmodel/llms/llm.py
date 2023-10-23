@@ -29,9 +29,11 @@ class OpenAIMessage(BaseModel):
     content: str
 
 
+DEFAULT_MODEL = "gpt-3.5-turbo"
+
+
 class LLM:
     def __init__(self, rate_limit_manager: Optional[RateLimitManager] = None):
-        self._model: str
         self._rate_limit_manager = rate_limit_manager
 
     @classmethod
@@ -60,13 +62,13 @@ class LLM:
     def run(
         self,
         messages: List[Dict[str, str]],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ):
         """Return the response from openai chat completion."""
-        _model = model or self._model
+        print("hi")
         response = completion(
-            model=_model,
+            model=model,
             messages=[
                 message.model_dump()
                 for message in self.__validate_openai_messages(messages)
@@ -81,13 +83,12 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         functions: List[Any],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ):
         """Return the response from openai chat completion."""
-        _model = model or self._model
         response = completion(
-            model=_model,
+            model=model,
             messages=[
                 message.model_dump()
                 for message in self.__validate_openai_messages(messages)
@@ -108,14 +109,13 @@ class LLM:
     async def arun(
         self,
         messages: List[Dict[str, str]],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ):
         """Return the response from openai chat completion."""
-        _model = model or self._model
         if self._rate_limit_manager:
             response = await self._rate_limit_manager.acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -123,7 +123,7 @@ class LLM:
             )
         else:
             response = await acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -138,14 +138,13 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         functions: List[Any],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ):
         """Return the response from openai chat completion."""
-        _model = model or self._model
         if self._rate_limit_manager:
             response = await self._rate_limit_manager.acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -155,7 +154,7 @@ class LLM:
             )
         else:
             response = await acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -180,15 +179,14 @@ class LLM:
     def stream(
         self,
         messages: List[Dict[str, str]],  # input
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ):
         """Stream openai chat completion."""
-        _model = model or self._model
         # load_prompt()
         start_time = datetime.datetime.now()
         response = completion(
-            model=_model,
+            model=model,
             messages=[
                 message.model_dump()
                 for message in self.__validate_openai_messages(messages)
@@ -213,13 +211,12 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         output_keys: List[str],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ) -> Dict[str, str]:
         """Parse and return output from openai chat completion."""
-        _model = model or self._model
         response = completion(
-            model=_model,
+            model=model,
             messages=[
                 message.model_dump()
                 for message in self.__validate_openai_messages(messages)
@@ -239,16 +236,15 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         output_keys: List[str],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
         **kwargs,
     ) -> Generator[Dict[str, str], None, None]:
         """Parse & stream output from openai chat completion."""
-        _model = model or self._model
         raw_output = ""
         start_time = datetime.datetime.now()
         response = completion(
-            model=_model,
+            model=model,
             messages=[
                 message.model_dump()
                 for message in self.__validate_openai_messages(messages)
@@ -313,7 +309,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         output_keys: List[str],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ) -> Dict[str, str]:
         """Generate openai chat completion asynchronously, and parse the output.
@@ -332,10 +328,9 @@ class LLM:
 
         Now generate the output:
         """
-        _model = model or self._model
         if self._rate_limit_manager:
             response = await self._rate_limit_manager.acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -343,7 +338,7 @@ class LLM:
             )
         else:
             response = await acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -432,15 +427,14 @@ class LLM:
     async def astream(
         self,
         messages: List[Dict[str, str]],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ) -> Generator[Dict[str, str], None, None]:
         """Parse & stream output from openai chat completion."""
-        _model = model or self._model
         start_time = datetime.datetime.now()
         if self._rate_limit_manager:
             response = await self._rate_limit_manager.acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -449,7 +443,7 @@ class LLM:
             )
         else:
             response = await acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -473,16 +467,15 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         output_keys: List[str],
-        model: Optional[str] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ) -> AsyncGenerator[Dict[str, str], None]:
         """Parse & stream output from openai chat completion."""
-        _model = model or self._model
         raw_output = ""
         start_time = datetime.datetime.now()
         if self._rate_limit_manager:
             response = await self._rate_limit_manager.acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -491,7 +484,7 @@ class LLM:
             )
         else:
             response = await acompletion(
-                model=_model,
+                model=model,
                 messages=[
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
@@ -634,11 +627,12 @@ class LLM:
                     )
 
     def make_model_response(
+        self,
         chunk: dict,
         response_ms,
         messages: List[Dict[str, str]],
         raw_output: str,
-        function_call: Optional[dict],
+        function_call: Optional[dict] = None,
     ) -> ModelResponse:
         choices = [
             {

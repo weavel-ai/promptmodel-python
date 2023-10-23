@@ -19,13 +19,17 @@ from peewee import (
 from promptmodel.database.config import BaseModel
 from promptmodel.utils.enums import LLMModuleVersionStatus
 
+
 class LLMModule(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     created_at = DateTimeField(default=datetime.datetime.now)
     project_uuid = UUIDField()
     name = CharField()
     local_usage = BooleanField(default=True)
-    is_deployment = BooleanField(default=False) # mark if the module is published to the cloud
+    is_deployment = BooleanField(
+        default=False
+    )  # mark if the module is published to the cloud
+
 
 class LLMModuleVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
@@ -46,7 +50,9 @@ class LLMModuleVersion(BaseModel):
     )
     model = CharField()
     candidate_version = IntegerField(null=True)
-    is_published = BooleanField(default=False) # Real publised version (not candidate = saved in cloud version)
+    is_published = BooleanField(
+        default=False
+    )  # Real publised version (not candidate = saved in cloud version)
 
 
 class Prompt(BaseModel):
@@ -76,13 +82,14 @@ class RunLog(BaseModel):
     raw_output = TextField()
     parsed_outputs = TextField()
     is_deployment = BooleanField(default=False)
-    
+
+
 class SampleInputs(BaseModel):
     id = AutoField()
     created_at = DateTimeField(default=datetime.datetime.now)
     name = TextField(unique=True)
     contents = TextField()
-    
+
     def set_contents(self, data: dict):
         self.contents = json.dumps(data)
 
@@ -93,7 +100,8 @@ class SampleInputs(BaseModel):
 class DeployedLLMModule(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     name = CharField()
-    
+
+
 class DeployedLLMModuleVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     from_uuid = UUIDField(null=True)
@@ -107,7 +115,7 @@ class DeployedLLMModuleVersion(BaseModel):
     is_published = BooleanField(default=False)
     is_ab_test = BooleanField(default=False)
     ratio = FloatField(null=True)
-    
+
 
 class DeployedPrompt(BaseModel):
     id = AutoField()

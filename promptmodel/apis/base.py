@@ -9,6 +9,7 @@ from promptmodel.utils.config_utils import read_config
 from promptmodel.constants import ENDPOINT_URL
 from promptmodel.utils.crypto import decrypt_message
 
+
 class APIClient:
     """
     A class to represent an API request client.
@@ -112,9 +113,10 @@ class APIClient:
                 print(f"[red]Error: {response}[/red]")
                 exit()
         except requests.exceptions.ConnectionError:
-            print("[red]Could not connect to the Fastllm API.[/red]")
+            print("[red]Could not connect to the Promptmodel API.[/red]")
         except requests.exceptions.Timeout:
             print("[red]The request timed out.[/red]")
+
 
 class AsyncAPIClient:
     """
@@ -155,6 +157,11 @@ class AsyncAPIClient:
             decrypted_key = decrypt_message(encrypted_key)
         else:
             decrypted_key = os.environ.get("PROMPTMODEL_API_KEY")
+            if decrypted_key is None:
+                raise Exception(
+                    "PROMPTMODEL_API_KEY was not found in the current environment."
+                )
+        print(decrypted_key)
         headers = {"Authorization": f"Bearer {decrypted_key}"}
         return headers
 
@@ -206,21 +213,18 @@ class AsyncAPIClient:
                     json=json,
                     **kwargs,
                 )
+                print(response.status_code)
             if not response:
                 print(f"[red]Error: {response}[/red]")
-                exit()
             if response.status_code == 200:
                 return response
             elif response.status_code == 403:
                 if not ignore_auth_error:
-                    print(
-                        "[red]Authentication failed. Please run [violet][bold]prompt login[/bold][/violet] first.[/red]"
-                    )
-                    exit()
+                    print("[red]Authentication failed.[/red]")
             else:
                 print(f"[red]Error: {response}[/red]")
-                exit()
+            return response
         except requests.exceptions.ConnectionError:
-            print("[red]Could not connect to the Fastllm API.[/red]")
+            print("[red]Could not connect to the Promptmodel API.[/red]")
         except requests.exceptions.Timeout:
             print("[red]The request timed out.[/red]")

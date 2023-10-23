@@ -19,10 +19,10 @@ def init(from_cli: bool = True):
         with open(PROMPTMODEL_DEV_FILENAME, "w") as target_file:
             target_file.write(content)
         print(
-        "[violet][bold]promptmodel_dev.py[/bold][/violet] was successfully created!"
+            "[violet][bold]promptmodel_dev.py[/bold][/violet] was successfully created!"
         )
         print(
-        "Add promptmodels in your code, then run [violet][bold]prompt dev[/bold][/violet] to start engineering prompts."
+            "Add promptmodels in your code, then run [violet][bold]prompt dev[/bold][/violet] to start engineering prompts."
         )
     elif from_cli:
         print(
