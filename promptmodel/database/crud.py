@@ -417,3 +417,13 @@ def update_candidate_version(new_candidates: dict):
                 .where(LLMModuleVersion.uuid == uuid)
                 .execute()
             )
+        # Find LLMModule
+        llm_modules : List[LLMModule] = list(
+            LLMModule.select().where(
+                LLMModule.uuid.in_(
+                    list(new_candidates.keys())
+                )
+            )
+        )
+        llm_module_uuids = [llm_module.uuid for llm_module in llm_modules]
+        LLMModule.update(is_deployment=True).where(LLMModule.uuid.in_(llm_module_uuids)).execute()
