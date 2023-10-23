@@ -217,7 +217,6 @@ def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], st
                     ).uuid
                 )
             )
-            print("yay")
             prompts: List[DeployedPrompt] = list(
                 DeployedPrompt.select()
                 .where(
@@ -374,8 +373,6 @@ def find_ancestor_versions(target_llm_module_uuid: Optional[str] = None):
         response = list(LLMModuleVersion.select())
     versions = [model_to_dict(x, recurse=False) for x in response]
 
-    print(versions)
-
     targets = list(
         filter(
             lambda version: version["status"] == LLMModuleVersionStatus.CANDIDATE.value
@@ -414,7 +411,6 @@ def _find_ancestor(target: dict, versions: list[dict]):
                 temp = new_temp
         target["from_uuid"] = ancestor["uuid"] if ancestor is not None else None
 
-    print(f"temp: {temp}")
     return target
 
 
@@ -436,7 +432,6 @@ def update_candidate_version(new_candidates: dict):
         llm_module_uuids = [
             llm_module.llm_module_uuid.uuid for llm_module in llm_module_versions
         ]
-        print(llm_module_uuids)
         LLMModule.update(is_deployment=True).where(
             LLMModule.uuid.in_(llm_module_uuids)
         ).execute()

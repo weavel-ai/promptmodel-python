@@ -161,7 +161,6 @@ class AsyncAPIClient:
                 raise Exception(
                     "PROMPTMODEL_API_KEY was not found in the current environment."
                 )
-        print(decrypted_key)
         headers = {"Authorization": f"Bearer {decrypted_key}"}
         return headers
 
@@ -213,7 +212,6 @@ class AsyncAPIClient:
                     json=json,
                     **kwargs,
                 )
-                print(response.status_code)
             if not response:
                 print(f"[red]Error: {response}[/red]")
             if response.status_code == 200:

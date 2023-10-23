@@ -53,6 +53,24 @@ class LLM:
         else:
             return None
 
+    @classmethod
+    def __parse_outputs__(cls, raw_output: str) -> Dict[str, str]:
+        """Parse all key-value pairs from raw output."""
+        pattern = (
+            r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\](.*?)\[\[\1(?:\s*\(.+\))?\send\]\]"
+        )
+        matches = re.findall(pattern, raw_output, flags=re.DOTALL)
+
+        parsed_outputs = {}
+        for key, value in matches:
+            parsed_key = key.strip()
+            parsed_value = value.strip()
+            if parsed_key in parsed_outputs:
+                raise ValueError(f"Multiple Matches for key: {parsed_key}")
+            parsed_outputs[parsed_key] = parsed_value
+
+        return parsed_outputs
+
     def __validate_openai_messages(
         self, messages: List[Dict[str, str]]
     ) -> List[OpenAIMessage]:
@@ -66,7 +84,6 @@ class LLM:
         show_response: bool = False,
     ):
         """Return the response from openai chat completion."""
-        print("hi")
         response = completion(
             model=model,
             messages=[
@@ -210,7 +227,7 @@ class LLM:
     def run_and_parse(
         self,
         messages: List[Dict[str, str]],
-        output_keys: List[str],
+        output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ) -> Dict[str, str]:
@@ -224,9 +241,12 @@ class LLM:
         )
         raw_output = response.choices[0]["message"]["content"]
 
-        parsed_output = {}
-        for key in output_keys:
-            parsed_output[key] = self.__parse_output__(raw_output, key)
+        if output_keys is None:
+            parsed_output = self.__parse_outputs__(raw_output)
+        else:
+            parsed_output = {}
+            for key in output_keys:
+                parsed_output[key] = self.__parse_output__(raw_output, key)
 
         if show_response:
             return parsed_output, response
@@ -235,7 +255,7 @@ class LLM:
     def stream_and_parse(
         self,
         messages: List[Dict[str, str]],
-        output_keys: List[str],
+        output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
         **kwargs,
@@ -276,8 +296,9 @@ class LLM:
                     raise ValueError("Multiple Matches")
                 # key = streaming_key[0].lower()
                 key = streaming_key[0]
-                if key not in output_keys:  # 미리 정해둔 output key가 아님
-                    continue
+                if output_keys is not None:
+                    if key not in output_keys:  # 미리 정해둔 output key가 아님
+                        continue
                 if stream_value.find("]") != -1 or "[" in re.sub(
                     r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
                     "",
@@ -308,7 +329,7 @@ class LLM:
     async def arun_and_parse(
         self,
         messages: List[Dict[str, str]],
-        output_keys: List[str],
+        output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ) -> Dict[str, str]:
@@ -346,11 +367,14 @@ class LLM:
             )
         raw_output = response.choices[0]["message"]["content"]
         # # logger.debug(f"Output:\n{raw_output}")
-        parsed_output = {}
-        for key in output_keys:
-            output = self.__parse_output__(raw_output, key)
-            if output:
-                parsed_output[key] = output
+        if output_keys is None:
+            parsed_output = self.__parse_outputs__(raw_output)
+        else:
+            parsed_output = {}
+            for key in output_keys:
+                output = self.__parse_output__(raw_output, key)
+                if output:
+                    parsed_output[key] = output
 
         if show_response:
             return parsed_output, response
@@ -375,7 +399,6 @@ class LLM:
             functions=function_list,
             function_call="auto",
         )
-        print(response)
         function_args = response["choices"][0]["message"]["function_call"]["arguments"]
         # make function_args to dict
         function_args = function_args.replace("'", '"')
@@ -466,7 +489,7 @@ class LLM:
     async def astream_and_parse(
         self,
         messages: List[Dict[str, str]],
-        output_keys: List[str],
+        output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ) -> AsyncGenerator[Dict[str, str], None]:
@@ -515,8 +538,9 @@ class LLM:
                     raise ValueError("Multiple Matches")
                 # key = streaming_key[0].lower()
                 key = streaming_key[0]
-                if key not in output_keys:  # 미리 정해둔 output key가 아님
-                    continue
+                if output_keys is not None:
+                    if key not in output_keys:  # 미리 정해둔 output key가 아님
+                        continue
                 if stream_value.find("]") != -1 or "[" in re.sub(
                     r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
                     "",

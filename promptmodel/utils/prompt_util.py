@@ -36,7 +36,6 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
         # call update_local API in background task
         asyncio.create_task(update_deployed_db(config))
         # get prompt from local DB by ratio
-        print("name", name)
         prompt_rows, model, version_uuid = get_deployed_prompts(name)
         if prompt_rows is None:
             return [], "", None
@@ -65,7 +64,6 @@ async def update_deployed_db(config):
         res = res.json()
         if res["need_update"]:
             # update local DB with res['project_status']
-            print("hey")
             project_status = res["project_status"]
             await update_deployed_cache(project_status)
             upsert_config({"version": res["version"]}, section="project")

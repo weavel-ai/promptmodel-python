@@ -85,9 +85,7 @@ class LLMProxy(LLM):
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
             prompts, model, version_uuid = asyncio.run(fetch_prompts(self._name))
-            print(prompts, model, version_uuid)
             call_args = self._prepare_call_args(prompts, model, inputs, True, kwargs)
-            print(call_args)
             # Call the method with the arguments
             result, raw_response = method(**call_args)
             if isinstance(result, dict):
@@ -137,8 +135,6 @@ class LLMProxy(LLM):
             "show_response": show_response,
         }
 
-        if "output_keys" in kwargs:
-            call_args["output_keys"] = kwargs["output_keys"]
         if "function_list" in kwargs:
             call_args["function_list"] = kwargs["function_list"]
 
@@ -186,11 +182,11 @@ class LLMProxy(LLM):
     def arun(self, inputs: Dict[str, Any] = {}) -> str:
         return self._wrap_async_method(super().arun)(inputs)
 
-    def run_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
-        return self._wrap_method(super().run_function_call)(inputs)
+    # def run_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
+    #     return self._wrap_method(super().run_function_call)(inputs)
 
-    def arun_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
-        return self._wrap_async_method(super().arun_function_call)(inputs)
+    # def arun_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
+    #     return self._wrap_async_method(super().arun_function_call)(inputs)
 
     def stream(self, inputs: Dict[str, Any] = {}) -> Generator[str, None, None]:
         return self._wrap_gen(super().stream)(inputs)
@@ -203,54 +199,50 @@ class LLMProxy(LLM):
     def run_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        output_keys: List[str] = [],
     ) -> Dict[str, str]:
-        return self._wrap_gen(super().run_and_parse)(inputs, output_keys)
+        return self._wrap_method(super().run_and_parse)(inputs)
 
     def arun_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        output_keys: List[str] = [],
     ) -> Dict[str, str]:
-        return self._wrap_async_gen(super().arun_and_parse)(inputs, output_keys)
+        return self._wrap_async_gen(super().arun_and_parse)(inputs)
 
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        output_keys: List[str] = [],
     ) -> Generator[str, None, None]:
-        return self._wrap_gen(super().stream_and_parse)(inputs, output_keys)
+        return self._wrap_gen(super().stream_and_parse)(inputs)
 
     def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        output_keys: List[str] = [],
     ) -> AsyncGenerator[str, None]:
-        return self._wrap_async_gen(super().astream_and_parse)(inputs, output_keys)
+        return self._wrap_async_gen(super().astream_and_parse)(inputs)
 
-    def run_and_parse_function_call(
-        self,
-        inputs: Dict[str, Any] = {},
-        function_list: List[Callable[..., Any]] = [],
-    ) -> Generator[str, None, None]:
-        return self._wrap_method(super().run_and_parse_function_call)(
-            inputs, function_list
-        )
+    # def run_and_parse_function_call(
+    #     self,
+    #     inputs: Dict[str, Any] = {},
+    #     function_list: List[Callable[..., Any]] = [],
+    # ) -> Generator[str, None, None]:
+    #     return self._wrap_method(super().run_and_parse_function_call)(
+    #         inputs, function_list
+    #     )
 
-    def arun_and_parse_function_call(
-        self,
-        inputs: Dict[str, Any] = {},
-        function_list: List[Callable[..., Any]] = [],
-    ) -> Generator[str, None, None]:
-        return self._wrap_async_method(super().arun_and_parse_function_call)(
-            inputs, function_list
-        )
+    # def arun_and_parse_function_call(
+    #     self,
+    #     inputs: Dict[str, Any] = {},
+    #     function_list: List[Callable[..., Any]] = [],
+    # ) -> Generator[str, None, None]:
+    #     return self._wrap_async_method(super().arun_and_parse_function_call)(
+    #         inputs, function_list
+    #     )
 
-    def astream_and_parse_function_call(
-        self,
-        inputs: Dict[str, Any] = {},
-        function_list: List[Callable[..., Any]] = [],
-    ) -> AsyncGenerator[str, None]:
-        return self._wrap_async_gen(super().astream_and_parse_function_call)(
-            inputs, function_list
-        )
+    # def astream_and_parse_function_call(
+    #     self,
+    #     inputs: Dict[str, Any] = {},
+    #     function_list: List[Callable[..., Any]] = [],
+    # ) -> AsyncGenerator[str, None]:
+    #     return self._wrap_async_gen(super().astream_and_parse_function_call)(
+    #         inputs, function_list
+    #     )
