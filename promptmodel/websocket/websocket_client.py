@@ -95,6 +95,7 @@ class DevWebsocketClient:
         if message.get("runner_id"):
             response["runner_id"] = message["runner_id"]
 
+        data = None
         try:
             if message["type"] == LocalTask.LIST_MODULES:
                 res_from_local_db = list_llm_modules()
@@ -146,6 +147,9 @@ class DevWebsocketClient:
                 del llm_module_version["candidate_version"]
                 del llm_module_version["is_published"]
 
+                for prompt in prompts:
+                    del prompt["id"]
+
                 llm_module = LLMModule.get(
                     LLMModule.uuid == llm_module_version.llm_module_uuid
                 ).__data__
@@ -180,6 +184,9 @@ class DevWebsocketClient:
                     del llm_module_version["status"]
                     del llm_module_version["candidate_version"]
                     del llm_module_version["is_published"]
+
+                for prompt in prompts:
+                    del prompt["id"]
 
                 llm_module_uuids = [
                     version["llm_module_uuid"] for version in llm_module_versions
@@ -378,7 +385,7 @@ class DevWebsocketClient:
                 )
             if data:
                 response.update(data)
-            await ws.send(json.dumps(response, cls=CustomJSONEncoder))
+                await ws.send(json.dumps(response, cls=CustomJSONEncoder))
             logger.info(f"Sent response: {response}")
         except Exception as error:
             logger.error(f"Error handling message: {error}")
