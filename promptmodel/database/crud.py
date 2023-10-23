@@ -267,6 +267,7 @@ def update_local_usage_llm_module_by_name(llm_module_name: str, local_usage: boo
         .execute()
     )
 
+
 def rename_llm_module(llm_module_uuid: str, new_name: str):
     """Update the name of the given LLM module."""
     return (
@@ -274,6 +275,7 @@ def rename_llm_module(llm_module_uuid: str, new_name: str):
         .where(LLMModule.uuid == llm_module_uuid)
         .execute()
     )
+
 
 def hide_llm_module_not_in_code(local_llm_module_list: list):
     return (
@@ -312,19 +314,22 @@ def update_samples(samples: list[dict]):
         SampleInputs.insert_many(samples).execute()
     return
 
+
 def update_llm_module_uuid(local_uuid, new_uuid):
     """Update llm_module_uuid"""
     with db.atomic():
-        local_llm_module : LLMModule = LLMModule.get(LLMModule.uuid == local_uuid)
+        local_llm_module: LLMModule = LLMModule.get(LLMModule.uuid == local_uuid)
         LLMModule.create(
             uuid=new_uuid,
             name=local_llm_module.name,
             project_uuid=local_llm_module.project_uuid,
             created_at=local_llm_module.created_at,
             local_usage=local_llm_module.local_usage,
-            is_deployment=True
+            is_deployment=True,
         )
-        LLMModuleVersion.update(llm_module_uuid=new_uuid).where(LLMModuleVersion.llm_module_uuid == local_uuid).execute()
+        LLMModuleVersion.update(llm_module_uuid=new_uuid).where(
+            LLMModuleVersion.llm_module_uuid == local_uuid
+        ).execute()
         LLMModule.delete().where(LLMModule.uuid == local_uuid).execute()
     return
 
@@ -418,12 +423,15 @@ def update_candidate_version(new_candidates: dict):
                 .execute()
             )
         # Find LLMModule
-        llm_module_versions : List[LLMModuleVersion]= list(
+        llm_module_versions: List[LLMModuleVersion] = list(
             LLMModuleVersion.select().where(
                 LLMModuleVersion.uuid.in_(list(new_candidates.keys()))
             )
         )
-        llm_module_versions = model_to_dict(llm_module_versions, recurse=False)
-        llm_module_uuids = [llm_module.llm_module_uuid for llm_module in llm_module_versions]
+        llm_module_uuids = [
+            llm_module.llm_module_uuid.uuid for llm_module in llm_module_versions
+        ]
         print(llm_module_uuids)
-        LLMModule.update(is_deployment=True).where(LLMModule.uuid.in_(llm_module_uuids)).execute()
+        LLMModule.update(is_deployment=True).where(
+            LLMModule.uuid.in_(llm_module_uuids)
+        ).execute()

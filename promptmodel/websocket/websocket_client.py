@@ -147,6 +147,9 @@ class DevWebsocketClient:
                 del llm_module_version["candidate_version"]
                 del llm_module_version["is_published"]
 
+                for prompt in prompts:
+                    del prompt["id"]
+
                 llm_module = LLMModule.get(
                     LLMModule.uuid == llm_module_version.llm_module_uuid
                 ).__data__
@@ -181,6 +184,9 @@ class DevWebsocketClient:
                     del llm_module_version["status"]
                     del llm_module_version["candidate_version"]
                     del llm_module_version["is_published"]
+
+                for prompt in prompts:
+                    del prompt["id"]
 
                 llm_module_uuids = [
                     version["llm_module_uuid"] for version in llm_module_versions
