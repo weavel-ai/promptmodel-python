@@ -338,7 +338,7 @@ class DevWebsocketClient:
                         ]
                     else:
                         messages_for_run = prompts
-                    res = llm_module_dev.dev_generate(
+                    res = llm_module_dev.dev_run(
                         messages_for_run, parsing_type, model, output_keys
                     )
                     async for item in res:
