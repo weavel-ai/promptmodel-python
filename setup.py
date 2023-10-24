@@ -9,7 +9,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="promptmodel",
-    version="0.0.9",
+    version="0.0.10",
     packages=find_namespace_packages(),
     entry_points={
         "console_scripts": [
@@ -22,7 +22,7 @@ setup(
     author="weavel",
     url="https://github.com/weavel-ai/promptmodel",
     install_requires=[
-        "httpx",
+        "httpx[http2]",
         "pydantic",
         "peewee",
         "typer[all]",

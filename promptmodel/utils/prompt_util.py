@@ -17,21 +17,22 @@ from promptmodel.apis.base import APIClient, AsyncAPIClient
 async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
     # Check dev_branch activate
     config = read_config()
-    if config["dev_branch"]["initializing"] == True:
-        return [], "", None
-    elif "dev_branch" in config and config["dev_branch"]["online"] == True:
-        # get prompt from local DB
-        prompt_rows, model, version_uuid = get_latest_version_prompts(name)
-        if prompt_rows is None:
+    if "dev_branch" in config:
+        if config["dev_branch"]["initializing"] == True:
             return [], "", None
-        return (
-            [
-                {"role": prompt.role, "content": prompt.content}
-                for prompt in prompt_rows
-            ],
-            model,
-            version_uuid,
-        )
+        elif config["dev_branch"]["online"] == True:
+            # get prompt from local DB
+            prompt_rows, model, version_uuid = get_latest_version_prompts(name)
+            if prompt_rows is None:
+                return [], "", None
+            return (
+                [
+                    {"role": prompt.role, "content": prompt.content}
+                    for prompt in prompt_rows
+                ],
+                model,
+                version_uuid,
+            )
     else:
         # call update_local API in background task
         asyncio.create_task(update_deployed_db(config))

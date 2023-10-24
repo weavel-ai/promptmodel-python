@@ -2,6 +2,7 @@ import os
 from typing import Dict
 
 import requests
+
 import httpx
 from rich import print
 
@@ -202,7 +203,7 @@ class AsyncAPIClient:
         url = f"{ENDPOINT_URL}{path}"
         headers = await cls._get_headers(use_cli_key)
         try:
-            async with httpx.AsyncClient() as _client:
+            async with httpx.AsyncClient(http2=True) as _client:
                 response = await _client.request(
                     method,
                     url,
