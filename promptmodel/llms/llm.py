@@ -4,7 +4,9 @@ import os
 import json
 import time
 import datetime
-from typing import Any, AsyncGenerator, List, Dict, Optional, Union, Generator
+from typing import (
+    Any, AsyncGenerator, List, Dict, Optional, Union, Generator, Tuple
+)
 
 import openai
 from pydantic import BaseModel
@@ -14,6 +16,7 @@ from litellm import ModelResponse, RateLimitManager
 from litellm.utils import prompt_token_calculator, token_counter
 
 from promptmodel.utils import logger
+from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
 
 load_dotenv()
 
@@ -71,6 +74,27 @@ class LLM:
 
         return parsed_outputs
 
+    @classmethod
+    def __parse_output_pattern__(
+        cls,
+        raw_output: str,
+        parsing_type: ParsingType
+    ) -> (Dict[str, str], bool):
+        parsing_pattern = get_pattern_by_type(parsing_type)
+        whole_pattern = parsing_pattern['whole']
+        parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
+        parsed_outputs = {}
+        
+        for parsed_result in parsed_results:
+            parsed_outputs[parsed_result[0]] = parsed_result[1]
+        
+        cannot_parsed_output = re.sub(whole_pattern, "", raw_output, flags=re.DOTALL)
+        
+        if cannot_parsed_output.strip() != "":
+            return parsed_outputs, False
+        else:
+            return parsed_outputs, True
+        
     def __validate_openai_messages(
         self, messages: List[Dict[str, str]]
     ) -> List[OpenAIMessage]:
@@ -227,6 +251,7 @@ class LLM:
     def run_and_parse(
         self,
         messages: List[Dict[str, str]],
+        parsing_type: ParsingType,
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
@@ -241,27 +266,24 @@ class LLM:
         )
         raw_output = response.choices[0]["message"]["content"]
 
-        if output_keys is None:
-            parsed_output = self.__parse_outputs__(raw_output)
-        else:
-            parsed_output = {}
-            for key in output_keys:
-                parsed_output[key] = self.__parse_output__(raw_output, key)
+        parsed_output, parsed_success = self.__parse_output_pattern__(raw_output, parsing_type)
 
         if show_response:
-            return parsed_output, response
-        return parsed_output
+            return parsed_output, parsed_success, response
+        return parsed_output, parsed_success
 
     def stream_and_parse(
         self,
         messages: List[Dict[str, str]],
-        output_keys: Optional[List[str]] = None,
+        parsing_type: Optional[ParsingType] = None,
         model: Optional[str] = DEFAULT_MODEL,
-        show_response: bool = False,
         **kwargs,
     ) -> Generator[Dict[str, str], None, None]:
         """Parse & stream output from openai chat completion."""
-        raw_output = ""
+        if parsing_type == ParsingType.COLON.value:
+            # cannot stream colon type
+            yield False
+            return
         start_time = datetime.datetime.now()
         response = completion(
             model=model,
@@ -271,67 +293,16 @@ class LLM:
             ],
             stream=True,
         )
-
-        cache = ""
-        for chunk in response:
-            pause_stream = False
-            if "content" in chunk["choices"][0]["delta"]:
-                stream_value = chunk["choices"][0]["delta"]["content"]
-                raw_output += stream_value  # 지금까지 생성된 누적 output
-                pattern = (
-                    r"\[\[.*?(\s*\(.+\))?\sstart\]\](.*?)\[\[.*?(\s*\(.+\))?\send\]\]"
-                )
-                stripped_output = re.sub(
-                    pattern, "", raw_output, flags=re.DOTALL
-                )  # 누적 output에서 [key start] ~ [key end] 부분을 제거한 output
-                streaming_key = re.findall(
-                    r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
-                    stripped_output,
-                    flags=re.DOTALL,  # stripped output에서 [key start] 부분을 찾음
-                )
-                if not streaming_key:  # 아직 output value를 streaming 중이 아님
-                    continue
-
-                if len(streaming_key) > 1:
-                    raise ValueError("Multiple Matches")
-                # key = streaming_key[0].lower()
-                key = streaming_key[0]
-                if output_keys is not None:
-                    if key not in output_keys:  # 미리 정해둔 output key가 아님
-                        continue
-                if stream_value.find("]") != -1 or "[" in re.sub(  # 닫히는 중이거나 시작했거나, 열리기 시작하고 있으면 일단 멈춘다.
-                    r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
-                    "",
-                    stripped_output,
-                    flags=re.DOTALL,
-                ):  # 현재 stream 중인 output이 [[key end]] 부분일 경우에는 pause_stream을 True로 설정
-                    pause_stream = True 
-                    
-                    if stream_value.find("[") != -1: # 열리기 시작한 상태면
-                        if cache.find("[[") != -1: # end_identifier 가 존재하면
-                            pause_stream = True # 멈춘다
-                        else:
-                            cache += "[" # end_identifier 가 존재하지 않으면, 일단 캐시에 기록한다
-                
-                    
-                if pause_stream: # 멈춘상태에서
-                    if stream_value.find("]") != -1: # 닫히기 시작하거나 닫히는 중이면,
-                        cache = "" # 캐시를 초기화하고
-                        pause_stream = False # stream 을 재시작한다
-                    continue
-
-                yield {key: stream_value}
-            if chunk["choices"][0]["finish_reason"] != None:
-                if show_response:
-                    end_time = datetime.datetime.now()
-                    response_ms = (end_time - start_time).total_seconds() * 1000
-                    yield self.make_model_response(
-                        chunk, response_ms, messages, raw_output
-                    )
+        
+        if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
+            return self.__double_type_sp_generator__(messages, response, parsing_type, start_time)
+        else:
+            return self.__single_type_sp_generator__(messages, response, parsing_type, start_time)
 
     async def arun_and_parse(
         self,
         messages: List[Dict[str, str]],
+        parsing_type: Optional[ParsingType] = None,
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
@@ -383,73 +354,6 @@ class LLM:
             return parsed_output, response
         return parsed_output
 
-    def run_and_parse_function_call(
-        self,
-        messages: List[Dict[str, str]],
-        function_list: [],
-        model: Optional[str] = "gpt-3.5-turbo-0613",
-        show_response: bool = False,
-    ) -> Generator[str, None, None]:
-        """
-        Parse by function call arguments
-        """
-        response = completion(
-            model=model,
-            messages=[
-                message.model_dump()
-                for message in self.__validate_openai_messages(messages)
-            ],
-            functions=function_list,
-            function_call="auto",
-        )
-        function_args = response["choices"][0]["message"]["function_call"]["arguments"]
-        # make function_args to dict
-        function_args = function_args.replace("'", '"')
-        function_args = json.loads(function_args)
-
-        if show_response:
-            return function_args, response
-        return function_args
-
-    async def arun_and_parse_function_call(
-        self,
-        messages: List[Dict[str, str]],
-        function_list: [],
-        model: Optional[str] = "gpt-3.5-turbo-0613",
-        show_response: bool = False,
-    ) -> Generator[str, None, None]:
-        """
-        Parse by function call arguments
-        """
-        if self._rate_limit_manager:
-            response = await self._rate_limit_manager.acompletion(
-                model=model,
-                messages=[
-                    message.model_dump()
-                    for message in self.__validate_openai_messages(messages)
-                ],
-                functions=function_list,
-                function_call="auto",
-            )
-        else:
-            response = await acompletion(
-                model=model,
-                messages=[
-                    message.model_dump()
-                    for message in self.__validate_openai_messages(messages)
-                ],
-                functions=function_list,
-                function_call="auto",
-            )
-        function_args = response["choices"][0]["message"]["function_call"]["arguments"]
-        # make function_args to dict
-        function_args = function_args.replace("'", '"')
-        function_args = json.loads(function_args)
-
-        if show_response:
-            return function_args, response
-        return function_args
-
     async def astream(
         self,
         messages: List[Dict[str, str]],
@@ -492,84 +396,34 @@ class LLM:
     async def astream_and_parse(
         self,
         messages: List[Dict[str, str]],
+        parsing_type: Optional[ParsingType] = None,
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         show_response: bool = False,
     ) -> AsyncGenerator[Dict[str, str], None]:
         """Parse & stream output from openai chat completion."""
-        raw_output = ""
+        if parsing_type == ParsingType.COLON.value:
+            # cannot stream colon type
+            yield False
+            return
         start_time = datetime.datetime.now()
-        if self._rate_limit_manager:
-            response = await self._rate_limit_manager.acompletion(
-                model=model,
-                messages=[
-                    message.model_dump()
-                    for message in self.__validate_openai_messages(messages)
-                ],
-                stream=True,
-            )
+        response = await acompletion(
+            model=model,
+            messages=[
+                message.model_dump()
+                for message in self.__validate_openai_messages(messages)
+            ],
+            stream=True,
+        )
+        
+        if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
+            async for result in self.__double_type_sp_agenerator__(messages, response, parsing_type, start_time):
+                yield result
         else:
-            response = await acompletion(
-                model=model,
-                messages=[
-                    message.model_dump()
-                    for message in self.__validate_openai_messages(messages)
-                ],
-                stream=True,
-            )
+            async for result in self.__single_type_sp_agenerator__(messages, response, parsing_type, start_time):
+                yield result
 
-        async for chunk in response:
-            pause_stream = False
-            if "content" in chunk["choices"][0]["delta"]:
-                stream_value = chunk["choices"][0]["delta"]["content"]
-                raw_output += stream_value  # 지금까지 생성된 누적 output
-                pattern = (
-                    r"\[\[.*?(\s*\(.+\))?\sstart\]\](.*?)\[\[.*?(\s*\(.+\))?\send\]\]"
-                )
-                stripped_output = re.sub(
-                    pattern, "", raw_output, flags=re.DOTALL
-                )  # 누적 output에서 [key start] ~ [key end] 부분을 제거한 output
-                streaming_key = re.findall(
-                    r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
-                    stripped_output,
-                    flags=re.DOTALL,  # stripped output에서 [key start] 부분을 찾음
-                )
-                if not streaming_key:  # 아직 output value를 streaming 중이 아님
-                    continue
 
-                if len(streaming_key) > 1:
-                    raise ValueError("Multiple Matches")
-                # key = streaming_key[0].lower()
-                key = streaming_key[0]
-                if output_keys is not None:
-                    if key not in output_keys:  # 미리 정해둔 output key가 아님
-                        continue
-                if stream_value.find("]") != -1 or "[" in re.sub(
-                    r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
-                    "",
-                    stripped_output.split(f"[[{key} start]]")[-1],
-                    flags=re.DOTALL,
-                ):  # 현재 stream 중인 output이 [[key end]] 부분일 경우에는 pause_stream을 True로 설정
-                    if stream_value.find("[") != -1:
-                        if cache.find("[[") != -1:
-                            # logger.info("[[ in cache")
-                            pause_stream = True
-                        else:
-                            cache += "["
-                    pause_stream = True
-                if not pause_stream:
-                    yield {key: stream_value}
-                elif stream_value.find("]") != -1:
-                    # Current stream_value (that includes ]) isn't yielded, but the next stream_values will be yielded.
-                    cache = ""
-                    pause_stream = False
-            if chunk["choices"][0]["finish_reason"] != None:
-                if show_response:
-                    end_time = datetime.datetime.now()
-                    response_ms = (end_time - start_time).total_seconds() * 1000
-                    yield self.make_model_response(
-                        chunk, response_ms, messages, raw_output
-                    )
 
     async def aget_embedding(self, context: str) -> List[float]:
         """
@@ -581,77 +435,6 @@ class LLM:
         )
         embedding = response["data"][0]["embedding"]
         return embedding
-
-    async def astream_and_parse_function_call(
-        self,
-        messages: List[Dict[str, str]],
-        function_list: [],
-        output_key: str,
-        model: Optional[str] = "gpt-3.5-turbo-0613",
-        show_response: bool = False,
-    ) -> Generator[str, None, None]:
-        start_time = datetime.datetime.now()
-        if self._rate_limit_manager:
-            response = await self._rate_limit_manager.acompletion(
-                model=model,
-                messages=[
-                    message.model_dump()
-                    for message in self.__validate_openai_messages(messages)
-                ],
-                functions=function_list,
-                function_call="auto",
-                stream=True,
-            )
-        else:
-            response = await acompletion(
-                model=model,
-                messages=[
-                    message.model_dump()
-                    for message in self.__validate_openai_messages(messages)
-                ],
-                functions=function_list,
-                function_call="auto",
-                stream=True,
-            )
-
-        function_call = {"name": "", "arguments": ""}
-        function_args = ""
-        start_to_stream = False
-        raw_output = ""
-        async for chunk in response:
-            if "content" in chunk["choices"][0]["delta"]:
-                raw_output += chunk["choices"][0]["delta"]["content"]
-            if "function_call" in chunk["choices"][0]["delta"]:
-                if "name" in chunk["choices"][0]["delta"]["function_call"]:
-                    function_name = chunk["choices"][0]["delta"]["function_call"][
-                        "name"
-                    ]
-                    function_call["name"] += function_name
-
-                function_args += chunk["choices"][0]["delta"]["function_call"][
-                    "arguments"
-                ]
-                if f'"{output_key}":' in function_args:
-                    if not start_to_stream:
-                        start_to_stream = True
-                        # yield function_args without output_key
-                        yield {
-                            output_key: function_args.replace(f'"{output_key}":', "")
-                        }
-                    else:
-                        yield {
-                            output_key: chunk["choices"][0]["delta"]["function_call"][
-                                "arguments"
-                            ]
-                        }
-            if chunk["choices"][0]["finish_reason"] != None:
-                if show_response:
-                    end_time = datetime.datetime.now()
-                    response_ms = (end_time - start_time).total_seconds() * 1000
-                    function_call["arguments"] = function_args
-                    yield self.make_model_response(
-                        chunk, response_ms, messages, raw_output, function_call
-                    )
 
     def make_model_response(
         self,
@@ -686,3 +469,326 @@ class LLM:
             response_ms=response_ms,
         )
         return res
+
+    def __double_type_sp_generator__(
+        self,
+        messages: List[Dict[str, str]],
+        response: Generator,
+        parsing_type: ParsingType,
+        start_time: datetime.datetime
+    ):
+        try:
+            parsing_pattern = get_pattern_by_type(parsing_type)
+            start_tag = parsing_pattern['start']
+            start_fstring = parsing_pattern['start_fstring']
+            end_fstring = parsing_pattern['end_fstring']
+            start_token = parsing_pattern['start_token']
+            end_token = parsing_pattern['end_token']
+            
+            end_tag_identifier = "[[/" if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value else "[[/"
+            
+            buffer = ""
+            raw_output = ""
+            active_key = None
+            stream_pause = False
+            end_tag = None
+            for chunk in response:
+                if "content" in chunk["choices"][0]["delta"]:
+                    stream_value : str= chunk["choices"][0]["delta"]["content"]
+                    raw_output += stream_value 
+                    yield stream_value
+                    buffer += stream_value
+                    
+                    while True:
+                        if active_key is None:
+                            keys = re.findall(start_tag, buffer, flags=re.DOTALL)
+                            if len(keys) > 1:
+                                yield False
+                                break
+                            if len(keys) == 0:
+                                break # no key
+                            active_key = keys[0]
+                            end_tag = end_fstring.format(key=active_key)
+                            # delete start tag from buffer
+                            start_pattern = start_fstring.format(key=active_key)
+                            buffer = buffer.split(start_pattern)[-1]
+                            
+                        else:
+                            if stream_value.find(start_token) != -1: # start token appers in chunk -> pause
+                                stream_pause = True 
+                                break
+                            elif stream_pause:
+                                if buffer.find(end_tag) != -1: # if end tag appears in buffer
+                                    yield {active_key: buffer.split(end_tag)[0]}
+                                    buffer = buffer.split(end_tag)[-1]
+                                    active_key = None
+                                    break
+                                elif stream_value.find(end_token) != -1: # if ("[blah]" != end_pattern) appeared in buffer 
+                                    if buffer.find(end_token + end_token) != -1: # if ]] in buffer -> error
+                                        yield False
+                                        yield {active_key: buffer.split(start_token)[0]}
+                                        buffer = buffer.split(end_token + end_token)[-1]
+                                        stream_pause = False
+                                        break
+                                    else:
+                                        if buffer.find(start_token + start_token) != -1: # if [[ in buffer -> pause
+                                            break
+                                        else:
+                                            # if [ in buffer (== [blah]) -> stream
+                                            yield {active_key: buffer}
+                                            buffer = ""
+                                            stream_pause = False
+                                            break
+                                break
+                            else:
+                                # no start token, no stream_pause (not inside of tag)
+                                if buffer:
+                                    yield {active_key: buffer}
+                                    buffer = ""
+                                break
+                            
+                if chunk["choices"][0]["finish_reason"] != None:
+                    end_time = datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield self.make_model_response(
+                        chunk, response_ms, messages, raw_output
+                    )
+        except Exception as e:
+            logger.error(e)
+            yield False
+
+    def __single_type_sp_generator__(
+        self,
+        messages: List[Dict[str, str]],
+        response: Generator,
+        parsing_type: ParsingType,
+        start_time: datetime.datetime
+    ):
+        try:
+            parsing_pattern = get_pattern_by_type(parsing_type)
+            start_tag = parsing_pattern['start']
+            start_fstring = parsing_pattern['start_fstring']
+            end_fstring = parsing_pattern['end_fstring']
+            start_token = parsing_pattern['start_token']
+            end_token = parsing_pattern['end_token']
+            
+            buffer = ""
+            raw_output = ""
+            active_key = None
+            stream_pause = False
+            end_tag = None
+            for chunk in response:
+                if "content" in chunk["choices"][0]["delta"]:
+                    stream_value : str= chunk["choices"][0]["delta"]["content"]
+                    raw_output += stream_value 
+                    yield stream_value
+                    buffer += stream_value
+                    
+                    while True:
+                        if active_key is None:
+                            keys = re.findall(start_tag, buffer, flags=re.DOTALL)
+                            if len(keys) > 1:
+                                yield False
+                                break
+                            if len(keys) == 0:
+                                break # no key
+                            
+                            active_key = keys[0]
+                            end_tag = end_fstring.format(key=active_key)
+                            # delete start tag from buffer
+                            start_pattern = start_fstring.format(key=active_key)
+                            buffer = buffer.split(start_pattern)[-1]
+                            
+                        else:
+                            if stream_value.find(start_token) != -1: # start token appers in chunk -> pause
+                                stream_pause = True 
+                                break
+                            elif stream_pause:
+                                if buffer.find(end_tag) != -1: # if end tag appears in buffer
+                                    yield {active_key: buffer.split(end_tag)[0].replace(end_tag, "")}
+                                    buffer = buffer.split(end_tag)[-1]
+                                    active_key = None
+                                elif stream_value.find(end_token) != -1: # if pattern ends  = ("[blah]" != end_pattern) appeared in buffer 
+                                    yield False # multiple matching error
+                                    stream_pause = False
+                                    yield {active_key: buffer}
+                                    buffer = ""
+                                break
+                            else:
+                                # no start token, no stream_pause (not inside of tag)
+                                if buffer:
+                                    yield {active_key: buffer}
+                                    buffer = ""
+                                break
+                            
+                if chunk["choices"][0]["finish_reason"] != None:
+                    end_time = datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield self.make_model_response(
+                        chunk, response_ms, messages, raw_output
+                    )
+        except Exception as e:
+            logger.error(e)
+            yield False
+            
+    async def __double_type_sp_agenerator__(
+        self,
+        messages: List[Dict[str, str]],
+        response: AsyncGenerator,
+        parsing_type: ParsingType,
+        start_time: datetime.datetime
+    ):
+        try:
+            parsing_pattern = get_pattern_by_type(parsing_type)
+            start_tag = parsing_pattern['start']
+            start_fstring = parsing_pattern['start_fstring']
+            end_fstring = parsing_pattern['end_fstring']
+            start_token = parsing_pattern['start_token']
+            end_token = parsing_pattern['end_token']
+            
+            end_tag_identifier = "[[/" if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value else "[[/"
+            
+            buffer = ""
+            raw_output = ""
+            active_key = None
+            stream_pause = False
+            end_tag = None
+            async for chunk in response:
+                if "content" in chunk["choices"][0]["delta"]:
+                    stream_value : str= chunk["choices"][0]["delta"]["content"]
+                    raw_output += stream_value 
+                    yield stream_value
+                    buffer += stream_value
+                    
+                    while True:
+                        if active_key is None:
+                            keys = re.findall(start_tag, buffer, flags=re.DOTALL)
+                            if len(keys) > 1:
+                                yield False
+                                break
+                            if len(keys) == 0:
+                                break # no key
+                            
+                            active_key = keys[0]
+                            end_tag = end_fstring.format(key=active_key)
+                            # delete start tag from buffer
+                            start_pattern = start_fstring.format(key=active_key)
+                            buffer = buffer.split(start_pattern)[-1]
+                            
+                        else:
+                            if stream_value.find(start_token) != -1: # start token appers in chunk -> pause
+                                stream_pause = True 
+                                break
+                            elif stream_pause:
+                                if buffer.find(end_tag) != -1: # if end tag appears in buffer
+                                    yield {active_key: buffer.split(end_tag)[0]}
+                                    buffer = buffer.split(end_tag)[-1]
+                                    active_key = None
+                                    break
+                                elif stream_value.find(end_token) != -1: # if ("[blah]" != end_pattern) appeared in buffer 
+                                    if buffer.find(end_token + end_token) != -1: # if ]] in buffer -> error
+                                        yield False
+                                        buffer = buffer.split(end_token + end_token)[-1]
+                                        stream_pause = False
+                                        break
+                                    else:
+                                        if buffer.find(start_token + start_token) != -1: # if [[ in buffer -> pause
+                                            break
+                                        else:
+                                            # if [ in buffer (== [blah]) -> stream
+                                            yield {active_key: buffer}
+                                            buffer = ""
+                                            stream_pause = False
+                                            break
+                                break
+                            else:
+                                # no start token, no stream_pause (not inside of tag)
+                                if buffer:
+                                    yield {active_key: buffer}
+                                    buffer = ""
+                                break
+                            
+                if chunk["choices"][0]["finish_reason"] != None:
+                    end_time = datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield self.make_model_response(
+                        chunk, response_ms, messages, raw_output
+                    )
+        except Exception as e:
+            logger.error(e)
+            yield False
+
+    async def __single_type_sp_agenerator__(
+        self,
+        messages: List[Dict[str, str]],
+        response: AsyncGenerator,
+        parsing_type: ParsingType,
+        start_time: datetime.datetime
+    ):
+        try:
+            parsing_pattern = get_pattern_by_type(parsing_type)
+            start_tag = parsing_pattern['start']
+            start_fstring = parsing_pattern['start_fstring']
+            end_fstring = parsing_pattern['end_fstring']
+            start_token = parsing_pattern['start_token']
+            end_token = parsing_pattern['end_token']
+            
+            buffer = ""
+            raw_output = ""
+            active_key = None
+            stream_pause = False
+            end_tag = None
+            async for chunk in response:
+                if "content" in chunk["choices"][0]["delta"]:
+                    stream_value : str= chunk["choices"][0]["delta"]["content"]
+                    raw_output += stream_value 
+                    yield stream_value
+                    buffer += stream_value
+                    
+                    while True:
+                        if active_key is None:
+                            keys = re.findall(start_tag, buffer, flags=re.DOTALL)
+                            if len(keys) > 1:
+                                yield False
+                                break
+                            
+                            if len(keys) == 0:
+                                break # no key
+                            
+                            active_key = keys[0]
+                            end_tag = end_fstring.format(key=active_key)
+                            # delete start tag from buffer
+                            start_pattern = start_fstring.format(key=active_key)
+                            buffer = buffer.split(start_pattern)[-1]
+                            
+                        else:
+                            if stream_value.find(start_token) != -1: # start token appers in chunk -> pause
+                                stream_pause = True 
+                                break
+                            elif stream_pause:
+                                if buffer.find(end_tag) != -1: # if end tag appears in buffer
+                                    yield {active_key: buffer.split(end_tag)[0]}
+                                    buffer = buffer.split(end_tag)[-1]
+                                    active_key = None
+                                elif stream_value.find(end_token) != -1: # if pattern ends  = ("[blah]" != end_pattern) appeared in buffer 
+                                    yield False # multiple matching error
+                                    stream_pause = False
+                                    yield {active_key: buffer}
+                                    buffer = ""
+                                break
+                            else:
+                                # no start token, no stream_pause (not inside of tag)
+                                if buffer:
+                                    yield {active_key: buffer}
+                                    buffer = ""
+                                break
+                            
+                if chunk["choices"][0]["finish_reason"] != None:
+                    end_time = datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield self.make_model_response(
+                        chunk, response_ms, messages, raw_output
+                    )
+        except Exception as e:
+            logger.error(e)
+            yield False

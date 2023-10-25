@@ -338,6 +338,8 @@ class DevWebsocketClient:
                         ]
                     else:
                         messages_for_run = prompts
+                        
+                    parsing_success =  True
                     res = llm_module_dev.dev_run(
                         messages_for_run, parsing_type, model, output_keys
                     )
@@ -366,6 +368,9 @@ class DevWebsocketClient:
                                 "status": "running",
                                 "parsed_outputs": item,
                             }
+                        elif type(item) == bool:
+                            parsing_success = item
+                            
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
@@ -375,6 +380,8 @@ class DevWebsocketClient:
                         and message['parsing_type'] is not None
                         and set(output["parsed_outputs"].keys()) != set(
                             message["output_keys"]
+                        ) or (
+                            parsing_success is False
                         )
                     ):
                         data = {

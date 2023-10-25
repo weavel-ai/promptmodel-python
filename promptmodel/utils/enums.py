@@ -42,32 +42,36 @@ class ParsingType(str, Enum):
     
 class ParsingPattern(dict, Enum):
     COLON = {
-        "start" : r"({key}): \n",
-        "end": None,
-        "whole": r"({key}): \n(.*?)",
-        "end_flag" : None,
-        "refresh_flag" : None
+        "start" : r"(.*?): \n",
+        "start_fstring": "{key}: \n",
+        "end_fstring": None,
+        "whole": r"(.*?): (.*?)\n",
+        "start_token" : None,
+        "end_token" : None
     }
     SQUARE_BRACKET = {
-        "start" : r"\[({key})\]",
-        "end": r"[/{key}]",
-        "whole": r"\[({key})\](.*?)\[/\1\]",
-        "end_flag" : r"[",
-        "refresh_flag" : r"]"
+        "start" : r"\[(.*?)\]",
+        "start_fstring": "[{key}]",
+        "end_fstring": "[/{key}]",
+        "whole": r"\[(.*?)\](.*?)\[/\1\]",
+        "start_token" : r"[",
+        "end_token" : r"]"
     }
     DOUBLE_SQUARE_BRACKET = {
-        "start" : r"\[\[({key})\]\]",
-        "end" : r"\[\[/{key}\]\]",
-        "whole" : r"\[\[({key})\]\](.*?)\[\[/\1\]\]",
-        "end_flag" : r"[",
-        "refresh_flag" : r"]"
+        "start" : r"\[\[(.*?)\]\]",
+        "start_fstring": "[[{key}]]",
+        "end_fstring" : "[[/{key}]]",
+        "whole" : r"\[\[(.*?)\]\](.*?)\[\[/\1\]\]",
+        "start_token" : r"[",
+        "end_token" : r"]"
     }
     HTML = {
-        "start" : r"<({key})>",
-        "end" : r"</{key}>",
-        "whole" : r"<({key})>(.*?)</\1>",
-        "end_flag" : r"<",
-        "refresh_flag" : r">"
+        "start" : r"<(.*?)>",
+        "start_fstring": "<{key}>",
+        "end_fstring": "</{key}>",
+        "whole" : r"<(.*?)>(.*?)</\1>",
+        "start_token" : r"<",
+        "end_token" : r">"
     }
 
 def get_pattern_by_type(parsing_type_value):
