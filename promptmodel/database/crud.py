@@ -35,7 +35,8 @@ def create_llm_modules(llm_module_list: list):
 def create_llm_module_version(
     llm_module_uuid: str,
     from_uuid: Optional[str],
-    status: str, model: str,
+    status: str, 
+    model: str,
     parsing_type: Optional[ParsingType] = None,
     output_keys: Optional[List[str]] = None
 ):

@@ -15,11 +15,19 @@ from promptmodel.apis.base import APIClient, AsyncAPIClient
 
 
 async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
+    """fetch prompts.
+
+    Args:
+        name (str): name of promtpmodel
+
+    Returns:
+        Tuple[List[Dict[str, str]], str]: (prompts, version_detail)
+    """
     # Check dev_branch activate
     config = read_config()
     if "dev_branch" in config:
         if config["dev_branch"]["initializing"] == True:
-            return [], "", None
+            return [], None
         elif config["dev_branch"]["online"] == True:
             # get prompt from local DB
             prompt_rows, version_detail = get_latest_version_prompts(name)
