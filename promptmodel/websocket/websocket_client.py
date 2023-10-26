@@ -4,7 +4,7 @@ import datetime
 import re
 
 from uuid import UUID
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
 from websockets.client import connect, WebSocketClientProtocol
@@ -215,26 +215,26 @@ class DevWebsocketClient:
                 update_candidate_version(new_candidates)
 
             elif message["type"] == LocalTask.RUN_LLM_MODULE:
-                llm_module_name = message["llm_module_name"]
-                sample_name = message["sample_name"]
+                llm_module_name: str = message["llm_module_name"]
+                sample_name: Optional[str] = message["sample_name"]
+                
                 # get sample from db
                 if sample_name:
                     sample_input_row = get_sample_input(sample_name)
                     if sample_input_row is None or "contents" not in sample_input_row:
                         logger.error(f"There is no sample input {sample_name}.")
                         return
-                    sample_input = json.loads(sample_input_row["contents"])
+                    sample_input = sample_input_row["contents"]
                 else:
                     sample_input = None
-
-                llm_module_names = [
-                    llm_module.name for llm_module in self._client.llm_modules
-                ]
+                
+                # Check llm_module in Local Usage
+                llm_module_names = self._client._get_llm_module_name_list()
                 if llm_module_name not in llm_module_names:
                     logger.error(f"There is no llm_module {llm_module_name}.")
                     return
-
-                # check variable matching
+                
+                # Validate Variable Matching
                 prompt_variables = []
                 for prompt in message["prompts"]:
                     fstring_input_pattern = r"(?<!\\)(?<!{{)\{([^}]+)\}(?!\\)(?!}})"
@@ -272,15 +272,16 @@ class DevWebsocketClient:
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
 
+                # Start PromptModel Running
                 output = {"raw_output": "", "parsed_outputs": {}}
                 try:
                     logger.info(f"Started PromptModel: {llm_module_name}")
                     # create llm_module_dev_instance
                     llm_module_dev = LLMDev()
                     # fine llm_module_uuid from local db
-                    llm_module_uuid = get_llm_module_uuid(llm_module_name)["uuid"]
+                    llm_module_uuid: str = get_llm_module_uuid(llm_module_name)["uuid"]
 
-                    llm_module_version_uuid = message["uuid"]
+                    llm_module_version_uuid: Optional[str] = message["uuid"]
                     # If llm_module_version_uuid is None, create new version & prompt
                     if llm_module_version_uuid is None:
                         llm_module_version: LLMModuleVersion = (
@@ -289,9 +290,11 @@ class DevWebsocketClient:
                                 status=LLMModuleVersionStatus.BROKEN.value,
                                 from_uuid=message["from_uuid"],
                                 model=message["model"],
+                                parsing_type=message["parsing_type"],
+                                output_keys=message["output_keys"],
                             )
                         )
-                        llm_module_version_uuid = llm_module_version.uuid
+                        llm_module_version_uuid: str = llm_module_version.uuid
 
                         prompts = message["prompts"]
                         for prompt in prompts:
@@ -334,7 +337,11 @@ class DevWebsocketClient:
                         ]
                     else:
                         messages_for_run = prompts
-                    res = llm_module_dev.dev_run(messages_for_run, parsing_type, model)
+                        
+                    parsing_success =  True
+                    res = llm_module_dev.dev_run(
+                        messages_for_run, parsing_type, model
+                    )
                     async for item in res:
                         # send item to backend
                         # save item & parse
@@ -360,16 +367,48 @@ class DevWebsocketClient:
                                 "status": "running",
                                 "parsed_outputs": item,
                             }
+                        elif type(item) == bool:
+                            parsing_success = item
+                            
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-
-                    data = {
-                        "type": ServerTask.UPDATE_RESULT_RUN.value,
-                        # "raw_output": output["raw_output"],
-                        # "parsed_outputs": output["parsed_outputs"],
-                        "status": "completed",
-                    }
+                    # Check output key matching : set(output['parsed_output'].keys()) == set(message['output_keys'])
+                    if (
+                        message["output_keys"] is not None
+                        and message['parsing_type'] is not None
+                        and set(output["parsed_outputs"].keys()) != set(
+                            message["output_keys"]
+                        ) or (
+                            parsing_success is False
+                        )
+                    ):
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_RUN.value,
+                            "status": "failed",
+                            "log" : "parsing failed"
+                        }
+                        update_llm_module_version(
+                            llm_module_version_uuid=llm_module_version_uuid,
+                            status=LLMModuleVersionStatus.BROKEN.value,
+                        )
+                            
+                    else:
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_RUN.value,
+                            "status": "completed",
+                        }
+                        update_llm_module_version(
+                            llm_module_version_uuid=llm_module_version_uuid,
+                            status=LLMModuleVersionStatus.WORKING.value,
+                        )
+                        
+                    create_run_log(
+                        llm_module_version_uuid=llm_module_version_uuid,
+                        inputs=sample_input,
+                        raw_output=output["raw_output"],
+                        parsed_outputs=output["parsed_outputs"],
+                    )
                 except Exception as error:
                     logger.error(f"Error running service: {error}")
                     data = {
@@ -377,12 +416,6 @@ class DevWebsocketClient:
                         "status": "failed",
                         "log": str(error),
                     }
-                create_run_log(
-                    llm_module_version_uuid=llm_module_version_uuid,
-                    inputs=json.dumps(sample_input),
-                    raw_output=json.dumps(output["raw_output"]),
-                    parsed_outputs=json.dumps(output["parsed_outputs"]),
-                )
             if data:
                 response.update(data)
                 await ws.send(json.dumps(response, cls=CustomJSONEncoder))

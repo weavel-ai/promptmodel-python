@@ -17,8 +17,14 @@ from peewee import (
 )
 
 from promptmodel.database.config import BaseModel
-from promptmodel.utils.enums import LLMModuleVersionStatus
+from promptmodel.utils.enums import LLMModuleVersionStatus, ParsingType
 
+class JSONField(TextField):
+    def db_value(self, value):
+        return json.dumps(value)
+
+    def python_value(self, value):
+        return json.loads(value)
 
 class LLMModule(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
@@ -50,9 +56,17 @@ class LLMModuleVersion(BaseModel):
     )
     model = CharField()
     candidate_version = IntegerField(null=True)
-    is_published = BooleanField(
-        default=False
-    )  # Real publised version (not candidate = saved in cloud version)
+    is_published = BooleanField(default=False)
+    parsing_type = CharField(
+        null=True,
+        default=None,
+        constraints=[
+            Check(
+                f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQUARE_BRACKET.value}', '{ParsingType.DOUBLE_SQUARE_BRACKET.value}')"
+            )
+        ]
+    )
+    output_keys = JSONField(null=True, default=None)
 
 
 class Prompt(BaseModel):
@@ -78,9 +92,9 @@ class RunLog(BaseModel):
         backref="run_logs",
         on_delete="CASCADE",
     )
-    inputs = TextField()
+    inputs = JSONField(null=True, default={})
     raw_output = TextField()
-    parsed_outputs = TextField()
+    parsed_outputs = JSONField(null=True, default={})
     is_deployment = BooleanField(default=False)
 
 
@@ -88,14 +102,7 @@ class SampleInputs(BaseModel):
     id = AutoField()
     created_at = DateTimeField(default=datetime.datetime.now)
     name = TextField(unique=True)
-    contents = TextField()
-
-    def set_contents(self, data: dict):
-        self.contents = json.dumps(data)
-
-    def get_contents(self) -> dict:
-        return json.loads(self.contents)
-
+    contents = JSONField()
 
 class DeployedLLMModule(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
@@ -115,7 +122,18 @@ class DeployedLLMModuleVersion(BaseModel):
     is_published = BooleanField(default=False)
     is_ab_test = BooleanField(default=False)
     ratio = FloatField(null=True)
+    parsing_type = CharField(
+        null=True,
+        default=None,
+        constraints=[
+            Check(
+                f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQUARE_BRACKET.value}', '{ParsingType.DOUBLE_SQUARE_BRACKET.value}')"
+            )
+        ]
+    )
+    output_keys = JSONField(null=True, default=None)
 
+    
 
 class DeployedPrompt(BaseModel):
     id = AutoField()

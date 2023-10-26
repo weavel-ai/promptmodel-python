@@ -9,22 +9,10 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import acompletion
 
-import promptmodel.utils.logger as logger
+from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
+from promptmodel.utils import logger
 
 load_dotenv()
-
-
-class Role:
-    SYSTEM = "system"
-    USER = "user"
-    ASSISTANT = "assistant"
-
-
-class ParsingType:
-    COLON = "colon"
-    SQURE_BRACKET = "square_bracket"
-    DOUBLE_SQURE_BRACKET = "double_square_bracket"
-
 
 class OpenAIMessage(BaseModel):
     role: str
@@ -44,7 +32,7 @@ class LLMDev:
     async def dev_run(
         self,
         messages: List[Dict[str, str]],
-        parsing_type: ParsingType,
+        parsing_type: Optional[ParsingType] = None,
         model: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, str], None]:
         """Parse & stream output from openai chat completion."""
@@ -58,51 +46,21 @@ class LLMDev:
             ],
             stream=True,
         )
-
-        if parsing_type == ParsingType.DOUBLE_SQURE_BRACKET:
-            async for chunk in response:
-                pause_stream = False
-                if "content" in chunk["choices"][0]["delta"]:
-                    stream_value = chunk["choices"][0]["delta"]["content"]
-                    yield stream_value  # return raw output
-
-                    raw_output += stream_value  # 지금까지 생성된 누적 output
-                    pattern = r"\[\[.*?(\s*\(.+\))?\sstart\]\](.*?)\[\[.*?(\s*\(.+\))?\send\]\]"
-                    stripped_output = re.sub(
-                        pattern, "", raw_output, flags=re.DOTALL
-                    )  # 누적 output에서 [key start] ~ [key end] 부분을 제거한 output
-                    streaming_key = re.findall(
-                        r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
-                        stripped_output,
-                        flags=re.DOTALL,  # stripped output에서 [key start] 부분을 찾음
-                    )
-                    if not streaming_key:  # 아직 output value를 streaming 중이 아님
-                        continue
-
-                    if len(streaming_key) > 1:
-                        raise ValueError("Multiple Matches")
-                    # key = streaming_key[0].lower()
-                    key = streaming_key[0]
-
-                    if stream_value.find("]") != -1 or "[" in re.sub(
-                        r"\[\[(.*?)(?:\s*\(.+\))?\sstart\]\]",
-                        "",
-                        stripped_output.split(f"[[{key} start]]")[-1],
-                        flags=re.DOTALL,
-                    ):  # 현재 stream 중인 output이 [[key end]] 부분일 경우에는 pause_stream을 True로 설정
-                        if stream_value.find("[") != -1:
-                            if cache.find("[[") != -1:
-                                # logger.info("[[ in cache")
-                                pause_stream = True
-                            else:
-                                cache += "["
-                        pause_stream = True
-                    if not pause_stream:
-                        yield {key: stream_value}  # return parsed output
-                    elif stream_value.find("]") != -1:
-                        # Current stream_value (that includes ]) isn't yielded, but the next stream_values will be yielded.
-                        cache = ""
-                        pause_stream = False
-        else:
-            # TODO: add other parsing types
-            pass
+        async for chunk in response:
+            if "content" in chunk["choices"][0]["delta"]:
+                stream_value = chunk["choices"][0]["delta"]["content"]
+                raw_output += stream_value  # 지금까지 생성된 누적 output
+                yield stream_value  # return raw output 
+        
+        # parsing
+        if parsing_type:
+            parsing_pattern : Dict[str, str] = get_pattern_by_type(parsing_type)
+            whole_pattern = parsing_pattern['whole']
+            parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
+            cannot_parsed_output = re.sub(whole_pattern, "", raw_output, flags=re.DOTALL)
+            if cannot_parsed_output.strip() != "":
+                yield False
+            else:
+                yield True
+            for parsed_result in parsed_results:
+                yield {parsed_result[0] : parsed_result[1]}
