@@ -1,11 +1,6 @@
 from __future__ import annotations
 import asyncio
-import dis
-import json
-import inspect
-import threading
-import time
-import atexit
+
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -18,15 +13,13 @@ from typing import (
     Tuple,
     Union,
 )
-from websockets.client import connect, WebSocketClientProtocol
-from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
+
 from litellm import RateLimitManager
 
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.prompt_util import fetch_prompts, update_deployed_db
-from promptmodel.utils.config_utils import read_config, upsert_config
-from promptmodel.database.orm import initialize_db
+from promptmodel.utils.prompt_util import fetch_prompts
+from promptmodel.utils.types import LLMStreamResponse, LLMResponse
 from promptmodel import Client
 
 
@@ -66,50 +59,147 @@ class PromptModel(metaclass=RegisteringMeta):
         self.llm_proxy = LLMProxy(name, rate_limit_manager)
 
     def get_prompts(self) -> List[Dict[str, str]]:
+        """Get prompt for the promptmodel.
+        If dev mode is running(if .promptmodel/config['dev_branch']['online'] = True), it will fetch the latest tested prompt in the dev branch local DB.  
+        If dev mode is not running, it will fetch the published prompt from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)  
+        - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio. 
+        If dev mode is initializing, it will return {}.
+
+        Returns:
+            List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
+        """
         # add name to the list of llm_modules
 
         prompts, _ = asyncio.run(fetch_prompts(self.name))
         return prompts
 
-    def run(self, inputs: Dict[str, Any] = {}) -> str:
+    def run(self, inputs: Dict[str, Any] = {}) -> LLMResponse:
+        """Run PromptModel. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
+
+        Returns:
+            LLMResponse: response from the promptmodel. you can find raw output in response.raw_output or response.api_response['choices'][0]['message']['content'].
+            
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
+        """
         return self.llm_proxy.run(inputs)
 
-    async def arun(self, inputs: Dict[str, Any] = {}) -> str:
+    async def arun(self, inputs: Dict[str, Any] = {}) -> LLMResponse:
+        """Async run PromptModel. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
+
+        Returns:
+            LLMResponse: response from the promptmodel. you can find raw output in response.raw_output or response.api_response['choices'][0]['message']['content'].
+            
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
+        """
         return await self.arun(inputs)
 
-    def stream(self, inputs: Dict[str, Any] = {}) -> Generator[str, None, None]:
+    def stream(self, inputs: Dict[str, Any] = {}) -> Generator[LLMStreamResponse]:
+        """Run PromptModel with stream=True. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): _description_. Defaults to {}.
+
+        Yields:
+            Generator[LLMStreamResponse]: Generator of LLMStreamResponse. you can find raw output in response.raw_output or response.api_response['choices'][0]['delta']['content'].
+            
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
+        """
         for item in self.llm_proxy.stream(inputs):
             yield item
 
     async def astream(
         self, inputs: Optional[Dict[str, Any]] = {}
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[LLMStreamResponse]:
+        """Async Run PromptModel with stream=True. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): _description_. Defaults to {}.
+
+        Yields:
+            Generator[LLMStreamResponse]: Generator of LLMStreamResponse. you can find raw output in response.raw_output or response.api_response['choices'][0]['delta']['content'].
+            
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
+        """
         async for item in self.llm_proxy.astream(inputs):
             yield item
 
     def run_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-    ) -> Dict[str, str]:
+    ) -> LLMResponse:
+        """Run PromptModel and make parsed outputs. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
+
+        Returns:
+            LLMResponse: response from the promptmodel. you can find parsed outputs in response.parsed_outputs. You can also find raw output in response.api_response['choices'][0]['message']['content'].
+            
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
+        """
         return self.llm_proxy.run_and_parse(inputs)
 
     async def arun_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-    ) -> Dict[str, str]:
+    ) -> LLMResponse:
+        """Async Run PromptModel and make parsed outputs. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
+
+        Returns:
+            LLMResponse: response from the promptmodel. you can find parsed outputs in response.parsed_outputs. You can also find raw output in response.api_response['choices'][0]['message']['content'].
+            
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
+        """
         return await self.llm_proxy.arun_and_parse(inputs)
 
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-    ) -> Generator[str, None, None]:
+    ) -> Generator[LLMStreamResponse]:
+        """Run PromptModel with stream=True and make parsed outputs. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): _description_. Defaults to {}.
+
+        Yields:
+            Generator[LLMStreamResponse]: Generator of LLMStreamResponse. you can find parsed outputs in response.parsed_outputs. You can also find raw output in reaponse.raw_output.
+            
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
+        """
         for item in self.llm_proxy.stream_and_parse(inputs):
             yield item
 
     async def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[LLMStreamResponse]:
+        """Async Run PromptModel with stream=True and make parsed outputs. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): _description_. Defaults to {}.
+
+        Yields:
+            Generator[LLMStreamResponse]: Generator of LLMStreamResponse. you can find parsed outputs in response.parsed_outputs. You can also find raw output in reaponse.raw_output.
+            
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
+        """
         async for item in self.llm_proxy.astream_and_parse(inputs):
             yield item
 

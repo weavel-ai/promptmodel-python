@@ -83,12 +83,12 @@ class LLM:
                 ],
             )
             raw_output = response.choices[0]["message"]["content"]
-            return LLMResponse(response=response, raw_output=raw_output)
+            return LLMResponse(api_response=response, raw_output=raw_output)
         except Exception as e:
             if response:
-                return LLMResponse(response=response, error=True, error_log=str(e))
+                return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response={}, error=True, error_log=str(e))
 
     def run_function_call(
         self,
@@ -113,12 +113,12 @@ class LLM:
                 if "function_call" in response.choices[0]["message"]
                 else None
             )
-            return LLMResponse(response=response, raw_output=content, function_call=call_func)
+            return LLMResponse(api_response=response, raw_output=content, function_call=call_func)
         except Exception as e:
             if response:
-                return LLMResponse(response=response, error=True, error_log=str(e))
+                return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response={}, error=True, error_log=str(e))
 
     async def arun(
         self,
@@ -144,12 +144,12 @@ class LLM:
                     ],
                 )
             content = response.choices[0]["message"]["content"]
-            return LLMResponse(response=response, raw_output=content)
+            return LLMResponse(api_response=response, raw_output=content)
         except Exception as e:
             if response:
-                return LLMResponse(response=response, error=True, error_log=str(e))
+                return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response={}, error=True, error_log=str(e))
 
     async def arun_function_call(
         self,
@@ -189,12 +189,12 @@ class LLM:
                 if "function_call" in response.choices[0]["message"]
                 else None
             )
-            return LLMResponse(response=response, raw_output=content, function_call=call_func)
+            return LLMResponse(api_response=response, raw_output=content, function_call=call_func)
         except Exception as e:
             if response:
-                return LLMResponse(response=response, error=True, error_log=str(e))
+                return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response={}, error=True, error_log=str(e))
     
     def stream(
         self,
@@ -223,7 +223,7 @@ class LLM:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
-                        response=self.make_model_response(
+                        api_response=self.make_model_response(
                             chunk, response_ms, messages, raw_output
                         )
                     )
@@ -257,12 +257,12 @@ class LLM:
                 parsed_success = False
                 error_log = "Output keys do not match with parsed output keys"
                 
-            return LLMResponse(response=response, parsed_outputs=parsed_outputs, error=not parsed_success, error_log=error_log)
+            return LLMResponse(api_response=response, parsed_outputs=parsed_outputs, error=not parsed_success, error_log=error_log)
         except Exception as e:
             if response:
-                return LLMResponse(response=response, error=True, error_log=str(e))
+                return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response={}, error=True, error_log=str(e))
 
     def stream_and_parse(
         self,
@@ -370,12 +370,12 @@ class LLM:
                 parsed_success = False
                 error_log = "Output keys do not match with parsed output keys"
                 
-            return LLMResponse(response=response, parsed_outputs=parsed_outputs, error=not parsed_success, error_log=error_log)
+            return LLMResponse(api_response=response, parsed_outputs=parsed_outputs, error=not parsed_success, error_log=error_log)
         except Exception as e:
             if response:
-                return LLMResponse(response=response, error=True, error_log=str(e))
+                return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response={}, error=True, error_log=str(e))
             
     async def astream(
         self,
@@ -412,7 +412,7 @@ class LLM:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
-                        response=self.make_model_response(
+                        api_response=self.make_model_response(
                             chunk, response_ms, messages, raw_output
                         )
                     )
@@ -666,7 +666,7 @@ class LLM:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
-                        response=self.make_model_response(
+                        api_response=self.make_model_response(
                             chunk, response_ms, messages, raw_output
                         )
                     )
@@ -825,7 +825,7 @@ class LLM:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
-                        response=self.make_model_response(
+                        api_response=self.make_model_response(
                             chunk, response_ms, messages, raw_output
                         )
                     )

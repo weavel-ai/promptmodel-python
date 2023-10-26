@@ -41,8 +41,8 @@ class LLMProxy(LLM):
             error_occurs = False
             error_log = None
             for item in stream_response:
-                if item.response:
-                    raw_response = item.response
+                if item.api_response:
+                    raw_response = item.api_response
                 if item.parsed_outputs:
                     dict_cache = update_dict(dict_cache, item.parsed_outputs)
                 if item.raw_output:
@@ -82,8 +82,8 @@ class LLMProxy(LLM):
             error_log = None
             raw_response : ModelResponse = None
             async for item in stream_response:
-                if item.response:
-                    raw_response = item.response
+                if item.api_response:
+                    raw_response = item.api_response
                 if item.parsed_outputs:
                     dict_cache = update_dict(dict_cache, item.parsed_outputs)
                 if item.raw_output:
@@ -106,6 +106,8 @@ class LLMProxy(LLM):
             }
             self._log_to_cloud(version_details['uuid'], inputs, raw_response, dict_cache, metadata)
             
+            # raise Exception("error_log")
+            
         return wrapper
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
@@ -123,9 +125,9 @@ class LLMProxy(LLM):
             }
             
             if llm_response.parsed_outputs:
-                self._log_to_cloud(version_details['uuid'], inputs, llm_response.response, llm_response.parsed_outputs, metadata)
+                self._log_to_cloud(version_details['uuid'], inputs, llm_response.api_response, llm_response.parsed_outputs, metadata)
             else:
-                self._log_to_cloud(version_details['uuid'], inputs, llm_response.response, {}, metadata)
+                self._log_to_cloud(version_details['uuid'], inputs, llm_response.api_response, {}, metadata)
             return llm_response
 
         return wrapper
@@ -145,9 +147,9 @@ class LLMProxy(LLM):
             }
             
             if llm_response.parsed_outputs:
-                self._log_to_cloud(version_details['uuid'], inputs, llm_response.response, llm_response.parsed_outputs, metadata)
+                self._log_to_cloud(version_details['uuid'], inputs, llm_response.api_response, llm_response.parsed_outputs, metadata)
             else:
-                self._log_to_cloud(version_details['uuid'], inputs, llm_response.response, {}, metadata)
+                self._log_to_cloud(version_details['uuid'], inputs, llm_response.api_response, {}, metadata)
             return llm_response
         return async_wrapper
 
@@ -185,7 +187,7 @@ class LLMProxy(LLM):
         self,
         version_uuid: str,
         inputs: dict,
-        raw_response: ModelResponse,
+        api_response: ModelResponse,
         parsed_outputs: dict,
         metadata: dict
     ):
@@ -197,8 +199,8 @@ class LLMProxy(LLM):
         ):
             return
 
-        raw_response_dict = raw_response.to_dict_recursive()
-        raw_response_dict.update({"response_ms": raw_response.response_ms})
+        api_response_dict = api_response.to_dict_recursive()
+        api_response_dict.update({"response_ms": api_response.response_ms})
         res = asyncio.run(
             AsyncAPIClient.execute(
                 method="POST",
@@ -208,7 +210,7 @@ class LLMProxy(LLM):
                 },
                 json={
                     "inputs": inputs,
-                    "raw_response": raw_response_dict,
+                    "api_response": api_response_dict,
                     "parsed_outputs": parsed_outputs,
                     "metadata": metadata,
                 },

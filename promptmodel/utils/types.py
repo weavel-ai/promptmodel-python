@@ -26,7 +26,7 @@ class LLMResponse:
         error_log: Optional[str] = None,
         function_call: Optional[Dict[str, Any]] = None
     ):
-        self.response = response
+        self.api_response = response
         self.raw_output = raw_output
         self.parsed_outputs = parsed_outputs
         self.error = error
@@ -43,7 +43,7 @@ class LLMStreamResponse:
         error_log: Optional[str] = None,
         function_call: Optional[Dict[str, Any]] = None
     ):
-        self.response = response
+        self.api_response = response
         self.raw_output = raw_output
         self.parsed_outputs = parsed_outputs
         self.error = error
