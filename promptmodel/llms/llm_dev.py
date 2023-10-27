@@ -14,6 +14,7 @@ from promptmodel.utils import logger
 
 load_dotenv()
 
+
 class OpenAIMessage(BaseModel):
     role: str
     content: str
@@ -32,7 +33,7 @@ class LLMDev:
     async def dev_run(
         self,
         messages: List[Dict[str, str]],
-        parsing_type: Optional[ParsingType] = None,
+        parsing_type: Optional[ParsingType] = ParsingType.DOUBLE_SQUARE_BRACKET,
         model: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, str], None]:
         """Parse & stream output from openai chat completion."""
@@ -50,17 +51,19 @@ class LLMDev:
             if "content" in chunk["choices"][0]["delta"]:
                 stream_value = chunk["choices"][0]["delta"]["content"]
                 raw_output += stream_value  # 지금까지 생성된 누적 output
-                yield stream_value  # return raw output 
-        
+                yield stream_value  # return raw output
+
         # parsing
         if parsing_type:
-            parsing_pattern : Dict[str, str] = get_pattern_by_type(parsing_type)
-            whole_pattern = parsing_pattern['whole']
+            parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)
+            whole_pattern = parsing_pattern["whole"]
             parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
-            cannot_parsed_output = re.sub(whole_pattern, "", raw_output, flags=re.DOTALL)
+            cannot_parsed_output = re.sub(
+                whole_pattern, "", raw_output, flags=re.DOTALL
+            )
             if cannot_parsed_output.strip() != "":
                 yield False
             else:
                 yield True
             for parsed_result in parsed_results:
-                yield {parsed_result[0] : parsed_result[1]}
+                yield {parsed_result[0]: parsed_result[1]}

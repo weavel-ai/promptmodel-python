@@ -21,6 +21,7 @@ from promptmodel.utils.output_utils import update_dict
 from promptmodel.apis.base import APIClient, AsyncAPIClient
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse
 
+
 class LLMProxy(LLM):
     def __init__(
         self, name: str, rate_limit_manager: Optional[RateLimitManager] = None
@@ -31,9 +32,11 @@ class LLMProxy(LLM):
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
             prompts, version_details = asyncio.run(fetch_prompts(self._name))
-            call_args = self._prepare_call_args(prompts, version_details, inputs, kwargs)
+            call_args = self._prepare_call_args(
+                prompts, version_details, inputs, kwargs
+            )
             # Call the generator with the arguments
-            stream_response : Generator[LLMStreamResponse] = gen(**call_args)
+            stream_response: Generator[LLMStreamResponse, None, None] = gen(**call_args)
 
             raw_response = None
             dict_cache = {}  # to store aggregated dictionary values
@@ -58,29 +61,35 @@ class LLMProxy(LLM):
             if "content" not in raw_response.choices[0]["message"]:
                 raw_response.choices[0]["message"]["content"] = string_cache
                 raw_response.choices[0]["message"]["role"] = "assistant"
-            
+
             metadata = {
-                "error_occurs" : error_occurs,
-                "error_log" : error_log,
+                "error_occurs": error_occurs,
+                "error_log": error_log,
             }
-            self._log_to_cloud(version_details['uuid'], inputs, raw_response, dict_cache, metadata)
+            self._log_to_cloud(
+                version_details["uuid"], inputs, raw_response, dict_cache, metadata
+            )
 
         return wrapper
 
     def _wrap_async_gen(self, async_gen: Callable[..., Any]) -> Callable[..., Any]:
         async def wrapper(inputs: Dict[str, Any], **kwargs):
             prompts, version_details = await fetch_prompts(self._name)
-            call_args = self._prepare_call_args(prompts, version_details, inputs, kwargs)
+            call_args = self._prepare_call_args(
+                prompts, version_details, inputs, kwargs
+            )
 
             # Call async_gen with the arguments
-            stream_response : AsyncGenerator[LLMStreamResponse]= async_gen(**call_args)
-            
+            stream_response: AsyncGenerator[LLMStreamResponse, None] = async_gen(
+                **call_args
+            )
+
             raw_response = None
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
             error_occurs = False
             error_log = None
-            raw_response : ModelResponse = None
+            raw_response: ModelResponse = None
             async for item in stream_response:
                 if item.api_response:
                     raw_response = item.api_response
@@ -92,65 +101,98 @@ class LLMProxy(LLM):
                     error_occurs = True
                     error_log = item.error_log
                 yield item
-            
+
             # add string_cache in model_response
             if "message" not in raw_response.choices[0]:
                 raw_response.choices[0]["message"] = {}
             if "content" not in raw_response.choices[0]["message"]:
                 raw_response.choices[0]["message"]["content"] = string_cache
                 raw_response.choices[0]["message"]["role"] = "assistant"
-            
+
             metadata = {
-                "error_occurs" : error_occurs,
-                "error_log" : error_log,
+                "error_occurs": error_occurs,
+                "error_log": error_log,
             }
-            self._log_to_cloud(version_details['uuid'], inputs, raw_response, dict_cache, metadata)
-            
+            self._log_to_cloud(
+                version_details["uuid"], inputs, raw_response, dict_cache, metadata
+            )
+
             # raise Exception("error_log")
-            
+
         return wrapper
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
             prompts, version_details = asyncio.run(fetch_prompts(self._name))
-            call_args = self._prepare_call_args(prompts, version_details, inputs, kwargs)
-            
+            call_args = self._prepare_call_args(
+                prompts, version_details, inputs, kwargs
+            )
+
             # Call the method with the arguments
-            llm_response : LLMResponse = method(**call_args)
+            llm_response: LLMResponse = method(**call_args)
             error_occurs = llm_response.error
             error_log = llm_response.error_log
             metadata = {
-                "error_occurs" : error_occurs,
-                "error_log" : error_log,
+                "error_occurs": error_occurs,
+                "error_log": error_log,
             }
-            
+
             if llm_response.parsed_outputs:
-                self._log_to_cloud(version_details['uuid'], inputs, llm_response.api_response, llm_response.parsed_outputs, metadata)
+                self._log_to_cloud(
+                    version_details["uuid"],
+                    inputs,
+                    llm_response.api_response,
+                    llm_response.parsed_outputs,
+                    metadata,
+                )
             else:
-                self._log_to_cloud(version_details['uuid'], inputs, llm_response.api_response, {}, metadata)
+                self._log_to_cloud(
+                    version_details["uuid"],
+                    inputs,
+                    llm_response.api_response,
+                    {},
+                    metadata,
+                )
             return llm_response
 
         return wrapper
 
     def _wrap_async_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         async def async_wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = await fetch_prompts(self._name) # messages, model, uuid = self._fetch_prompts()
-            call_args = self._prepare_call_args(prompts, version_details, inputs, kwargs)
+            prompts, version_details = await fetch_prompts(
+                self._name
+            )  # messages, model, uuid = self._fetch_prompts()
+            call_args = self._prepare_call_args(
+                prompts, version_details, inputs, kwargs
+            )
 
             # Call the method with the arguments
-            llm_response : LLMResponse = await method(**call_args)
+            llm_response: LLMResponse = await method(**call_args)
             error_occurs = llm_response.error
             error_log = llm_response.error_log
             metadata = {
-                "error_occurs" : error_occurs,
-                "error_log" : error_log,
+                "error_occurs": error_occurs,
+                "error_log": error_log,
             }
-            
+
             if llm_response.parsed_outputs:
-                self._log_to_cloud(version_details['uuid'], inputs, llm_response.api_response, llm_response.parsed_outputs, metadata)
+                self._log_to_cloud(
+                    version_details["uuid"],
+                    inputs,
+                    llm_response.api_response,
+                    llm_response.parsed_outputs,
+                    metadata,
+                )
             else:
-                self._log_to_cloud(version_details['uuid'], inputs, llm_response.api_response, {}, metadata)
+                self._log_to_cloud(
+                    version_details["uuid"],
+                    inputs,
+                    llm_response.api_response,
+                    {},
+                    metadata,
+                )
             return llm_response
+
         return async_wrapper
 
     def _prepare_call_args(
@@ -170,9 +212,9 @@ class LLMProxy(LLM):
         ]
         call_args = {
             "messages": messages,
-            "model": version_detail['model'] if version_detail else None,
-            "parsing_type": version_detail['parsing_type'] if version_detail else None,
-            "output_keys": version_detail['output_keys'] if version_detail else None,
+            "model": version_detail["model"] if version_detail else None,
+            "parsing_type": version_detail["parsing_type"] if version_detail else None,
+            "output_keys": version_detail["output_keys"] if version_detail else None,
         }
         if call_args["parsing_type"] is None:
             del call_args["parsing_type"]
@@ -189,7 +231,7 @@ class LLMProxy(LLM):
         inputs: dict,
         api_response: ModelResponse,
         parsed_outputs: dict,
-        metadata: dict
+        metadata: dict,
     ):
         # Log to cloud
         # logging if only status = deployed
@@ -233,12 +275,14 @@ class LLMProxy(LLM):
     # def arun_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
     #     return self._wrap_async_method(super().arun_function_call)(inputs)
 
-    def stream(self, inputs: Dict[str, Any] = {}) -> Generator[LLMStreamResponse]:
+    def stream(
+        self, inputs: Dict[str, Any] = {}
+    ) -> Generator[LLMStreamResponse, None, None]:
         return self._wrap_gen(super().stream)(inputs)
 
     def astream(
         self, inputs: Optional[Dict[str, Any]] = {}
-    ) -> AsyncGenerator[LLMStreamResponse]:
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         return self._wrap_async_gen(super().astream)(inputs)
 
     def run_and_parse(
@@ -256,13 +300,13 @@ class LLMProxy(LLM):
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-    ) -> Generator[LLMStreamResponse]:
+    ) -> Generator[LLMStreamResponse, None, None]:
         return self._wrap_gen(super().stream_and_parse)(inputs)
 
     def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-    ) -> AsyncGenerator[LLMStreamResponse]:
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         return self._wrap_async_gen(super().astream_and_parse)(inputs)
 
     # def run_and_parse_function_call(
