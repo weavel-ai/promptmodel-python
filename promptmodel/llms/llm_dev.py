@@ -36,7 +36,7 @@ class LLMDev:
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
         model: Optional[str] = None,
-    ) -> AsyncGenerator[Dict[str, str], None]:
+    ) -> AsyncGenerator[Any, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""

@@ -388,6 +388,7 @@ class DevWebsocketClient:
                             "status": "failed",
                             "log" : "parsing failed"
                         }
+                        # IF function_call in response -> call function -> call LLM once more
                         update_llm_module_version(
                             llm_module_version_uuid=llm_module_version_uuid,
                             status=LLMModuleVersionStatus.BROKEN.value,
@@ -408,6 +409,8 @@ class DevWebsocketClient:
                         inputs=sample_input,
                         raw_output=output["raw_output"],
                         parsed_outputs=output["parsed_outputs"],
+                        # function_list
+                        # intermiditate_output
                     )
                 except Exception as error:
                     logger.error(f"Error running service: {error}")

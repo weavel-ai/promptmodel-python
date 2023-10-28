@@ -83,6 +83,7 @@ class LLM:
     def run(
         self,
         messages: List[Dict[str, str]],
+        functions: [List[Any]] = [],
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
@@ -96,36 +97,14 @@ class LLM:
                     message.model_dump()
                     for message in self.__validate_openai_messages(messages)
                 ],
-            )
-            raw_output = response.choices[0]["message"]["content"]
-            return LLMResponse(api_response=response, raw_output=raw_output)
-        except Exception as e:
-            if response:
-                return LLMResponse(api_response=response, error=True, error_log=str(e))
-            else:
-                return LLMResponse(api_response={}, error=True, error_log=str(e))
-
-    def run_function_call(
-        self,
-        messages: List[Dict[str, str]],
-        functions: List[Any],
-        model: Optional[str] = DEFAULT_MODEL,
-        *args,
-        **kwargs,
-    ):
-        """Return the response from openai chat completion."""
-        response = None
-        try:
-            response = completion(
-                model=model,
-                messages=[
-                    message.model_dump()
-                    for message in self.__validate_openai_messages(messages)
-                ],
-                function_call=True,
                 functions=functions,
             )
-            content = response.choices[0]["message"]["content"]
+            
+            content = (
+                response.choices[0]["message"]["content"]
+                if "content" in response.choices[0]["message"]
+                else None
+            )
             call_func = (
                 response.choices[0]["message"]["function_call"]
                 if "function_call" in response.choices[0]["message"]
@@ -143,6 +122,7 @@ class LLM:
     async def arun(
         self,
         messages: List[Dict[str, str]],
+        functions: [List[Any]] = [],
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
@@ -157,6 +137,7 @@ class LLM:
                         message.model_dump()
                         for message in self.__validate_openai_messages(messages)
                     ],
+                    functions=functions
                 )
             else:
                 response = await acompletion(
@@ -165,45 +146,7 @@ class LLM:
                         message.model_dump()
                         for message in self.__validate_openai_messages(messages)
                     ],
-                )
-            content = response.choices[0]["message"]["content"]
-            return LLMResponse(api_response=response, raw_output=content)
-        except Exception as e:
-            if response:
-                return LLMResponse(api_response=response, error=True, error_log=str(e))
-            else:
-                return LLMResponse(api_response={}, error=True, error_log=str(e))
-
-    async def arun_function_call(
-        self,
-        messages: List[Dict[str, str]],
-        functions: List[Any],
-        model: Optional[str] = DEFAULT_MODEL,
-        *args,
-        **kwargs,
-    ):
-        """Return the response from openai chat completion."""
-        response = None
-        try:
-            if self._rate_limit_manager:
-                response = await self._rate_limit_manager.acompletion(
-                    model=model,
-                    messages=[
-                        message.model_dump()
-                        for message in self.__validate_openai_messages(messages)
-                    ],
-                    function_call=True,
-                    functions=functions,
-                )
-            else:
-                response = await acompletion(
-                    model=model,
-                    messages=[
-                        message.model_dump()
-                        for message in self.__validate_openai_messages(messages)
-                    ],
-                    function_call=True,
-                    functions=functions,
+                    functions=functions
                 )
             content = (
                 response.choices[0]["message"]["content"]
@@ -246,18 +189,23 @@ class LLM:
             ).choices[0]["message"]["content"]
 
             raw_output = ""
+            function_call = {"name" : "", "arguments" : ""}
+            
             for chunk in response:
                 if "content" in chunk["choices"][0]["delta"]:
                     raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(
-                        raw_output=chunk["choices"][0]["delta"]["content"]
-                    )
+                    yield LLMStreamResponse(raw_output=chunk["choices"][0]["delta"]["content"])
+                    
+                if "function_call" in chunk["choices"][0]["delta"]:
+                    for key, value in chunk["choices"][0]["delta"]["function_call"].items():
+                        function_call[key] += value
+                    
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
-                            chunk, response_ms, messages, raw_output
+                            chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None
                         )
                     )
         except Exception as e:
@@ -322,7 +270,7 @@ class LLM:
         try:
             if parsing_type == ParsingType.COLON.value:
                 # cannot stream colon type
-                yield False
+                yield LLMStreamResponse(error=True, error_log="Cannot stream colon type")
                 return
             start_time = datetime.datetime.now()
             response = completion(
@@ -477,18 +425,23 @@ class LLM:
                     stream=True,
                 )
             raw_output = ""
+            function_call = {"name" : "", "arguments" : ""}
+            
             async for chunk in response:
                 if "content" in chunk["choices"][0]["delta"]:
                     raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(
-                        raw_output=chunk["choices"][0]["delta"]["content"]
-                    )
+                    yield LLMStreamResponse(raw_output=chunk["choices"][0]["delta"]["content"])
+                    
+                if "function_call" in chunk["choices"][0]["delta"]:
+                    for key, value in chunk["choices"][0]["delta"]["function_call"].items():
+                        function_call[key] += value
+                        
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
-                            chunk, response_ms, messages, raw_output
+                            chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None
                         )
                     )
         except Exception as e:

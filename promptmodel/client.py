@@ -146,6 +146,7 @@ class CacheManager:
         self.cache_thread = threading.Thread(target=self._run_cache_loop)
         self.cache_thread.daemon = True
         self.cache_thread.start()
+        logger.debug("CacheManager initialized")
 
     def _run_cache_loop(self):
         asyncio.run(self._update_cache_periodically())
