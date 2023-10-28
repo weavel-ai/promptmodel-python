@@ -7,15 +7,17 @@ from typing import (
     Optional,
     AsyncGenerator,
     Callable,
-    Union
+    Union,
 )
 from pydantic import BaseModel
 from litellm import ModelResponse as LiteLLMModelResponse
 
+
 class ModelResponse(LiteLLMModelResponse):
     def __init__(self, **params):
         super(ModelResponse, self).__init__(**params)
-    
+
+
 class LLMResponse:
     def __init__(
         self,
@@ -24,7 +26,7 @@ class LLMResponse:
         parsed_outputs: Optional[Dict[str, str]] = None,
         error: Optional[bool] = None,
         error_log: Optional[str] = None,
-        function_call: Optional[Dict[str, Any]] = None
+        function_call: Optional[Dict[str, Any]] = None,
     ):
         self.api_response = api_response
         self.raw_output = raw_output
@@ -32,7 +34,8 @@ class LLMResponse:
         self.error = error
         self.error_log = error_log
         self.function_call = function_call
-    
+
+
 class LLMStreamResponse:
     def __init__(
         self,
@@ -41,7 +44,7 @@ class LLMStreamResponse:
         parsed_outputs: Optional[Dict[str, str]] = None,
         error: Optional[bool] = None,
         error_log: Optional[str] = None,
-        function_call: Optional[Dict[str, Any]] = None
+        function_call: Optional[Dict[str, Any]] = None,
     ):
         self.api_response = api_response
         self.raw_output = raw_output
