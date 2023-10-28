@@ -74,6 +74,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
     ):
         """Return the response from openai chat completion."""
+        response = None
         try:
             response = completion(
                 model=model,
@@ -97,6 +98,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
     ):
         """Return the response from openai chat completion."""
+        response = None
         try:
             response = completion(
                 model=model,
@@ -126,6 +128,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
     ):
         """Return the response from openai chat completion."""
+        response = None
         try:
             if self._rate_limit_manager:
                 response = await self._rate_limit_manager.acompletion(
@@ -158,6 +161,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
     ):
         """Return the response from openai chat completion."""
+        response = None
         try:
             if self._rate_limit_manager:
                 response = await self._rate_limit_manager.acompletion(
@@ -202,6 +206,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
     ):
         """Stream openai chat completion."""
+        response = None
         try:
             # load_prompt()
             start_time = datetime.datetime.now()
@@ -238,6 +243,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
     ) -> Dict[str, str]:
         """Parse and return output from openai chat completion."""
+        response = None
         try:
             response = completion(
                 model=model,
@@ -273,6 +279,7 @@ class LLM:
         **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
+        response = None
         try:
             if parsing_type == ParsingType.COLON.value:
                 # cannot stream colon type
@@ -343,6 +350,7 @@ class LLM:
 
         Now generate the output:
         """
+        response = None
         try:
             if self._rate_limit_manager:
                 response = await self._rate_limit_manager.acompletion(
@@ -383,6 +391,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
+        response = None
         try:
             start_time = datetime.datetime.now()
             if self._rate_limit_manager:
@@ -427,6 +436,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
+        response = None
         try:
             if parsing_type == ParsingType.COLON.value:
                 # cannot stream colon type

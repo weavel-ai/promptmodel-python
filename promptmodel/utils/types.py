@@ -19,14 +19,14 @@ class ModelResponse(LiteLLMModelResponse):
 class LLMResponse:
     def __init__(
         self,
-        response: ModelResponse,
+        api_response: ModelResponse,
         raw_output: Optional[str] = None,
         parsed_outputs: Optional[Dict[str, str]] = None,
         error: Optional[bool] = None,
         error_log: Optional[str] = None,
         function_call: Optional[Dict[str, Any]] = None
     ):
-        self.api_response = response
+        self.api_response = api_response
         self.raw_output = raw_output
         self.parsed_outputs = parsed_outputs
         self.error = error
@@ -36,14 +36,14 @@ class LLMResponse:
 class LLMStreamResponse:
     def __init__(
         self,
-        response: Optional[ModelResponse] = None,
+        api_response: Optional[ModelResponse] = None,
         raw_output: Optional[str] = None,
         parsed_outputs: Optional[Dict[str, str]] = None,
         error: Optional[bool] = None,
         error_log: Optional[str] = None,
         function_call: Optional[Dict[str, Any]] = None
     ):
-        self.api_response = response
+        self.api_response = api_response
         self.raw_output = raw_output
         self.parsed_outputs = parsed_outputs
         self.error = error

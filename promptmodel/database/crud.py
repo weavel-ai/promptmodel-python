@@ -218,7 +218,7 @@ def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]
         return None, None
 
 
-def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], str, str]:
+def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], str]:
     try:
         with db.atomic():
             versions: List[DeployedLLMModuleVersion] = list(
