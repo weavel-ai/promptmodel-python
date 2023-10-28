@@ -101,7 +101,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         return await self.arun(inputs)
 
-    def stream(self, inputs: Dict[str, Any] = {}) -> Generator[LLMStreamResponse]:
+    def stream(self, inputs: Dict[str, Any] = {}) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True. It does not raise error.
 
         Args:
@@ -118,7 +118,7 @@ class PromptModel(metaclass=RegisteringMeta):
 
     async def astream(
         self, inputs: Optional[Dict[str, Any]] = {}
-    ) -> AsyncGenerator[LLMStreamResponse]:
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Async Run PromptModel with stream=True. It does not raise error.
 
         Args:
@@ -170,7 +170,7 @@ class PromptModel(metaclass=RegisteringMeta):
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-    ) -> Generator[LLMStreamResponse]:
+    ) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
         Args:
@@ -188,7 +188,7 @@ class PromptModel(metaclass=RegisteringMeta):
     async def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-    ) -> AsyncGenerator[LLMStreamResponse]:
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Async Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
         Args:

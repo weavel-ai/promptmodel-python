@@ -271,7 +271,7 @@ class LLM:
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         **kwargs,
-    ) -> Generator[Dict[str, str], None, None]:
+    ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
         try:
             if parsing_type == ParsingType.COLON.value:
@@ -381,7 +381,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = DEFAULT_MODEL,
-    ) -> Generator[Dict[str, str], None, None]:
+    ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
         try:
             start_time = datetime.datetime.now()
@@ -425,7 +425,7 @@ class LLM:
         parsing_type: Optional[ParsingType] = None,
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
-    ) -> AsyncGenerator[Dict[str, str], None]:
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
         try:
             if parsing_type == ParsingType.COLON.value:
