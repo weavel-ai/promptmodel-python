@@ -57,20 +57,18 @@ class ParsingPattern(dict, Enum):
         "end_token": None,
     }
     SQUARE_BRACKET = {
-        "start": r"\[(.*?)\]",
-        "start_fstring": "[{key}]",
+        "start": r"\[(\w+)\s+type=<([\w,\s\[\]]+)>\]",
+        "start_fstring": "[{key} type=<{type}>]",
         "end_fstring": "[/{key}]",
-        # "whole": r"\[(.*?)\](.*?)\[/\1\]",
-        "whole": r"\[(\w+)\s+type=<([\w,\s\[\]]+)>\](.*?)\[/\1\]",  # also captures type
+        "whole": r"\[(\w+)\s+type=<([\w,\s\[\]]+)>\](.*?)\[/\1\]",
         "start_token": r"[",
         "end_token": r"]",
     }
     DOUBLE_SQUARE_BRACKET = {
-        "start": r"\[\[(.*?)\]\]",
-        "start_fstring": "[[{key}]]",
+        "start": r"\[\[(\w+)\s+type=<([\w,\s\[\]]+)>\]\]",
+        "start_fstring": "[[{key} type=<{type}>]]",
         "end_fstring": "[[/{key}]]",
-        # "whole" : r"\[\[(.*?)\]\](.*?)\[\[/\1\]\]",
-        "whole": r"\[\[(\w+)\s+type=<([\w,\s\[\]]+)>\]\](.*?)\[\[/\1\]\]",  # also captures type
+        "whole": r"\[\[(\w+)\s+type=<([\w,\s\[\]]+)>\]\](.*?)\[\[/\1\]\]",
         "start_token": r"[",
         "end_token": r"]",
     }
@@ -78,7 +76,6 @@ class ParsingPattern(dict, Enum):
         "start": r"<(.*?)>",
         "start_fstring": "<{key}>",
         "end_fstring": "</{key}>",
-        # "whole": r"<(.*?)>(.*?)</\1>",
         "whole": r"<(\w+)\s+type=<([\w,\s\[\]]+)>>(.*?)</\1>",  # also captures type
         "start_token": r"<",
         "end_token": r">",

@@ -601,10 +601,12 @@ class LLM:
                                 break
                             if len(keys) == 0:
                                 break  # no key
-                            active_key = keys[0]
+                            active_key, active_type = keys[0]
                             end_tag = end_fstring.format(key=active_key)
                             # delete start tag from buffer
-                            start_pattern = start_fstring.format(key=active_key)
+                            start_pattern = start_fstring.format(
+                                key=active_key, type=active_type
+                            )
                             buffer = buffer.split(start_pattern)[-1]
 
                         else:
@@ -715,10 +717,14 @@ class LLM:
                             if len(keys) == 0:
                                 break  # no key
 
-                            active_key = keys[0]
+                            active_key, active_type = keys[
+                                0
+                            ]  # Updated to unpack both key and type
                             end_tag = end_fstring.format(key=active_key)
                             # delete start tag from buffer
-                            start_pattern = start_fstring.format(key=active_key)
+                            start_pattern = start_fstring.format(
+                                key=active_key, type=active_type
+                            )
                             buffer = buffer.split(start_pattern)[-1]
 
                         else:
@@ -810,10 +816,12 @@ class LLM:
                                 break
                             if len(keys) == 0:
                                 break  # no key
-                            active_key = keys[0]
+                            active_key, active_type = keys[0]
                             end_tag = end_fstring.format(key=active_key)
                             # delete start tag from buffer
-                            start_pattern = start_fstring.format(key=active_key)
+                            start_pattern = start_fstring.format(
+                                key=active_key, type=active_type
+                            )
                             buffer = buffer.split(start_pattern)[-1]
 
                         else:
@@ -924,10 +932,14 @@ class LLM:
                             if len(keys) == 0:
                                 break  # no key
 
-                            active_key = keys[0]
+                            active_key, active_type = keys[
+                                0
+                            ]  # Updated to unpack both key and type
                             end_tag = end_fstring.format(key=active_key)
                             # delete start tag from buffer
-                            start_pattern = start_fstring.format(key=active_key)
+                            start_pattern = start_fstring.format(
+                                key=active_key, type=active_type
+                            )
                             buffer = buffer.split(start_pattern)[-1]
 
                         else:
