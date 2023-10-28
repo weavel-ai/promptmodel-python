@@ -32,15 +32,20 @@ class Client:
         self.llm_modules: List[LLMModule] = []
         self.samples: List[Dict[str, Any]] = []
         config = read_config()
-        if config and "dev_branch" in config:
-            dev_branch = config["dev_branch"]
-            if ("online" in dev_branch and dev_branch["online"] == True) or (
-                "initializing" in dev_branch and dev_branch["initializing"] == True
-            ):
-                self.cache_manager = None
+        if (
+            config and 
+            "dev_branch" in config and (
+                (
+                    "online" in config['dev_branch'] and config['dev_branch']["online"] == True
+                ) or 
+                (
+                    "initializing" in config['dev_branch'] and config['dev_branch']["initializing"] == True
+                )
+            )
+        ):
+            self.cache_manager = None
         else:
             self.cache_manager = CacheManager()
-        # # logger.debug("Client initialized")
 
     def fastmodel(self, name: str) -> LLMProxy:
         return LLMProxy(name)
