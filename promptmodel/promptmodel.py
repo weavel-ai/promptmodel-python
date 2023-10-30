@@ -137,6 +137,7 @@ class PromptModel(metaclass=RegisteringMeta):
     def run_and_parse(
         self,
         inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None
     ) -> LLMResponse:
         """Run PromptModel and make parsed outputs. It does not raise error.
 
@@ -149,11 +150,12 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return self.llm_proxy.run_and_parse(inputs)
+        return self.llm_proxy.run_and_parse(inputs, function_list)
 
     async def arun_and_parse(
         self,
         inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None
     ) -> LLMResponse:
         """Async Run PromptModel and make parsed outputs. It does not raise error.
 
@@ -166,11 +168,12 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return await self.llm_proxy.arun_and_parse(inputs)
+        return await self.llm_proxy.arun_and_parse(inputs, function_list)
 
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None
     ) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
@@ -183,12 +186,13 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
         """
-        for item in self.llm_proxy.stream_and_parse(inputs):
+        for item in self.llm_proxy.stream_and_parse(inputs, function_list):
             yield item
 
     async def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Async Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
@@ -201,7 +205,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
         """
-        async for item in self.llm_proxy.astream_and_parse(inputs):
+        async for item in self.llm_proxy.astream_and_parse(inputs, function_list):
             yield item
 
     # def run_and_parse_function_call(
