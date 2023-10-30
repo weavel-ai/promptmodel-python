@@ -281,27 +281,31 @@ class LLMProxy(LLM):
     
     def run_and_parse(
         self,
-        inputs: Dict[str, Any] = {},
+        inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> LLMResponse:
-        return self._wrap_method(super().run_and_parse)(inputs)
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_method(super().run_and_parse)(inputs, **kwargs)
 
     def arun_and_parse(
         self,
-        inputs: Dict[str, Any] = {},
+        inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> LLMResponse:
-        return self._wrap_async_gen(super().arun_and_parse)(inputs)
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_async_gen(super().arun_and_parse)(inputs, **kwargs)
 
     def stream_and_parse(
         self,
-        inputs: Dict[str, Any] = {},
+        inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> Generator[LLMStreamResponse, None, None]:
-        return self._wrap_gen(super().stream_and_parse)(inputs)
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_gen(super().stream_and_parse)(inputs, **kwargs)
 
     def astream_and_parse(
         self,
-        inputs: Dict[str, Any] = {},
+        inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        return self._wrap_async_gen(super().astream_and_parse)(inputs)
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_async_gen(super().astream_and_parse)(inputs, **kwargs)
 
     # def run_and_parse_function_call(
     #     self,
