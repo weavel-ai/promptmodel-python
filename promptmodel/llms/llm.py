@@ -5,6 +5,7 @@ import json
 import time
 import datetime
 from typing import Any, AsyncGenerator, List, Dict, Optional, Union, Generator, Tuple
+from attr import dataclass
 
 import openai
 from pydantic import BaseModel
@@ -35,6 +36,13 @@ class OpenAIMessage(BaseModel):
 DEFAULT_MODEL = "gpt-3.5-turbo"
 
 
+@dataclass
+class ParseResult:
+    parsed_outputs: Dict[str, Any]
+    error: bool
+    error_log: Optional[str]
+
+
 class LLM:
     def __init__(self, rate_limit_manager: Optional[RateLimitManager] = None):
         self._rate_limit_manager = rate_limit_manager
@@ -42,24 +50,29 @@ class LLM:
     @classmethod
     def __parse_output_pattern__(
         cls, raw_output: str, parsing_type: ParsingType
-    ) -> (Dict[str, str], bool, Optional[str]):
+    ) -> ParseResult:
         parsing_pattern = get_pattern_by_type(parsing_type)
         whole_pattern = parsing_pattern["whole"]
         parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
         parsed_outputs = {}
+        error = False
+        error_log: str = None
 
-        for parsed_result in parsed_results:
-            key = parsed_result[0]
-            type_str = parsed_result[1]
-            value = convert_str_to_type(parsed_result[2], type_str)
-            parsed_outputs[key] = value
+        try:
+            for parsed_result in parsed_results:
+                key = parsed_result[0]
+                type_str = parsed_result[1]
+                value = convert_str_to_type(parsed_result[2], type_str)
+                parsed_outputs[key] = value
+        except Exception as error:
+            error = True
+            error_log = str(error)
 
-        cannot_parsed_output = re.sub(whole_pattern, "", raw_output, flags=re.DOTALL)
-
-        if cannot_parsed_output.strip() != "":
-            return parsed_outputs, False, "String cannot be parsed detected"
-        else:
-            return parsed_outputs, True, None
+        return ParseResult(
+            parsed_outputs=parsed_outputs,
+            error=error,
+            error_log=error_log,
+        )
 
     def __validate_openai_messages(
         self, messages: List[Dict[str, str]]
@@ -260,6 +273,7 @@ class LLM:
         """Parse and return output from openai chat completion."""
         response = None
         try:
+            parse_success = True
             response = completion(
                 model=model,
                 messages=[
@@ -269,21 +283,24 @@ class LLM:
             )
             raw_output = response.choices[0]["message"]["content"]
 
-            parsed_outputs, parsed_success, error_log = self.__parse_output_pattern__(
+            parse_result: ParseResult = self.__parse_output_pattern__(
                 raw_output, parsing_type
             )
+            error_log = parse_result.error_log
 
             if (
                 output_keys is not None
-                and set(parsed_outputs.keys()) != set(output_keys)
-            ) and parsed_success:
-                parsed_success = False
+                and set(parse_result.parsed_outputs.keys()) != set(output_keys)
+                or parse_result.error
+            ):
+                parse_success = False
                 error_log = "Output keys do not match with parsed output keys"
 
             return LLMResponse(
                 api_response=response,
-                parsed_outputs=parsed_outputs,
-                error=not parsed_success,
+                raw_output=raw_output,
+                parsed_outputs=parse_result.parsed_outputs,
+                error=not parse_success,
                 error_log=error_log,
             )
         except Exception as e:
@@ -398,20 +415,29 @@ class LLM:
                     ],
                 )
             raw_output = response.choices[0]["message"]["content"]
-            parsed_outputs, parsed_success, error_log = self.__parse_output_pattern__(
+            parse_result: ParseResult = self.__parse_output_pattern__(
                 raw_output, parsing_type
             )
+            error_log = parse_result.error_log
 
             if (
                 output_keys is not None
-                and set(parsed_outputs.keys()) != set(output_keys)
-            ) and parsed_success:
+                and set(parse_result.parsed_outputs.keys()) != set(output_keys)
+                or parse_result.error
+            ):
+                parse_success = False
+                error_log = "Output keys do not match with parsed output keys"
+
+            if (
+                output_keys is not None
+                and set(parse_result.parsed_outputs.keys()) != set(output_keys)
+            ) and parse_success:
                 parsed_success = False
                 error_log = "Output keys do not match with parsed output keys"
 
             return LLMResponse(
                 api_response=response,
-                parsed_outputs=parsed_outputs,
+                parsed_outputs=parse_result.parsed_outputs,
                 error=not parsed_success,
                 error_log=error_log,
             )

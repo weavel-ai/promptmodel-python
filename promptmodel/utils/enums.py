@@ -74,7 +74,7 @@ class ParsingPattern(dict, Enum):
     }
     HTML = {
         "start": r"<(.*?)>",
-        "start_fstring": "<{key}>",
+        "start_fstring": "<{key} type=<{type}>>",
         "end_fstring": "</{key}>",
         "whole": r"<(\w+)\s+type=<([\w,\s\[\]]+)>>(.*?)</\1>",  # also captures type
         "start_token": r"<",
