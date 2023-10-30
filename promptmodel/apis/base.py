@@ -222,8 +222,11 @@ class AsyncAPIClient:
                     print("[red]Authentication failed.[/red]")
             else:
                 print(f"[red]Error: {response}[/red]")
+
             return response
         except requests.exceptions.ConnectionError:
             print("[red]Could not connect to the Promptmodel API.[/red]")
         except requests.exceptions.Timeout:
             print("[red]The request timed out.[/red]")
+        except Exception as exception:
+            print(f"[red]Error: {exception}[/red]")

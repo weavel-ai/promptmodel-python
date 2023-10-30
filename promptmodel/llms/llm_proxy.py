@@ -124,6 +124,8 @@ class LLMProxy(LLM):
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
             prompts, version_details = asyncio.run(fetch_prompts(self._name))
+            print(prompts)
+            print(version_details)
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )

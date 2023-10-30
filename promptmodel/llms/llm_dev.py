@@ -11,6 +11,7 @@ from litellm import acompletion
 
 from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
 from promptmodel.utils import logger
+from promptmodel.utils.output_utils import convert_str_to_type
 
 load_dotenv()
 
@@ -33,7 +34,7 @@ class LLMDev:
     async def dev_run(
         self,
         messages: List[Dict[str, str]],
-        parsing_type: Optional[ParsingType] = ParsingType.DOUBLE_SQUARE_BRACKET,
+        parsing_type: Optional[ParsingType] = None,
         model: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, str], None]:
         """Parse & stream output from openai chat completion."""
@@ -66,4 +67,7 @@ class LLMDev:
             else:
                 yield True
             for parsed_result in parsed_results:
-                yield {parsed_result[0]: parsed_result[1]}
+                key = parsed_result[0]
+                type_str = parsed_result[1]
+                value = convert_str_to_type(parsed_result[2], type_str)
+                yield {key: value}
