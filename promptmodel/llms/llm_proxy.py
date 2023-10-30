@@ -136,7 +136,6 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
-
             if llm_response.parsed_outputs:
                 self._log_to_cloud(
                     version_details["uuid"],

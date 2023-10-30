@@ -14,7 +14,7 @@ from promptmodel.utils import logger
 from promptmodel.apis.base import APIClient, AsyncAPIClient
 
 
-async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
+async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
     """fetch prompts.
 
     Args:
@@ -26,22 +26,29 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], str]:
     # Check dev_branch activate
     config = read_config()
     if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
-        return [], ""
+        return [], {}
     elif "dev_branch" in config and config["dev_branch"]["online"] == True:
         # get prompt from local DB
         prompt_rows, version_detail = get_latest_version_prompts(name)
         if prompt_rows is None:
-            return [], ""
+            return [], {}
         return [{"role": prompt.role, "content" : prompt.content} for prompt in prompt_rows], version_detail
     else:
-        # call update_local API in background task
-        asyncio.create_task(update_deployed_db(config))
-        # get prompt from local DB by ratio
-        prompt_rows, version_detail = get_deployed_prompts(name)
-        if prompt_rows is None:
-            return [], ""
+        if "project" in config and "use_cache" in config["project"] and config["project"]["use_cache"] == True:
+            # call update_local API in background task
+            asyncio.create_task(update_deployed_db(config))
+            # get prompt from local DB by ratio
+            prompt_rows, version_detail = get_deployed_prompts(name)
+            if prompt_rows is None:
+                return [], {}
+        else:
+            asyncio.run(update_deployed_db(config)) # wait for update local DB cache
+            prompt_rows, version_detail = get_deployed_prompts(name)
+            if prompt_rows is None:
+                return [], {}
+            
         return [{"role": prompt.role, "content" : prompt.content} for prompt in prompt_rows], version_detail
-    
+
 
 async def update_deployed_db(config):
     if "project" not in config or "version" not in config["project"]:
