@@ -28,14 +28,15 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
     if "dev_branch" in config:
         if config["dev_branch"]["initializing"] == True:
             return [], {}
-    elif config["dev_branch"]["online"] == True:
-        # get prompt from local DB
-        prompt_rows, version_detail = get_latest_version_prompts(name)
-        if prompt_rows is None:
-            return [], {}
-        return [
-            {"role": prompt.role, "content": prompt.content} for prompt in prompt_rows
-        ], version_detail
+        elif config["dev_branch"]["online"] == True:
+            # get prompt from local DB
+            prompt_rows, version_detail = get_latest_version_prompts(name)
+            if prompt_rows is None:
+                return [], {}
+            return [
+                {"role": prompt.role, "content": prompt.content}
+                for prompt in prompt_rows
+            ], version_detail
     else:
         if (
             "project" in config

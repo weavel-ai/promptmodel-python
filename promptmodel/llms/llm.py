@@ -71,6 +71,8 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = DEFAULT_MODEL,
+        *args,
+        **kwargs,
     ):
         """Return the response from openai chat completion."""
         response = None
@@ -95,6 +97,8 @@ class LLM:
         messages: List[Dict[str, str]],
         functions: List[Any],
         model: Optional[str] = DEFAULT_MODEL,
+        *args,
+        **kwargs,
     ):
         """Return the response from openai chat completion."""
         response = None
@@ -127,6 +131,8 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = DEFAULT_MODEL,
+        *args,
+        **kwargs,
     ):
         """Return the response from openai chat completion."""
         response = None
@@ -160,6 +166,8 @@ class LLM:
         messages: List[Dict[str, str]],
         functions: List[Any],
         model: Optional[str] = DEFAULT_MODEL,
+        *args,
+        **kwargs,
     ):
         """Return the response from openai chat completion."""
         response = None
@@ -207,6 +215,8 @@ class LLM:
         self,
         messages: List[Dict[str, str]],  # input
         model: Optional[str] = DEFAULT_MODEL,
+        *args,
+        **kwargs,
     ):
         """Stream openai chat completion."""
         response = None
@@ -415,6 +425,8 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = DEFAULT_MODEL,
+        *args,
+        **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
         response = None
