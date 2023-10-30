@@ -15,6 +15,7 @@ from peewee import Model, Case
 from playhouse.shortcuts import model_to_dict
 from promptmodel.utils.enums import LLMModuleVersionStatus, ParsingType
 from promptmodel.utils.random_utils import select_version
+from promptmodel.utils import logger
 from promptmodel.database.config import db
 from rich import print
 
@@ -215,6 +216,7 @@ def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]
         return prompts, version_details
 
     except Exception as e:
+        logger.error(e)
         return None, None
 
 
@@ -258,7 +260,8 @@ def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], st
         }
 
         return selected_prompts, version_details
-    except Exception:
+    except Exception as e:
+        logger.error(e)
         return None, None
 
 

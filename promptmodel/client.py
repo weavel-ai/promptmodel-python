@@ -27,7 +27,7 @@ class LLMModule:
 class Client:
     """Client main class"""
 
-    def __init__(self, default_model: Optional[str] = "gpt-3.5-turbo"):
+    def __init__(self, use_cache: Optional[bool] = True, default_model: Optional[str] = "gpt-3.5-turbo"):
         self._default_model: str = default_model
         self.llm_modules: List[LLMModule] = []
         self.samples: List[Dict[str, Any]] = []
@@ -45,7 +45,13 @@ class Client:
         ):
             self.cache_manager = None
         else:
-            self.cache_manager = CacheManager()
+            if use_cache:
+                upsert_config({"use_cache": True}, section="project")
+                self.cache_manager = CacheManager()
+            else:
+                upsert_config({"use_cache": False}, section="project")
+                self.cache_manager = None
+                initialize_db() # init db for local usage
 
     def fastmodel(self, name: str) -> LLMProxy:
         return LLMProxy(name)
@@ -136,6 +142,7 @@ class CacheManager:
         initialize_db()
         atexit.register(self._terminate)
         # # logger.debug("CacheManager initialized")
+        asyncio.run(self.update_cache()) # updae cache first synchronously
         self.cache_thread = threading.Thread(target=self._run_cache_loop)
         self.cache_thread.daemon = True
         self.cache_thread.start()
@@ -145,14 +152,16 @@ class CacheManager:
 
     async def _update_cache_periodically(self):
         while True:
-            await self.update_cache()
-            # # logger.debug("Update cache")
             await asyncio.sleep(self.update_interval)  # Non-blocking sleep
+            await self.update_cache()
 
     async def update_cache(self):
         # Current time
         current_time = time.time()
         config = read_config()
+        if not config:
+            upsert_config({"version": "0.0.0"}, section="project")
+            config = {"project" : {"version": "0.0.0"}}
 
         # Check if we need to update the cache
         if current_time - self.last_update_time > self.update_interval:
