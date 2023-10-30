@@ -42,7 +42,7 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
             if prompt_rows is None:
                 return [], {}
         else:
-            asyncio.run(update_deployed_db(config)) # wait for update local DB cache
+            await update_deployed_db(config) # wait for update local DB cache
             prompt_rows, version_detail = get_deployed_prompts(name)
             if prompt_rows is None:
                 return [], {}
