@@ -75,3 +75,37 @@ class LLMDev:
                 type_str = parsed_result[1]
                 value = convert_str_to_type(parsed_result[2], type_str)
                 yield LLMStreamResponse(parsed_outputs={key: value})
+
+    async def dev_chat(
+        self,
+        messages: List[Dict[str, str]],
+        parsing_type: Optional[ParsingType] = None,
+        model: Optional[str] = None,
+    ) -> AsyncGenerator[Any, None]:
+        """Parse & stream output from openai chat completion."""
+        _model = model or self._model
+        raw_output = ""
+        response = await acompletion(
+            model=_model,
+            messages=[
+                message.model_dump()
+                for message in self.__validate_openai_messages(messages)
+            ],
+            stream=True,
+        )
+        async for chunk in response:
+            if "content" in chunk["choices"][0]["delta"]:
+                stream_value = chunk["choices"][0]["delta"]["content"]
+                raw_output += stream_value # append raw output
+                yield LLMStreamResponse(raw_output=stream_value) # return raw output
+                
+        # parsing
+        if parsing_type:
+            parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)
+            whole_pattern = parsing_pattern["whole"]
+            parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
+            for parsed_result in parsed_results:
+                key = parsed_result[0]
+                type_str = parsed_result[1]
+                value = convert_str_to_type(parsed_result[2], type_str)
+                yield LLMStreamResponse(parsed_outputs={key: value})

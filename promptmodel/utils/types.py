@@ -52,3 +52,35 @@ class LLMStreamResponse:
         self.error = error
         self.error_log = error_log
         self.function_call = function_call
+
+class FunctionDescription(BaseModel):
+    """
+    {
+            "name": str,
+            "description": Optional[str],
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "argument_name": {
+                        "type": str,
+                        "description": Optional[str],
+                        "enum": Optional[List[str]]
+                    },
+                },
+                "required": Optional[List[str]],
+            },
+        }
+    """
+    class _Parameters(BaseModel):
+        class _Properties(BaseModel):
+            type: str
+            description: Optional[str] = None
+            enum: Optional[List[str]] = None
+            
+        type : str = "object"
+        properties: Dict[str, _Properties] = {} 
+        required: Optional[List[str]] = None
+            
+    name: str
+    description: Optional[str] = None
+    parameters: _Parameters

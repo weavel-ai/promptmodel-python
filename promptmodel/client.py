@@ -7,7 +7,7 @@ import threading
 import time
 import atexit
 from dataclasses import dataclass
-from typing import Callable, Dict, Any, List, Optional
+from typing import Callable, Dict, Any, List, Optional, Union
 from websockets.client import connect, WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
@@ -15,6 +15,7 @@ import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.prompt_util import update_deployed_db
 from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.utils.types import FunctionDescription
 from promptmodel.database.orm import initialize_db
 
 
@@ -31,6 +32,7 @@ class Client:
         self._default_model: str = default_model
         self.llm_modules: List[LLMModule] = []
         self.samples: List[Dict[str, Any]] = []
+        self.functions : Dict[str, Dict[str, Union[FunctionDescription, Callable]]] = {}
         config = read_config()
         if (
             config and 
@@ -96,6 +98,20 @@ class Client:
                 default_model=self._default_model,
             )
         )
+        
+    def register_function(self, description: Union[Dict[str, Any], FunctionDescription], function: Callable):
+        function_name = description['name']
+        if isinstance(description, ):
+            try:
+                description = FunctionDescription(**description)
+            except:
+                raise ValueError("description is not a valid function call description.")
+            
+        if function_name not in self.functions:
+            self.functions[function_name] = {
+                "description" : description,
+                "function" : function,
+            }
 
     def include(self, client: Client):
         self.llm_modules.extend(client.llm_modules)
@@ -109,12 +125,22 @@ class Client:
         self.samples = list(
             {sample["name"]: sample for sample in self.samples}.values()
         )
+        
+        self.functions.update(client.functions)
 
     def register_sample(self, name: str, content: Dict[str, Any]):
         self.samples.append({"name": name, "contents": content})
         
     def _get_llm_module_name_list(self) -> List[str]:
         return [llm_module.name for llm_module in self.llm_modules]
+    
+    def _call_register_function(self, name: str, arguments: Dict[str, str]):
+        function_to_call : Callable = self.functions[name]["function"]
+        try:
+            function_response = function_to_call(**arguments)
+            return function_response
+        except Exception as e:
+            raise e
 
 
 class DevApp(Client):
