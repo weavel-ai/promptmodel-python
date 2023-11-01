@@ -2,7 +2,7 @@ import os
 import sys
 import yaml
 import asyncio
-from typing import Any, Dict, Tuple, List, Union
+from typing import Any, Dict, Tuple, List, Union, Optional
 
 from promptmodel.database.crud import (
     get_latest_version_prompts,
@@ -21,7 +21,7 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
         name (str): name of promtpmodel
 
     Returns:
-        Tuple[List[Dict[str, str]], str]: (prompts, version_detail)
+        Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
     """
     # Check dev_branch activate
     config = read_config()

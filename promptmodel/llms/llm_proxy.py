@@ -80,10 +80,8 @@ class LLMProxy(LLM):
             )
 
             # Call async_gen with the arguments
-            stream_response: AsyncGenerator[LLMStreamResponse, None] = async_gen(
-                **call_args
-            )
-
+            stream_response : AsyncGenerator[LLMStreamResponse, None]= async_gen(**call_args)
+            
             raw_response = None
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
@@ -222,8 +220,7 @@ class LLMProxy(LLM):
             del call_args["output_keys"]
 
         if "function_list" in kwargs:
-            call_args["function_list"] = kwargs["function_list"]
-        # call_args = {"messages", "model", Optional["function_list"], Optional["parsing_type"], Optional["output_keys"]}
+            call_args["functions"] = kwargs["function_list"]
         return call_args
 
     def _log_to_cloud(
@@ -264,51 +261,51 @@ class LLMProxy(LLM):
             print(f"[red]Failed to log to cloud: {res.json()}[/red]")
         return
 
-    def run(self, inputs: Dict[str, Any] = {}) -> str:
-        return self._wrap_method(super().run)(inputs)
+    def run(self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None) -> LLMResponse:
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_method(super().run)(inputs, **kwargs)
 
-    def arun(self, inputs: Dict[str, Any] = {}) -> str:
-        return self._wrap_async_method(super().arun)(inputs)
+    def arun(self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None) -> LLMResponse:
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_async_method(super().arun)(inputs, **kwargs)
 
-    # def run_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
-    #     return self._wrap_method(super().run_function_call)(inputs)
-
-    # def arun_function_call(self, inputs: Dict[str, Any] = {}) -> Tuple[Any, Any]:
-    #     return self._wrap_async_method(super().arun_function_call)(inputs)
-
-    def stream(
-        self, inputs: Dict[str, Any] = {}
-    ) -> Generator[LLMStreamResponse, None, None]:
-        return self._wrap_gen(super().stream)(inputs)
+    def stream(self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None) -> Generator[LLMStreamResponse, None, None]:
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_gen(super().stream)(inputs, **kwargs)
 
     def astream(
-        self, inputs: Optional[Dict[str, Any]] = {}
+        self, inputs: Optional[Dict[str, Any]] = {}, function_list: Optional[List[Any]] = None
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        return self._wrap_async_gen(super().astream)(inputs)
-
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_async_gen(super().astream)(inputs, **kwargs)
+    
     def run_and_parse(
         self,
-        inputs: Dict[str, Any] = {},
+        inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> LLMResponse:
-        return self._wrap_method(super().run_and_parse)(inputs)
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_method(super().run_and_parse)(inputs, **kwargs)
 
     def arun_and_parse(
         self,
-        inputs: Dict[str, Any] = {},
+        inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> LLMResponse:
-        return self._wrap_async_gen(super().arun_and_parse)(inputs)
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_async_gen(super().arun_and_parse)(inputs, **kwargs)
 
     def stream_and_parse(
         self,
-        inputs: Dict[str, Any] = {},
+        inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> Generator[LLMStreamResponse, None, None]:
-        return self._wrap_gen(super().stream_and_parse)(inputs)
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_gen(super().stream_and_parse)(inputs, **kwargs)
 
     def astream_and_parse(
         self,
-        inputs: Dict[str, Any] = {},
+        inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        return self._wrap_async_gen(super().astream_and_parse)(inputs)
+        kwargs = {"function_list": function_list} if function_list else {}
+        return self._wrap_async_gen(super().astream_and_parse)(inputs, **kwargs)
 
     # def run_and_parse_function_call(
     #     self,

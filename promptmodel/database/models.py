@@ -67,6 +67,7 @@ class LLMModuleVersion(BaseModel):
         ]
     )
     output_keys = JSONField(null=True, default=None)
+    functions = JSONField(default=[])
 
 
 class Prompt(BaseModel):
@@ -96,6 +97,7 @@ class RunLog(BaseModel):
     raw_output = TextField()
     parsed_outputs = JSONField(null=True, default={})
     is_deployment = BooleanField(default=False)
+    function_call = JSONField(null=True, default={})
 
 
 class SampleInputs(BaseModel):
@@ -132,6 +134,7 @@ class DeployedLLMModuleVersion(BaseModel):
         ]
     )
     output_keys = JSONField(null=True, default=None)
+    functions = JSONField(default=[])
 
     
 

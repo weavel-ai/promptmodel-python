@@ -17,8 +17,8 @@ __pycache__
 */.DS_Store
 *.egg-info
 
-test
-test/*
+ipynb_test
+ipynb_test/*
 testapp
 testapp/*
 
