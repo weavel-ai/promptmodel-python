@@ -90,6 +90,7 @@ def create_run_log(
     raw_output: str,
     parsed_outputs: str,
     is_deployment: bool = False,
+    function_call: Optional[dict] = None,
 ):
     """Create a new run log with the given parameters."""
     return RunLog.create(
@@ -98,6 +99,7 @@ def create_run_log(
         raw_output=raw_output,
         parsed_outputs=parsed_outputs,
         is_deployment=is_deployment,
+        function_call=function_call,
     )
 
 

@@ -531,7 +531,6 @@ class DevWebsocketClient:
                                     raw_output=output["raw_output"],
                                     parsed_outputs=output["parsed_outputs"],
                                     function_call=function_call_log,
-                                    
                                 )
                                 response.update(data)
                                 await ws.send(json.dumps(response, cls=CustomJSONEncoder))

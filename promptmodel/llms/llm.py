@@ -205,6 +205,7 @@ class LLM:
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
+                    # TODO: make token_usage
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
                             chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None

@@ -97,6 +97,7 @@ class RunLog(BaseModel):
     raw_output = TextField()
     parsed_outputs = JSONField(null=True, default={})
     is_deployment = BooleanField(default=False)
+    function_call = JSONField(null=True, default={})
 
 
 class SampleInputs(BaseModel):
