@@ -55,9 +55,6 @@ class Client:
                 self.cache_manager = None
                 initialize_db() # init db for local usage
 
-    def fastmodel(self, name: str) -> LLMProxy:
-        return LLMProxy(name)
-
     def register(self, func):
         instructions = list(dis.get_instructions(func))
         for idx in range(
@@ -101,7 +98,7 @@ class Client:
         
     def register_function(self, description: Union[Dict[str, Any], FunctionDescription], function: Callable):
         function_name = description['name']
-        if isinstance(description, ):
+        if isinstance(description, dict):
             try:
                 description = FunctionDescription(**description)
             except:
