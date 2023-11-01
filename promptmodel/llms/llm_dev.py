@@ -20,6 +20,11 @@ load_dotenv()
 class OpenAIMessage(BaseModel):
     role: str
     content: str
+    
+class OpenAIFunctionMessage(BaseModel):
+    role: str
+    content: str
+    name: str
 
 
 class LLMDev:
@@ -28,9 +33,15 @@ class LLMDev:
 
     def __validate_openai_messages(
         self, messages: List[Dict[str, str]]
-    ) -> List[OpenAIMessage]:
+    ) -> List[Union[OpenAIMessage, OpenAIFunctionMessage]]:
         """Validate and convert list of dictionaries to list of OpenAIMessage."""
-        return [OpenAIMessage(**message) for message in messages]
+        res = []
+        for message in messages:
+            if "role" in message and message["role"] == "function":
+                res.append(OpenAIFunctionMessage(**message))
+            else:
+                res.append(OpenAIMessage(**message))
+        return res
 
     async def dev_run(
         self,
@@ -53,14 +64,14 @@ class LLMDev:
         )
         function_call = {"name" : "", "arguments" : ""}
         async for chunk in response:
-            if "content" in chunk["choices"][0]["delta"]:
+            if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]["content"] is not None:
                 stream_value = chunk["choices"][0]["delta"]["content"]
                 raw_output += stream_value # append raw output
                 yield LLMStreamResponse(raw_output=stream_value) # return raw output
                 
-            if "function_call" in chunk["choices"][0]["delta"]:
+            if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]["function_call"] is not None:
                 for key, value in chunk["choices"][0]["delta"]["function_call"].items():
-                    function_call[key] = value
+                    function_call[key] += value
 
             if chunk["choices"][0]["finish_reason"] == "function_call":
                 yield LLMStreamResponse(function_call=function_call)

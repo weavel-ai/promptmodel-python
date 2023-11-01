@@ -74,12 +74,12 @@ class FunctionDescription(BaseModel):
     class _Parameters(BaseModel):
         class _Properties(BaseModel):
             type: str
-            description: Optional[str] = None
-            enum: Optional[List[str]] = None
+            description: Optional[str] = ""
+            enum: Optional[List[str]] = []
             
         type : str = "object"
         properties: Dict[str, _Properties] = {} 
-        required: Optional[List[str]] = None
+        required: Optional[List[str]] = []
             
     name: str
     description: Optional[str] = None

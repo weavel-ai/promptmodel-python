@@ -277,7 +277,7 @@ class DevWebsocketClient:
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
 
-                # Start PromptModel Running
+                # Start PromptModel Running                                                                                                                                 
                 output = {"raw_output": "", "parsed_outputs": {}}
                 try:
                     logger.info(f"Started PromptModel: {llm_module_name}")
@@ -285,6 +285,7 @@ class DevWebsocketClient:
                     llm_module_dev = LLMDev()
                     # fine llm_module_uuid from local db
                     llm_module_uuid: str = get_llm_module_uuid(llm_module_name)["uuid"]
+
 
                     llm_module_version_uuid: Optional[str] = message["uuid"]
                     # If llm_module_version_uuid is None, create new version & prompt
@@ -352,7 +353,19 @@ class DevWebsocketClient:
                     # get function descriptions from register & send to LLM
                     function_names : List[str] = message['functions']
                     logger.debug(f"function_names : {function_names}")
-                    function_descriptions : List[str] = self._client._get_function_descriptions(function_names)
+                    try:
+                        function_descriptions : List[str] = self._client._get_function_descriptions(function_names)
+                    except Exception as error:
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_RUN.value,
+                            "status": "failed",
+                            "log": f"There is no function. : {error}",
+                        }
+                        data.update(response)
+                        # logger.debug(f"Sent response: {data}")
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                        return
+                    
                     logger.debug(f"functions : {function_descriptions}")
                     
                     res: AsyncGenerator[LLMStreamResponse,  None] = llm_module_dev.dev_run(
@@ -365,28 +378,28 @@ class DevWebsocketClient:
                         # send item to backend
                         # save item & parse
                         # if type(item) == str: raw output, if type(item) == dict: parsed output
-                        if item.raw_output:
-                            output["raw_output"] += item
+                        if item.raw_output is not None:
+                            output["raw_output"] += item.raw_output
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
-                                "raw_output": item,
+                                "raw_output": item.raw_output,
                             }
                         if item.parsed_outputs:
-                            if list(item.keys())[0] not in output["parsed_outputs"]:
-                                output["parsed_outputs"][list(item.keys())[0]] = list(
-                                    item.values()
+                            if list(item.parsed_outputs.keys())[0] not in output["parsed_outputs"]:
+                                output["parsed_outputs"][list(item.parsed_outputs.keys())[0]] = list(
+                                    item.parsed_outputs.values()
                                 )[0]
                             else:
-                                output["parsed_outputs"][list(item.keys())[0]] += list(
-                                    item.values()
+                                output["parsed_outputs"][list(item.parsed_outputs.keys())[0]] += list(
+                                    item.parsed_outputs.values()
                                 )[0]
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
-                                "parsed_outputs": item,
+                                "parsed_outputs": item.parsed_outputs,
                             }
-                        if item.function_call:
+                        if item.function_call is not None:
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
@@ -431,7 +444,7 @@ class DevWebsocketClient:
                         response.update(data)
                         await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                         return
-                            
+                    
                     # IF function_call in response -> call function -> call LLM once more
                     if function_call:
                         # make function_call_log
@@ -470,71 +483,73 @@ class DevWebsocketClient:
                             response.update(data)
                             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                             return
-                            
-                            
                         # call LLM once more
-                        messages_for_run.append({"role" : "function", "content" : str(function_response)})
+                        messages_for_run.append({"role" : "function", "name": function_call['name'], "content" : str(function_response)})
                         res_after_function_call : AsyncGenerator[LLMStreamResponse,  None] = llm_module_dev.dev_chat(
                             messages_for_run, parsing_type, model
                         )
                         
                         output = {"raw_output": "", "parsed_outputs": {}}
                         async for item in res_after_function_call:
-                            if item.raw_output:
-                                output["raw_output"] += item
+                            if item.raw_output is not None:
+                                output["raw_output"] += item.raw_output
                                 data = {
                                     "type": ServerTask.UPDATE_RESULT_RUN.value,
                                     "status": "running",
-                                    "raw_output": item,
+                                    "raw_output": item.raw_output,
                                 }
                             if item.parsed_outputs:
-                                if list(item.keys())[0] not in output["parsed_outputs"]:
-                                    output["parsed_outputs"][list(item.keys())[0]] = list(
-                                        item.values()
+                                if list(item.parsed_outputs.keys())[0] not in output["parsed_outputs"]:
+                                    output["parsed_outputs"][list(item.parsed_outputs.keys())[0]] = list(
+                                        item.parsed_outputs.values()
                                     )[0]
                                 else:
-                                    output["parsed_outputs"][list(item.keys())[0]] += list(
-                                        item.values()
+                                    output["parsed_outputs"][list(item.parsed_outputs.keys())[0]] += list(
+                                        item.parsed_outputs.values()
                                     )[0]
                                 data = {
                                     "type": ServerTask.UPDATE_RESULT_RUN.value,
                                     "status": "running",
-                                    "parsed_outputs": item,
+                                    "parsed_outputs": item.parsed_outputs,
                                 }
                                 
                             if item.error and parsing_success is True:
                                 parsing_success = not item.error
                                 error_log = item.error_log
                                 
-                            if (
-                                message["output_keys"] is not None
-                                and message['parsing_type'] is not None
-                                and set(output["parsed_outputs"].keys()) != set(
-                                    message["output_keys"]
-                                ) or (
-                                    parsing_success is False
-                                )
-                            ):
-                                error_log = error_log if error_log else "Key matching failed."
-                                data = {
-                                    "type": ServerTask.UPDATE_RESULT_RUN.value,
-                                    "status": "failed",
-                                    "log" : f"parsing failed, {error_log}"
-                                }
-                                update_llm_module_version(
-                                    llm_module_version_uuid=llm_module_version_uuid,
-                                    status=LLMModuleVersionStatus.BROKEN.value,
-                                )
-                                create_run_log(
-                                    llm_module_version_uuid=llm_module_version_uuid,
-                                    inputs=sample_input,
-                                    raw_output=output["raw_output"],
-                                    parsed_outputs=output["parsed_outputs"],
-                                    function_call=function_call_log,
-                                )
-                                response.update(data)
-                                await ws.send(json.dumps(response, cls=CustomJSONEncoder))
-                                return
+                            data.update(response)
+                            # logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                                
+                        if (
+                            message["output_keys"] is not None
+                            and message['parsing_type'] is not None
+                            and set(output["parsed_outputs"].keys()) != set(
+                                message["output_keys"]
+                            ) or (
+                                parsing_success is False
+                            )
+                        ):
+                            error_log = error_log if error_log else "Key matching failed."
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_RUN.value,
+                                "status": "failed",
+                                "log" : f"parsing failed, {error_log}"
+                            }
+                            update_llm_module_version(
+                                llm_module_version_uuid=llm_module_version_uuid,
+                                status=LLMModuleVersionStatus.BROKEN.value,
+                            )
+                            create_run_log(
+                                llm_module_version_uuid=llm_module_version_uuid,
+                                inputs=sample_input,
+                                raw_output=output["raw_output"],
+                                parsed_outputs=output["parsed_outputs"],
+                                function_call=function_call_log,
+                            )
+                            response.update(data)
+                            await ws.send(json.dumps(response, cls=CustomJSONEncoder))
+                            return
                                     
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,

@@ -32,6 +32,10 @@ class OpenAIMessage(BaseModel):
     role: str
     content: str
 
+class OpenAIFunctionMessage(BaseModel):
+    role: str
+    content: str
+    name: str
 
 DEFAULT_MODEL = "gpt-3.5-turbo"
 
@@ -76,9 +80,15 @@ class LLM:
 
     def __validate_openai_messages(
         self, messages: List[Dict[str, str]]
-    ) -> List[OpenAIMessage]:
+    ) -> List[Union[OpenAIMessage, OpenAIFunctionMessage]]:
         """Validate and convert list of dictionaries to list of OpenAIMessage."""
-        return [OpenAIMessage(**message) for message in messages]
+        res = []
+        for message in messages:
+            if "role" in message and message["role"] == "function":
+                res.append(OpenAIFunctionMessage(**message))
+            else:
+                res.append(OpenAIMessage(**message))
+        return res
 
     def run(
         self,
@@ -198,7 +208,7 @@ class LLM:
                     raw_output += chunk["choices"][0]["delta"]["content"]
                     yield LLMStreamResponse(raw_output=chunk["choices"][0]["delta"]["content"])
                     
-                if "function_call" in chunk["choices"][0]["delta"]:
+                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
                     for key, value in chunk["choices"][0]["delta"]["function_call"].items():
                         function_call[key] += value
                     
@@ -459,7 +469,7 @@ class LLM:
                     raw_output += chunk["choices"][0]["delta"]["content"]
                     yield LLMStreamResponse(raw_output=chunk["choices"][0]["delta"]["content"])
                     
-                if "function_call" in chunk["choices"][0]["delta"]:
+                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
                     for key, value in chunk["choices"][0]["delta"]["function_call"].items():
                         function_call[key] += value
                         
@@ -687,7 +697,7 @@ class LLM:
                                     buffer = ""
                                 break
                 
-                if "function_call" in chunk["choices"][0]["delta"]:
+                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
                     for key, value in chunk["choices"][0]["delta"]["function_call"].items():
                         function_call[key] += value
                         
@@ -792,7 +802,7 @@ class LLM:
                                     buffer = ""
                                 break
                 
-                if "function_call" in chunk["choices"][0]["delta"]:
+                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
                     for key, value in chunk["choices"][0]["delta"]["function_call"].items():
                         function_call[key] += value
                         
@@ -912,7 +922,7 @@ class LLM:
                                     buffer = ""
                                 break
                 
-                if "function_call" in chunk["choices"][0]["delta"]:
+                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
                     for key, value in chunk["choices"][0]["delta"]["function_call"].items():
                         function_call[key] += value
                 
@@ -1017,7 +1027,7 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if "function_call" in chunk["choices"][0]["delta"]:
+                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
                     for key, value in chunk["choices"][0]["delta"]["function_call"].items():
                         function_call[key] += value
                 

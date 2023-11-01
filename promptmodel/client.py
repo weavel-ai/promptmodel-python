@@ -146,8 +146,11 @@ class Client:
         return list(self.functions.keys())
     
     def _get_function_descriptions(self, function_names: List[str] = []):
-        function_descriptions = [self.functions[function_name]["description"].model_dump() for function_name in function_names]
-        return function_descriptions
+        try:
+            function_descriptions = [self.functions[function_name]["description"].model_dump() for function_name in function_names]
+            return function_descriptions
+        except Exception as e:
+            raise e
 
 class DevApp(Client):
     def __init__(self, default_model: Optional[str] = "gpt-3.5-turbo"):
