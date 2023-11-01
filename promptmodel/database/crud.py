@@ -39,7 +39,8 @@ def create_llm_module_version(
     status: str, 
     model: str,
     parsing_type: Optional[ParsingType] = None,
-    output_keys: Optional[List[str]] = None
+    output_keys: Optional[List[str]] = None,
+    functions: List[str] = []
 ):
     """Create a new LLM module version with the given parameters."""
     return LLMModuleVersion.create(
@@ -50,6 +51,7 @@ def create_llm_module_version(
         model=model,
         parsing_type=parsing_type,
         output_keys=output_keys,
+        functions=functions
     )
 
 

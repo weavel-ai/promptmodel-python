@@ -4,7 +4,7 @@ import datetime
 import re
 
 from uuid import UUID
-from typing import Dict, Any, Optional, AsyncGenerator
+from typing import Dict, Any, Optional, AsyncGenerator, List
 from dotenv import load_dotenv
 
 from websockets.client import connect, WebSocketClientProtocol
@@ -115,6 +115,10 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.LIST_SAMPLES:
                 res_from_local_db = list_samples()
                 data = {"samples": res_from_local_db}
+                
+            elif message["type"] == LocalTask.LIST_FUNCTIONS:
+                function_name_list = self._client._get_function_name_list()
+                data = {"functions": function_name_list}
 
             elif message["type"] == LocalTask.GET_PROMPTS:
                 llm_module_version_uuid = message["llm_module_version_uuid"]
@@ -293,6 +297,7 @@ class DevWebsocketClient:
                                 model=message["model"],
                                 parsing_type=message["parsing_type"],
                                 output_keys=message["output_keys"],
+                                functions=message['functions']
                             )
                         )
                         llm_module_version_uuid: str = llm_module_version.uuid
@@ -344,11 +349,17 @@ class DevWebsocketClient:
                     function_call = None
                     function_call_log = None
                     
-                    # TODO: get function descriptions from register & send to LLM
-                    functions = []
+                    # get function descriptions from register & send to LLM
+                    function_names : List[str] = message['functions']
+                    logger.debug(f"function_names : {function_names}")
+                    function_descriptions : List[str] = self._client._get_function_descriptions(function_names)
+                    logger.debug(f"functions : {function_descriptions}")
                     
                     res: AsyncGenerator[LLMStreamResponse,  None] = llm_module_dev.dev_run(
-                        messages_for_run, parsing_type, functions, model
+                        messages=messages_for_run,
+                        parsing_type=parsing_type, 
+                        functions=function_descriptions,
+                        model=model
                     )
                     async for item in res:
                         # send item to backend
