@@ -11,7 +11,7 @@ import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import completion, acompletion
-from litellm import ModelResponse, RateLimitManager
+from litellm import ModelResponse, RateLimitManager, Choices
 from litellm.utils import prompt_token_calculator, token_counter
 
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse
@@ -93,7 +93,7 @@ class LLM:
     def run(
         self,
         messages: List[Dict[str, str]],
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
@@ -132,7 +132,7 @@ class LLM:
     async def arun(
         self,
         messages: List[Dict[str, str]],
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
@@ -180,7 +180,7 @@ class LLM:
     def stream(
         self,
         messages: List[Dict[str, str]],  # input
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
@@ -198,7 +198,7 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
-            ).choices[0]["message"]["content"]
+            )
 
             raw_output = ""
             function_call = {"name" : "", "arguments" : ""}
@@ -228,7 +228,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         parsing_type: ParsingType,
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
     ) -> Dict[str, str]:
@@ -283,7 +283,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         parsing_type: ParsingType,
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         **kwargs,
@@ -349,7 +349,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
     ) -> Dict[str, str]:
@@ -432,7 +432,7 @@ class LLM:
     async def astream(
         self,
         messages: List[Dict[str, str]],
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
@@ -488,7 +488,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
@@ -567,15 +567,12 @@ class LLM:
         raw_output: str,
         function_call: Optional[dict] = None,
     ) -> ModelResponse:
-        choices = [
-            {
-                "index": 0,
-                "message": {"role": "assistant", "content": raw_output},
-                "finish_reason": chunk["choices"][0]["finish_reason"],
-            }
-        ]
-        if function_call:
-            choices[0]["message"]["function_call"] = function_call
+        choices = Choices(
+            finish_reason=chunk["choices"][0]["finish_reason"],
+            index=0,
+            message= {"role": "assistant", "content": raw_output}
+        )
+        
         prompt_token: int = prompt_token_calculator(chunk["model"], messages)
         completion_token: int = token_counter(chunk["model"], raw_output)
         usage = {
@@ -585,12 +582,18 @@ class LLM:
         }
         res = ModelResponse(
             id=chunk["id"],
-            choices=choices,
             created=chunk["created"],
             model=chunk["model"],
             usage=usage,
             response_ms=response_ms,
         )
+        res.choices[0]['finish_reason'] = chunk["choices"][0]["finish_reason"] 
+        res.choices[0]['message']['content'] = raw_output
+        res.response_ms = response_ms
+
+        if function_call:
+            res.choices[0]["message"]["function_call"] = function_call
+
         return res
 
     def __double_type_sp_generator__(

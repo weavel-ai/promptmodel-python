@@ -240,7 +240,7 @@ class LLMProxy(LLM):
             return
 
         api_response_dict = api_response.to_dict_recursive()
-        api_response_dict.update({"response_ms": api_response.response_ms})
+        api_response_dict.update({"response_ms": api_response['response_ms']})
         res = asyncio.run(
             AsyncAPIClient.execute(
                 method="POST",
