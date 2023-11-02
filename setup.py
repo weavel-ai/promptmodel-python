@@ -9,7 +9,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="promptmodel",
-    version="0.0.11",
+    version="0.0.12",
     packages=find_namespace_packages(),
     entry_points={
         "console_scripts": [
@@ -34,7 +34,7 @@ setup(
         "websockets",
         "termcolor",
         "watchdog",
-        "readerwriterlock",
+        "readerwriterlock"
     ],
     python_requires=">=3.7.1",
     keywords=[
