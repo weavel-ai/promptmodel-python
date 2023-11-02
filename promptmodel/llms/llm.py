@@ -32,10 +32,12 @@ class OpenAIMessage(BaseModel):
     role: str
     content: str
 
+
 class OpenAIFunctionMessage(BaseModel):
     role: str
     content: str
     name: str
+
 
 DEFAULT_MODEL = "gpt-3.5-turbo"
 
@@ -109,7 +111,7 @@ class LLM:
                 ],
                 functions=functions,
             )
-            
+
             content = (
                 response.choices[0]["message"]["content"]
                 if "content" in response.choices[0]["message"]
@@ -147,7 +149,7 @@ class LLM:
                         message.model_dump()
                         for message in self.__validate_openai_messages(messages)
                     ],
-                    functions=functions
+                    functions=functions,
                 )
             else:
                 response = await acompletion(
@@ -156,7 +158,7 @@ class LLM:
                         message.model_dump()
                         for message in self.__validate_openai_messages(messages)
                     ],
-                    functions=functions
+                    functions=functions,
                 )
             content = (
                 response.choices[0]["message"]["content"]
@@ -201,24 +203,40 @@ class LLM:
             ).choices[0]["message"]["content"]
 
             raw_output = ""
-            function_call = {"name" : "", "arguments" : ""}
-            
+            function_call = {"name": "", "arguments": ""}
+
             for chunk in response:
-                if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['content'] is not None:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
                     raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(raw_output=chunk["choices"][0]["delta"]["content"])
-                    
-                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
-                    for key, value in chunk["choices"][0]["delta"]["function_call"].items():
+                    yield LLMStreamResponse(
+                        raw_output=chunk["choices"][0]["delta"]["content"]
+                    )
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
                         function_call[key] += value
-                    
+
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     # TODO: make token_usage
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
-                            chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
                         )
                     )
         except Exception as e:
@@ -250,7 +268,7 @@ class LLM:
                 raw_output, parsing_type
             )
             error_log = parse_result.error_log
-            
+
             call_func = (
                 response.choices[0]["message"]["function_call"]
                 if "function_call" in response.choices[0]["message"]
@@ -293,7 +311,9 @@ class LLM:
         try:
             if parsing_type == ParsingType.COLON.value:
                 # cannot stream colon type
-                yield LLMStreamResponse(error=True, error_log="Cannot stream colon type")
+                yield LLMStreamResponse(
+                    error=True, error_log="Cannot stream colon type"
+                )
                 return
             start_time = datetime.datetime.now()
             response = completion(
@@ -394,7 +414,7 @@ class LLM:
                 raw_output, parsing_type
             )
             error_log = parse_result.error_log
-            
+
             call_func = (
                 response.choices[0]["message"]["function_call"]
                 if "function_call" in response.choices[0]["message"]
@@ -462,23 +482,39 @@ class LLM:
                     functions=functions,
                 )
             raw_output = ""
-            function_call = {"name" : "", "arguments" : ""}
-            
+            function_call = {"name": "", "arguments": ""}
+
             async for chunk in response:
-                if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['content'] is not None:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
                     raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(raw_output=chunk["choices"][0]["delta"]["content"])
-                    
-                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
-                    for key, value in chunk["choices"][0]["delta"]["function_call"].items():
+                    yield LLMStreamResponse(
+                        raw_output=chunk["choices"][0]["delta"]["content"]
+                    )
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
                         function_call[key] += value
-                        
+
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
-                            chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
                         )
                     )
         except Exception as e:
@@ -613,9 +649,12 @@ class LLM:
             active_key = None
             stream_pause = False
             end_tag = None
-            function_call = {"name" : "", "arguments" : ""}
+            function_call = {"name": "", "arguments": ""}
             for chunk in response:
-                if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['content'] is not None:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
                     stream_value: str = chunk["choices"][0]["delta"]["content"]
                     raw_output += stream_value
                     yield LLMStreamResponse(raw_output=stream_value)
@@ -657,7 +696,7 @@ class LLM:
                                     )
                                     buffer = buffer.split(end_tag)[-1]
                                     active_key = None
-                                    break
+                                    stream_pause = False
                                 elif (
                                     stream_value.find(end_token) != -1
                                 ):  # if ("[blah]" != end_pattern) appeared in buffer
@@ -696,17 +735,28 @@ class LLM:
                                     )
                                     buffer = ""
                                 break
-                
-                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
-                    for key, value in chunk["choices"][0]["delta"]["function_call"].items():
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
                         function_call[key] += value
-                        
+
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
-                            chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
                         )
                     )
         except Exception as e:
@@ -733,9 +783,12 @@ class LLM:
             active_key = None
             stream_pause = False
             end_tag = None
-            function_call = {"name" : "", "arguments" : ""}
+            function_call = {"name": "", "arguments": ""}
             for chunk in response:
-                if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['content'] is not None:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
                     stream_value: str = chunk["choices"][0]["delta"]["content"]
                     raw_output += stream_value
                     yield LLMStreamResponse(raw_output=stream_value)
@@ -782,9 +835,32 @@ class LLM:
                                     )
                                     buffer = buffer.split(end_tag)[-1]
                                     active_key = None
+                                    stream_pause = False
                                 elif (
                                     stream_value.find(end_token) != -1
                                 ):  # if pattern ends  = ("[blah]" != end_pattern) appeared in buffer
+                                    if (
+                                        active_type == "List"
+                                        or active_type == "Dict"
+                                        and end_token.find("]") != -1
+                                    ):
+                                        try:
+                                            buffer_dict = json.loads(buffer)
+                                            stream_pause = False
+                                            continue
+                                        except Exception as exception:
+                                            logger.error(exception)
+                                            yield LLMStreamResponse(
+                                                error=True,
+                                                error_log="Parsing error : Invalid end tag detected",
+                                                parsed_outputs={
+                                                    active_key: buffer.split(
+                                                        start_token
+                                                    )[0]
+                                                },
+                                            )
+                                            stream_pause = False
+                                            buffer = ""
                                     yield LLMStreamResponse(
                                         error=True,
                                         error_log="Parsing error : Invalid end tag detected",
@@ -801,17 +877,28 @@ class LLM:
                                     )
                                     buffer = ""
                                 break
-                
-                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
-                    for key, value in chunk["choices"][0]["delta"]["function_call"].items():
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
                         function_call[key] += value
-                        
+
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
-                            chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
                         )
                     )
         except Exception as e:
@@ -838,9 +925,12 @@ class LLM:
             active_key = None
             stream_pause = False
             end_tag = None
-            function_call = {"name" : "", "arguments" : ""} 
+            function_call = {"name": "", "arguments": ""}
             for chunk in response:
-                if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['content'] is not None:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
                     stream_value: str = chunk["choices"][0]["delta"]["content"]
                     raw_output += stream_value
                     yield LLMStreamResponse(raw_output=stream_value)
@@ -882,7 +972,8 @@ class LLM:
                                     )
                                     buffer = buffer.split(end_tag)[-1]
                                     active_key = None
-                                    break
+                                    stream_pause = False
+                                    # break
                                 elif (
                                     stream_value.find(end_token) != -1
                                 ):  # if ("[blah]" != end_pattern) appeared in buffer
@@ -921,17 +1012,28 @@ class LLM:
                                     )
                                     buffer = ""
                                 break
-                
-                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
-                    for key, value in chunk["choices"][0]["delta"]["function_call"].items():
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
                         function_call[key] += value
-                
+
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
-                            chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
                         )
                     )
         except Exception as e:
@@ -958,9 +1060,12 @@ class LLM:
             active_key = None
             stream_pause = False
             end_tag = None
-            function_call = {"name" : "", "arguments" : ""}
+            function_call = {"name": "", "arguments": ""}
             async for chunk in response:
-                if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['content'] is not None:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
                     stream_value: str = chunk["choices"][0]["delta"]["content"]
                     raw_output += stream_value
                     yield LLMStreamResponse(raw_output=stream_value)
@@ -1007,9 +1112,32 @@ class LLM:
                                     )
                                     buffer = buffer.split(end_tag)[-1]
                                     active_key = None
+                                    stream_pause = False
                                 elif (
                                     stream_value.find(end_token) != -1
                                 ):  # if pattern ends  = ("[blah]" != end_pattern) appeared in buffer
+                                    if (
+                                        active_type == "List"
+                                        or active_type == "Dict"
+                                        and end_token.find("]") != -1
+                                    ):
+                                        try:
+                                            buffer_dict = json.loads(buffer)
+                                            stream_pause = False
+                                            continue
+                                        except Exception as exception:
+                                            logger.error(exception)
+                                            yield LLMStreamResponse(
+                                                error=True,
+                                                error_log="Parsing error : Invalid end tag detected",
+                                                parsed_outputs={
+                                                    active_key: buffer.split(
+                                                        start_token
+                                                    )[0]
+                                                },
+                                            )
+                                            stream_pause = False
+                                            buffer = ""
                                     yield LLMStreamResponse(
                                         error=True,
                                         error_log="Parsing error : Invalid end tag detected",
@@ -1027,16 +1155,27 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]['function_call'] is not None:
-                    for key, value in chunk["choices"][0]["delta"]["function_call"].items():
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
                         function_call[key] += value
-                
+
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
                         api_response=self.make_model_response(
-                            chunk, response_ms, messages, raw_output, function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
                         )
                     )
         except Exception as e:

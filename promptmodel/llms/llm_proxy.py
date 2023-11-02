@@ -127,6 +127,7 @@ class LLMProxy(LLM):
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
+            print(call_args)
 
             # Call the method with the arguments
             llm_response: LLMResponse = method(**call_args)

@@ -1,4 +1,4 @@
 from .client import Client, DevApp
 from .promptmodel import PromptModel
 
-__version__ = "0.0.12"
+__version__ = "0.0.13"
