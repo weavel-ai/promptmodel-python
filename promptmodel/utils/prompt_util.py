@@ -25,19 +25,17 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
     """
     # Check dev_branch activate
     config = read_config()
-    if "dev_branch" in config:
-        if config["dev_branch"]["initializing"] == True:
+    if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+        return [], {}
+    elif "dev_branch" in config and config["dev_branch"]["online"] == True:
+        # get prompt from local DB
+        prompt_rows, version_detail = get_latest_version_prompts(name)
+        if prompt_rows is None:
             return [], {}
-        elif config["dev_branch"]["online"] == True:
-            # get prompt from local DB
-            prompt_rows, version_detail = get_latest_version_prompts(name)
-
-            if prompt_rows is None:
-                return [], {}
-            return [
-                {"role": prompt.role, "content": prompt.content}
-                for prompt in prompt_rows
-            ], version_detail
+        return [
+            {"role": prompt.role, "content": prompt.content}
+            for prompt in prompt_rows
+        ], version_detail
     else:
         if (
             "project" in config
@@ -51,7 +49,7 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
             if prompt_rows is None:
                 return [], {}
         else:
-            await update_deployed_db(config)  # wait for update local DB cache
+            await update_deployed_db(config) # wait for update local DB cache
             prompt_rows, version_detail = get_deployed_prompts(name)
             if prompt_rows is None:
                 return [], {}

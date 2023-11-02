@@ -7,7 +7,7 @@ from uuid import uuid4
 from dataclasses import dataclass
 from websockets.exceptions import ConnectionClosedOK
 from promptmodel.websocket.websocket_client import DevWebsocketClient
-from promptmodel.utils.enums import LocalTask
+from promptmodel.utils.enums import LocalTask, ParsingType
 from promptmodel.database.models import LLMModuleVersion
 from promptmodel.utils.types import FunctionDescription
 
@@ -75,6 +75,7 @@ async def test_run_model_function_call(mocker, websocket_client : DevWebsocketCl
     mocker.patch("promptmodel.websocket.websocket_client.update_llm_module_version", new_callable=MagicMock)
     create_run_log_mock = mocker.patch("promptmodel.websocket.websocket_client.create_run_log", new_callable=MagicMock)
     
+    # success case
     await websocket_client._DevWebsocketClient__handle_message(
         message = {
             "type" : LocalTask.RUN_LLM_MODULE,
@@ -99,6 +100,7 @@ async def test_run_model_function_call(mocker, websocket_client : DevWebsocketCl
     create_run_log_mock.reset_mock()
     print("=======================================================================================")
     
+    # success case with no function call
     await websocket_client._DevWebsocketClient__handle_message(
         message = {
             "type" : LocalTask.RUN_LLM_MODULE,
@@ -123,6 +125,40 @@ async def test_run_model_function_call(mocker, websocket_client : DevWebsocketCl
     create_run_log_mock.reset_mock()
     print("=======================================================================================")
     
+    # success case with parsing
+    system_prompt_with_format = """
+You are a helpful assistant.
+
+This is your output format. Keep the string between < type=< >>, </ > as it is.
+<temperature type=<float>>
+(value here)
+</temperature>
+    """
+    await websocket_client._DevWebsocketClient__handle_message(
+        message = {
+            "type" : LocalTask.RUN_LLM_MODULE,
+            "llm_module_name" : "test_module",
+            "sample_name" : "sample_1",
+            "prompts" : [
+                { "role" : "system", "content" : system_prompt_with_format, "step" : 1},
+                { "role" : "user", "content" : "{user_message}", "step" : 2}
+            ],
+            "model" : "gpt-3.5-turbo",
+            "uuid" : None,
+            "from_uuid" : None,
+            "parsing_type" : ParsingType.HTML.value,
+            "output_keys" : ["temperature"],
+            "functions" : ["get_current_weather"]
+        },
+        ws = mock_websocket
+    )
+    create_run_log_mock.assert_called_once()
+    _, kwargs = create_run_log_mock.call_args
+    assert kwargs['function_call'] is not None, "function_call is None"
+    create_run_log_mock.reset_mock()
+    print("=======================================================================================")
+    
+    # early failed case due to function not existing
     await websocket_client._DevWebsocketClient__handle_message(
         message = {
             "type" : LocalTask.RUN_LLM_MODULE,

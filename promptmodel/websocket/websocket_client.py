@@ -420,43 +420,15 @@ class DevWebsocketClient:
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-
-                    # Check output key matching : set(output['parsed_output'].keys()) == set(message['output_keys'])
-                    if (
-                        message["output_keys"] is not None
-                        and message["parsing_type"] is not None
-                        and set(output["parsed_outputs"].keys())
-                        != set(message["output_keys"])
-                        or (parsing_success is False)
-                    ):
-                        error_log = error_log if error_log else "Key matching failed."
-                        data = {
-                            "type": ServerTask.UPDATE_RESULT_RUN.value,
-                            "status": "failed",
-                            "log": f"parsing failed, {error_log}",
-                        }
-                        update_llm_module_version(
-                            llm_module_version_uuid=llm_module_version_uuid,
-                            status=LLMModuleVersionStatus.BROKEN.value,
-                        )
-                        create_run_log(
-                            llm_module_version_uuid=llm_module_version_uuid,
-                            inputs=sample_input,
-                            raw_output=output["raw_output"],
-                            parsed_outputs=output["parsed_outputs"],
-                        )
-                        response.update(data)
-                        await ws.send(json.dumps(response, cls=CustomJSONEncoder))
-                        return
-
+                    
                     # IF function_call in response -> call function -> call LLM once more
                     if function_call:
                         # make function_call_log
                         function_call_log = {
-                            "name": function_call["name"],
-                            "arguments": function_call["arguments"],
-                            "response": None,
-                            "initial_raw_output": output["raw_output"],
+                            "name" : function_call['name'],
+                            "arguments" : function_call['arguments'],
+                            "response" : None,
+                            "initial_raw_output" : output["raw_output"],
                         }
 
                         # call function
@@ -538,37 +510,37 @@ class DevWebsocketClient:
                             data.update(response)
                             # logger.debug(f"Sent response: {data}")
                             await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-
-                        if (
-                            message["output_keys"] is not None
-                            and message["parsing_type"] is not None
-                            and set(output["parsed_outputs"].keys())
-                            != set(message["output_keys"])
-                            or (parsing_success is False)
-                        ):
-                            error_log = (
-                                error_log if error_log else "Key matching failed."
-                            )
-                            data = {
-                                "type": ServerTask.UPDATE_RESULT_RUN.value,
-                                "status": "failed",
-                                "log": f"parsing failed, {error_log}",
-                            }
-                            update_llm_module_version(
-                                llm_module_version_uuid=llm_module_version_uuid,
-                                status=LLMModuleVersionStatus.BROKEN.value,
-                            )
-                            create_run_log(
-                                llm_module_version_uuid=llm_module_version_uuid,
-                                inputs=sample_input,
-                                raw_output=output["raw_output"],
-                                parsed_outputs=output["parsed_outputs"],
-                                function_call=function_call_log,
-                            )
-                            response.update(data)
-                            await ws.send(json.dumps(response, cls=CustomJSONEncoder))
-                            return
-
+                                
+                    if (
+                        message["output_keys"] is not None
+                        and message['parsing_type'] is not None
+                        and set(output["parsed_outputs"].keys()) != set(
+                            message["output_keys"]
+                        ) or (
+                            parsing_success is False
+                        )
+                    ):
+                        error_log = error_log if error_log else "Key matching failed."
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_RUN.value,
+                            "status": "failed",
+                            "log" : f"parsing failed, {error_log}"
+                        }
+                        update_llm_module_version(
+                            llm_module_version_uuid=llm_module_version_uuid,
+                            status=LLMModuleVersionStatus.BROKEN.value,
+                        )
+                        create_run_log(
+                            llm_module_version_uuid=llm_module_version_uuid,
+                            inputs=sample_input,
+                            raw_output=output["raw_output"],
+                            parsed_outputs=output["parsed_outputs"],
+                            function_call=function_call_log,
+                        )
+                        response.update(data)
+                        await ws.send(json.dumps(response, cls=CustomJSONEncoder))
+                        return
+                                    
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
                         "status": "completed",

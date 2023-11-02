@@ -63,6 +63,7 @@ class LLMDev:
             functions=functions,
         )
         function_call = {"name" : "", "arguments" : ""}
+        finish_reason_function_call = False
         async for chunk in response:
             if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]["content"] is not None:
                 stream_value = chunk["choices"][0]["delta"]["content"]
@@ -74,10 +75,11 @@ class LLMDev:
                     function_call[key] += value
 
             if chunk["choices"][0]["finish_reason"] == "function_call":
+                finish_reason_function_call = True
                 yield LLMStreamResponse(function_call=function_call)
                 
         # parsing
-        if parsing_type:
+        if parsing_type and not finish_reason_function_call:
             parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)
             whole_pattern = parsing_pattern["whole"]
             parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
