@@ -31,6 +31,7 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
         elif config["dev_branch"]["online"] == True:
             # get prompt from local DB
             prompt_rows, version_detail = get_latest_version_prompts(name)
+
             if prompt_rows is None:
                 return [], {}
             return [

@@ -36,11 +36,11 @@ def create_llm_modules(llm_module_list: list):
 def create_llm_module_version(
     llm_module_uuid: str,
     from_uuid: Optional[str],
-    status: str, 
+    status: str,
     model: str,
     parsing_type: Optional[ParsingType] = None,
     output_keys: Optional[List[str]] = None,
-    functions: List[str] = []
+    functions: List[str] = [],
 ):
     """Create a new LLM module version with the given parameters."""
     return LLMModuleVersion.create(
@@ -51,7 +51,7 @@ def create_llm_module_version(
         model=model,
         parsing_type=parsing_type,
         output_keys=output_keys,
-        functions=functions
+        functions=functions,
     )
 
 
@@ -200,21 +200,21 @@ def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]
 
             prompts: List[Prompt] = (
                 Prompt.select()
-                .where(Prompt.version_uuid == latest_run_log.version_uuid)
+                .where(Prompt.version_uuid == latest_run_log.version_uuid.uuid)
                 .order_by(Prompt.step.asc())
             )
 
             version: LLMModuleVersion = (
-                LLMModuleVersion.select(LLMModuleVersion.model)
-                .where(LLMModuleVersion.uuid == latest_run_log.version_uuid)
+                LLMModuleVersion.select()
+                .where(LLMModuleVersion.uuid == latest_run_log.version_uuid.uuid)
                 .get()
             )
-        
+
         version_details = {
             "model": version.model,
             "uuid": version.uuid,
-            "parsing_type" : version.parsing_type,
-            "output_keys" : version.output_keys
+            "parsing_type": version.parsing_type,
+            "output_keys": version.output_keys,
         }
 
         return prompts, version_details
@@ -255,12 +255,12 @@ def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], st
                 prompts,
             )
         )
-        
+
         version_details = {
-            "model": selected_version['model'],
-            "uuid": selected_version['uuid'],
-            "parsing_type" : selected_version['parsing_type'],
-            "output_keys" : selected_version['output_keys']
+            "model": selected_version["model"],
+            "uuid": selected_version["uuid"],
+            "parsing_type": selected_version["parsing_type"],
+            "output_keys": selected_version["output_keys"],
         }
 
         return selected_prompts, version_details

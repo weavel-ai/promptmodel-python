@@ -115,7 +115,7 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.LIST_SAMPLES:
                 res_from_local_db = list_samples()
                 data = {"samples": res_from_local_db}
-                
+
             elif message["type"] == LocalTask.LIST_FUNCTIONS:
                 function_name_list = self._client._get_function_name_list()
                 data = {"functions": function_name_list}
@@ -222,7 +222,7 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.RUN_LLM_MODULE:
                 llm_module_name: str = message["llm_module_name"]
                 sample_name: Optional[str] = message["sample_name"]
-                
+
                 # get sample from db
                 if sample_name:
                     sample_input_row = get_sample_input(sample_name)
@@ -232,13 +232,13 @@ class DevWebsocketClient:
                     sample_input = sample_input_row["contents"]
                 else:
                     sample_input = None
-                
+
                 # Check llm_module in Local Usage
                 llm_module_names = self._client._get_llm_module_name_list()
                 if llm_module_name not in llm_module_names:
                     logger.error(f"There is no llm_module {llm_module_name}.")
                     return
-                
+
                 # Validate Variable Matching
                 prompt_variables = []
                 for prompt in message["prompts"]:
@@ -277,7 +277,7 @@ class DevWebsocketClient:
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
 
-                # Start PromptModel Running                                                                                                                                 
+                # Start PromptModel Running
                 output = {"raw_output": "", "parsed_outputs": {}}
                 try:
                     logger.info(f"Started PromptModel: {llm_module_name}")
@@ -285,7 +285,6 @@ class DevWebsocketClient:
                     llm_module_dev = LLMDev()
                     # fine llm_module_uuid from local db
                     llm_module_uuid: str = get_llm_module_uuid(llm_module_name)["uuid"]
-
 
                     llm_module_version_uuid: Optional[str] = message["uuid"]
                     # If llm_module_version_uuid is None, create new version & prompt
@@ -298,7 +297,7 @@ class DevWebsocketClient:
                                 model=message["model"],
                                 parsing_type=message["parsing_type"],
                                 output_keys=message["output_keys"],
-                                functions=message['functions']
+                                functions=message["functions"],
                             )
                         )
                         llm_module_version_uuid: str = llm_module_version.uuid
@@ -344,17 +343,19 @@ class DevWebsocketClient:
                         ]
                     else:
                         messages_for_run = prompts
-                        
-                    parsing_success =  True
+
+                    parsing_success = True
                     error_log = None
                     function_call = None
                     function_call_log = None
-                    
+
                     # get function descriptions from register & send to LLM
-                    function_names : List[str] = message['functions']
+                    function_names: List[str] = message["functions"]
                     logger.debug(f"function_names : {function_names}")
                     try:
-                        function_descriptions : List[str] = self._client._get_function_descriptions(function_names)
+                        function_descriptions: List[
+                            str
+                        ] = self._client._get_function_descriptions(function_names)
                     except Exception as error:
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
@@ -365,14 +366,16 @@ class DevWebsocketClient:
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
-                    
+
                     logger.debug(f"functions : {function_descriptions}")
-                    
-                    res: AsyncGenerator[LLMStreamResponse,  None] = llm_module_dev.dev_run(
+
+                    res: AsyncGenerator[
+                        LLMStreamResponse, None
+                    ] = llm_module_dev.dev_run(
                         messages=messages_for_run,
-                        parsing_type=parsing_type, 
+                        parsing_type=parsing_type,
                         functions=function_descriptions,
-                        model=model
+                        model=model,
                     )
                     async for item in res:
                         # send item to backend
@@ -386,14 +389,17 @@ class DevWebsocketClient:
                                 "raw_output": item.raw_output,
                             }
                         if item.parsed_outputs:
-                            if list(item.parsed_outputs.keys())[0] not in output["parsed_outputs"]:
-                                output["parsed_outputs"][list(item.parsed_outputs.keys())[0]] = list(
-                                    item.parsed_outputs.values()
-                                )[0]
+                            if (
+                                list(item.parsed_outputs.keys())[0]
+                                not in output["parsed_outputs"]
+                            ):
+                                output["parsed_outputs"][
+                                    list(item.parsed_outputs.keys())[0]
+                                ] = list(item.parsed_outputs.values())[0]
                             else:
-                                output["parsed_outputs"][list(item.parsed_outputs.keys())[0]] += list(
-                                    item.parsed_outputs.values()
-                                )[0]
+                                output["parsed_outputs"][
+                                    list(item.parsed_outputs.keys())[0]
+                                ] += list(item.parsed_outputs.values())[0]
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
@@ -406,30 +412,28 @@ class DevWebsocketClient:
                                 "function_call": item.function_call,
                             }
                             function_call = item.function_call
-                            
+
                         if item.error and parsing_success is True:
                             parsing_success = not item.error
                             error_log = item.error_log
-                            
+
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-                    
+
                     # Check output key matching : set(output['parsed_output'].keys()) == set(message['output_keys'])
                     if (
                         message["output_keys"] is not None
-                        and message['parsing_type'] is not None
-                        and set(output["parsed_outputs"].keys()) != set(
-                            message["output_keys"]
-                        ) or (
-                            parsing_success is False
-                        )
+                        and message["parsing_type"] is not None
+                        and set(output["parsed_outputs"].keys())
+                        != set(message["output_keys"])
+                        or (parsing_success is False)
                     ):
                         error_log = error_log if error_log else "Key matching failed."
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
                             "status": "failed",
-                            "log" : f"parsing failed, {error_log}"
+                            "log": f"parsing failed, {error_log}",
                         }
                         update_llm_module_version(
                             llm_module_version_uuid=llm_module_version_uuid,
@@ -444,30 +448,33 @@ class DevWebsocketClient:
                         response.update(data)
                         await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                         return
-                    
+
                     # IF function_call in response -> call function -> call LLM once more
                     if function_call:
                         # make function_call_log
                         function_call_log = {
-                            "name" : function_call['name'],
-                            "arguments" : function_call['arguments'],
-                            "response" : None,
-                            "initial_raw_output" : output["raw_output"],
-                                
+                            "name": function_call["name"],
+                            "arguments": function_call["arguments"],
+                            "response": None,
+                            "initial_raw_output": output["raw_output"],
                         }
-                            
+
                         # call function
                         try:
-                            function_call_args: Dict[str, Any] = json.loads(function_call['arguments'])
-                            function_response = self._client._call_register_function(function_call['name'], function_call_args)
-                            function_call_log['response'] = function_response
+                            function_call_args: Dict[str, Any] = json.loads(
+                                function_call["arguments"]
+                            )
+                            function_response = self._client._call_register_function(
+                                function_call["name"], function_call_args
+                            )
+                            function_call_log["response"] = function_response
                         except Exception as error:
                             logger.error(f"{error}")
-                            
+
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "failed",
-                                "log" : f"Function call Failed, {error}"
+                                "log": f"Function call Failed, {error}",
                             }
                             update_llm_module_version(
                                 llm_module_version_uuid=llm_module_version_uuid,
@@ -484,11 +491,19 @@ class DevWebsocketClient:
                             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                             return
                         # call LLM once more
-                        messages_for_run.append({"role" : "function", "name": function_call['name'], "content" : str(function_response)})
-                        res_after_function_call : AsyncGenerator[LLMStreamResponse,  None] = llm_module_dev.dev_chat(
+                        messages_for_run.append(
+                            {
+                                "role": "function",
+                                "name": function_call["name"],
+                                "content": str(function_response),
+                            }
+                        )
+                        res_after_function_call: AsyncGenerator[
+                            LLMStreamResponse, None
+                        ] = llm_module_dev.dev_chat(
                             messages_for_run, parsing_type, model
                         )
-                        
+
                         output = {"raw_output": "", "parsed_outputs": {}}
                         async for item in res_after_function_call:
                             if item.raw_output is not None:
@@ -499,42 +514,45 @@ class DevWebsocketClient:
                                     "raw_output": item.raw_output,
                                 }
                             if item.parsed_outputs:
-                                if list(item.parsed_outputs.keys())[0] not in output["parsed_outputs"]:
-                                    output["parsed_outputs"][list(item.parsed_outputs.keys())[0]] = list(
-                                        item.parsed_outputs.values()
-                                    )[0]
+                                if (
+                                    list(item.parsed_outputs.keys())[0]
+                                    not in output["parsed_outputs"]
+                                ):
+                                    output["parsed_outputs"][
+                                        list(item.parsed_outputs.keys())[0]
+                                    ] = list(item.parsed_outputs.values())[0]
                                 else:
-                                    output["parsed_outputs"][list(item.parsed_outputs.keys())[0]] += list(
-                                        item.parsed_outputs.values()
-                                    )[0]
+                                    output["parsed_outputs"][
+                                        list(item.parsed_outputs.keys())[0]
+                                    ] += list(item.parsed_outputs.values())[0]
                                 data = {
                                     "type": ServerTask.UPDATE_RESULT_RUN.value,
                                     "status": "running",
                                     "parsed_outputs": item.parsed_outputs,
                                 }
-                                
+
                             if item.error and parsing_success is True:
                                 parsing_success = not item.error
                                 error_log = item.error_log
-                                
+
                             data.update(response)
                             # logger.debug(f"Sent response: {data}")
                             await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-                                
+
                         if (
                             message["output_keys"] is not None
-                            and message['parsing_type'] is not None
-                            and set(output["parsed_outputs"].keys()) != set(
-                                message["output_keys"]
-                            ) or (
-                                parsing_success is False
-                            )
+                            and message["parsing_type"] is not None
+                            and set(output["parsed_outputs"].keys())
+                            != set(message["output_keys"])
+                            or (parsing_success is False)
                         ):
-                            error_log = error_log if error_log else "Key matching failed."
+                            error_log = (
+                                error_log if error_log else "Key matching failed."
+                            )
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "failed",
-                                "log" : f"parsing failed, {error_log}"
+                                "log": f"parsing failed, {error_log}",
                             }
                             update_llm_module_version(
                                 llm_module_version_uuid=llm_module_version_uuid,
@@ -550,7 +568,7 @@ class DevWebsocketClient:
                             response.update(data)
                             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                             return
-                                    
+
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
                         "status": "completed",
@@ -559,7 +577,7 @@ class DevWebsocketClient:
                         llm_module_version_uuid=llm_module_version_uuid,
                         status=LLMModuleVersionStatus.WORKING.value,
                     )
-                        
+
                     create_run_log(
                         llm_module_version_uuid=llm_module_version_uuid,
                         inputs=sample_input,
@@ -577,7 +595,7 @@ class DevWebsocketClient:
                     response.update(data)
                     await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                     return
-                
+
             if data:
                 response.update(data)
                 await ws.send(json.dumps(response, cls=CustomJSONEncoder))
