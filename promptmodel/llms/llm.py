@@ -129,7 +129,7 @@ class LLM:
             if response:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(api_response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response=None, error=True, error_log=str(e))
 
     async def arun(
         self,
@@ -177,7 +177,7 @@ class LLM:
             if response:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(api_response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response=None, error=True, error_log=str(e))
 
     def stream(
         self,
@@ -237,7 +237,8 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        )
+                        ),
+                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
                     )
         except Exception as e:
             return LLMStreamResponse(error=True, error_log=str(e))
@@ -295,7 +296,7 @@ class LLM:
             if response:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(api_response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response=None, error=True, error_log=str(e))
 
     def stream_and_parse(
         self,
@@ -447,7 +448,7 @@ class LLM:
             if response:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                return LLMResponse(api_response={}, error=True, error_log=str(e))
+                return LLMResponse(api_response=None, error=True, error_log=str(e))
 
     async def astream(
         self,
@@ -515,7 +516,8 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        )
+                        ),
+                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
                     )
         except Exception as e:
             yield LLMStreamResponse(error=True, error_log=str(e))
@@ -760,7 +762,8 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        )
+                        ),
+                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
                     )
         except Exception as e:
             logger.error(e)
@@ -902,7 +905,8 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        )
+                        ),
+                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
                     )
         except Exception as e:
             logger.error(e)
@@ -1037,7 +1041,8 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        )
+                        ),
+                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
                     )
         except Exception as e:
             logger.error(e)
@@ -1179,7 +1184,8 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        )
+                        ),
+                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
                     )
         except Exception as e:
             logger.error(e)

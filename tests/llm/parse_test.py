@@ -384,7 +384,6 @@ async def test_run_and_parsing(mocker):
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )
-    print(res.__dict__)
     mock_completion.assert_called_once()
     mock_completion.reset_mock()
     assert res.parsed_outputs == {"key" : "ab"}, f"parsed output error : {res.parsed_outputs}"
@@ -427,7 +426,8 @@ async def test_run_and_parsing(mocker):
     }, f"function call mismatch : {res.function_call}"
     
     # error case
-    mock_completion = mocker.patch("promptmodel.llms.llm.completion", return_value = mock_response, side_effect = Exception("test"))
+    mock_completion = mocker.patch("promptmodel.llms.llm.completion", returun_value = mock_response)
+    mocker.patch("promptmodel.llms.llm.LLM.__parse_output_pattern__", side_effect = Exception("test"))
     res : LLMResponse = llm.run_and_parse(
         messages=[
             {"role": "user", "content": "What is the weather like in Boston?"}
@@ -454,7 +454,7 @@ async def test_run_and_parsing(mocker):
     )
     mock_completion.assert_called_once()
     mock_completion.reset_mock()
-    assert res.api_response == {}, f"api response mismatch : {res.api_response}"
+    assert res.api_response is None, f"api response mismatch : {res.api_response}"
     assert res.error == True, f"error mismatch : {res.error}"
     
     

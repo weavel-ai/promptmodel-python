@@ -21,7 +21,7 @@ class ModelResponse(LiteLLMModelResponse):
 class LLMResponse:
     def __init__(
         self,
-        api_response: ModelResponse,
+        api_response: Optional[ModelResponse] = None,
         raw_output: Optional[str] = None,
         parsed_outputs: Optional[Dict[str, str]] = None,
         error: Optional[bool] = None,
