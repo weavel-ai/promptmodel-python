@@ -929,7 +929,7 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            for chunk in response:
+            async for chunk in response:
                 if (
                     "content" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["content"] is not None

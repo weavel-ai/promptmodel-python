@@ -178,7 +178,3 @@ This is your output format. Keep the string between < type=< >>, </ > as it is.
         ws = mock_websocket
     )
     create_run_log_mock.assert_not_called()
-    
-
-    
-    

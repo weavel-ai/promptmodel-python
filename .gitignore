@@ -26,3 +26,6 @@ build
 build/*
 dist
 dist/*
+
+.coverage
+key.key
