@@ -110,7 +110,7 @@ class Client:
                 "function" : function,
             }
 
-    def include(self, client: Client):
+    def include_client(self, client: Client):
         self.llm_modules.extend(client.llm_modules)
         # delete duplicated llm_modules
         self.llm_modules = list(
@@ -153,7 +153,7 @@ class DevApp(Client):
     def __init__(self, default_model: Optional[str] = "gpt-3.5-turbo"):
         super().__init__(default_model)
 
-    def include(self, client: Client):
+    def include_client(self, client: Client):
         self.llm_modules.extend(client.llm_modules)
 
 

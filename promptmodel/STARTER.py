@@ -9,4 +9,4 @@ app = Client()
 
 # Example usage
 # This is needed to integrate your codebase with the prompt engineering dashboard
-# app.include(<objectname>)
+# app.include_client(<objectname>)

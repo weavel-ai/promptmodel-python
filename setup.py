@@ -9,7 +9,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="promptmodel",
-    version="0.0.14",
+    version="0.0.15",
     packages=find_namespace_packages(),
     entry_points={
         "console_scripts": [
