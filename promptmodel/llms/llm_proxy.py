@@ -1,5 +1,6 @@
 import inspect
 import asyncio
+from concurrent.futures import Future
 from typing import (
     Any,
     AsyncGenerator,
@@ -16,7 +17,7 @@ from litellm import RateLimitManager, ModelResponse
 from promptmodel.llms.llm import LLM
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
-from promptmodel.utils.prompt_util import fetch_prompts
+from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
 from promptmodel.utils.output_utils import update_dict
 from promptmodel.apis.base import APIClient, AsyncAPIClient
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse
@@ -31,7 +32,7 @@ class LLMProxy(LLM):
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = asyncio.run(fetch_prompts(self._name))
+            prompts, version_details = run_async_in_sync(fetch_prompts(self._name))
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -66,7 +67,7 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
-            self._log_to_cloud(
+            self._sync_log_to_cloud(
                 version_details["uuid"], inputs, raw_response, dict_cache, metadata
             )
 
@@ -113,7 +114,7 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
-            self._log_to_cloud(
+            await self._async_log_to_cloud(
                 version_details["uuid"], inputs, raw_response, dict_cache, metadata
             )
 
@@ -123,7 +124,7 @@ class LLMProxy(LLM):
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = asyncio.run(fetch_prompts(self._name))
+            prompts, version_details = run_async_in_sync(fetch_prompts(self._name))
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -138,7 +139,7 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             if llm_response.parsed_outputs:
-                self._log_to_cloud(
+                self._sync_log_to_cloud(
                     version_details["uuid"],
                     inputs,
                     llm_response.api_response,
@@ -146,7 +147,7 @@ class LLMProxy(LLM):
                     metadata,
                 )
             else:
-                self._log_to_cloud(
+                self._sync_log_to_cloud(
                     version_details["uuid"],
                     inputs,
                     llm_response.api_response,
@@ -176,7 +177,7 @@ class LLMProxy(LLM):
             }
 
             if llm_response.parsed_outputs:
-                self._log_to_cloud(
+                await self._async_log_to_cloud(
                     version_details["uuid"],
                     inputs,
                     llm_response.api_response,
@@ -184,7 +185,7 @@ class LLMProxy(LLM):
                     metadata,
                 )
             else:
-                self._log_to_cloud(
+                await self._async_log_to_cloud(
                     version_details["uuid"],
                     inputs,
                     llm_response.api_response,
@@ -223,8 +224,8 @@ class LLMProxy(LLM):
         if "function_list" in kwargs:
             call_args["functions"] = kwargs["function_list"]
         return call_args
-
-    def _log_to_cloud(
+    
+    async def _async_log_to_cloud(
         self,
         version_uuid: str,
         inputs: dict,
@@ -232,35 +233,94 @@ class LLMProxy(LLM):
         parsed_outputs: dict,
         metadata: dict,
     ):
-        # Log to cloud
-        # logging if only status = deployed
-        config = read_config()
-        if "dev_branch" in config and (
-            config["dev_branch"]["initializing"] or config["dev_branch"]["online"]
-        ):
-            return
-
+        # Perform the logging asynchronously
         api_response_dict = api_response.to_dict_recursive()
         api_response_dict.update({"response_ms": api_response['response_ms']})
-        res = asyncio.run(
-            AsyncAPIClient.execute(
-                method="POST",
-                path="/log_deployment_run",
-                params={
-                    "version_uuid": version_uuid,
-                },
-                json={
-                    "inputs": inputs,
-                    "api_response": api_response_dict,
-                    "parsed_outputs": parsed_outputs,
-                    "metadata": metadata,
-                },
-                use_cli_key=False,
-            )
+        res = await AsyncAPIClient.execute(
+            method="POST",
+            path="/log_deployment_run",
+            params={
+                "version_uuid": version_uuid,
+            },
+            json={
+                "inputs": inputs,
+                "api_response": api_response_dict,
+                "parsed_outputs": parsed_outputs,
+                "metadata": metadata,
+            },
+            use_cli_key=False,
         )
         if res.status_code != 200:
             print(f"[red]Failed to log to cloud: {res.json()}[/red]")
-        return
+        return res
+
+    def _sync_log_to_cloud(
+        self,
+        version_uuid: str,
+        inputs: dict,
+        api_response: ModelResponse,
+        parsed_outputs: dict,
+        metadata: dict,
+    ):
+        coro = self._async_log_to_cloud(
+            version_uuid,
+            inputs,
+            api_response,
+            parsed_outputs,
+            metadata,
+        )
+        # This is the synchronous wrapper that will wait for the async function to complete.
+        try:
+            # Try to get a running event loop
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # If there is no running loop, create a new one and set it as the event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(coro)
+            loop.close()  # Make sure to close the loop after use
+            return result
+        
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result()          
+
+    # def _log_to_cloud(
+    #     self,
+    #     version_uuid: str,
+    #     inputs: dict,
+    #     api_response: ModelResponse,
+    #     parsed_outputs: dict,
+    #     metadata: dict,
+    # ):
+    #     # Log to cloud
+    #     # logging if only status = deployed
+    #     config = read_config()
+    #     if "dev_branch" in config and (
+    #         config["dev_branch"]["initializing"] or config["dev_branch"]["online"]
+    #     ):
+    #         return
+
+    #     api_response_dict = api_response.to_dict_recursive()
+    #     api_response_dict.update({"response_ms": api_response['response_ms']})
+    #     res = asyncio.run(
+    #         AsyncAPIClient.execute(
+    #             method="POST",
+    #             path="/log_deployment_run",
+    #             params={
+    #                 "version_uuid": version_uuid,
+    #             },
+    #             json={
+    #                 "inputs": inputs,
+    #                 "api_response": api_response_dict,
+    #                 "parsed_outputs": parsed_outputs,
+    #                 "metadata": metadata,
+    #             },
+    #             use_cli_key=False,
+    #         )
+    #     )
+    #     if res.status_code != 200:
+    #         print(f"[red]Failed to log to cloud: {res.json()}[/red]")
+    #     return
 
     def run(
         self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None

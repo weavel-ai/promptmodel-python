@@ -11,13 +11,13 @@ import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import completion, acompletion
-from litellm import ModelResponse, RateLimitManager, Choices
-from litellm.utils import prompt_token_calculator, token_counter
+from litellm import ModelResponse, RateLimitManager
 
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse
 from promptmodel.utils import logger
 from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
 from promptmodel.utils.output_utils import convert_str_to_type, update_dict
+from promptmodel.utils.prompt_util import num_tokens_for_messages, num_tokens_from_function_call_output, num_tokens_from_functions_input
 
 load_dotenv()
 
@@ -234,6 +234,7 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
+                            function_list=functions,
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
@@ -332,7 +333,7 @@ class LLM:
             error_log = ""
             if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
                 for result in self.__double_type_sp_generator__(
-                    messages, response, parsing_type, start_time
+                    messages, response, parsing_type, start_time, functions
                 ):
                     yield result
                     if result.parsed_outputs:
@@ -349,7 +350,7 @@ class LLM:
                     yield result
                     if result.parsed_outputs:
                         parsed_outputs = update_dict(
-                            parsed_outputs, result.parsed_outputs
+                            parsed_outputs, result.parsed_outputs, functions
                         )
                     if result.error and not error_occurs:
                         error_occurs = True
@@ -513,6 +514,7 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
+                            function_list=functions,
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
@@ -554,7 +556,7 @@ class LLM:
             error_occurs = False
             if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
                 async for result in self.__double_type_sp_agenerator__(
-                    messages, response, parsing_type, start_time
+                    messages, response, parsing_type, start_time, functions
                 ):
                     yield result
                     if result.parsed_outputs:
@@ -565,7 +567,7 @@ class LLM:
                         error_occurs = True
             else:
                 async for result in self.__single_type_sp_agenerator__(
-                    messages, response, parsing_type, start_time
+                    messages, response, parsing_type, start_time, functions
                 ):
                     yield result
                     if result.parsed_outputs:
@@ -603,16 +605,25 @@ class LLM:
         response_ms,
         messages: List[Dict[str, str]],
         raw_output: str,
+        function_list : List[Any] = [],
         function_call: Optional[dict] = None,
     ) -> ModelResponse:
-        choices = Choices(
-            finish_reason=chunk["choices"][0]["finish_reason"],
-            index=0,
-            message= {"role": "assistant", "content": raw_output}
-        )
+
+        count_start_time = datetime.datetime.now()
+        prompt_token: int = num_tokens_for_messages(messages=messages, model=chunk["model"])
+        completion_token: int = num_tokens_for_messages(model=chunk["model"], messages=[{"role": "assistant", "content": raw_output}])
         
-        prompt_token: int = prompt_token_calculator(chunk["model"], messages)
-        completion_token: int = token_counter(chunk["model"], raw_output)
+        if len(function_list) > 0:
+            function_list_token = num_tokens_from_functions_input(functions=function_list, model=chunk["model"])
+            prompt_token += function_list_token
+            
+        if function_call:
+            function_call_token = num_tokens_from_function_call_output(function_call_output=function_call, model=chunk["model"])
+            completion_token += function_call_token
+            
+        count_end_time = datetime.datetime.now()
+        logger.debug(f"counting token time : {(count_end_time - count_start_time).total_seconds() * 1000} ms")
+        
         usage = {
             "prompt_tokens": prompt_token,
             "completion_tokens": completion_token,
@@ -625,13 +636,11 @@ class LLM:
             usage=usage,
             response_ms=response_ms,
         )
-        res.choices[0]['finish_reason'] = chunk["choices"][0]["finish_reason"] 
-        res.choices[0]['message']['content'] = raw_output
-        res.response_ms = response_ms
-
+        res['choices'][0]['finish_reason'] = chunk["choices"][0]["finish_reason"] 
+        res['choices'][0]['message']['content'] = raw_output if raw_output != "" else None
+        res['response_ms'] = response_ms
         if function_call:
             res.choices[0]["message"]["function_call"] = function_call
-
         return res
 
     def __double_type_sp_generator__(
@@ -640,6 +649,7 @@ class LLM:
         response: Generator,
         parsing_type: ParsingType,
         start_time: datetime.datetime,
+        functions: List[Any] = [],
     ):
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
@@ -759,6 +769,7 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
+                            function_list=functions,
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
@@ -775,6 +786,7 @@ class LLM:
         response: Generator,
         parsing_type: ParsingType,
         start_time: datetime.datetime,
+        functions: List[Any] = [],
     ):
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
@@ -902,6 +914,7 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
+                            function_list=functions,
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
@@ -918,6 +931,7 @@ class LLM:
         response: AsyncGenerator,
         parsing_type: ParsingType,
         start_time: datetime.datetime,
+        functions: List[Any] = [],
     ):
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
@@ -1038,6 +1052,7 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
+                            function_list=functions,
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
@@ -1054,6 +1069,7 @@ class LLM:
         response: AsyncGenerator,
         parsing_type: ParsingType,
         start_time: datetime.datetime,
+        functions: List[Any] = [],
     ):
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
@@ -1181,6 +1197,7 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
+                            function_list=functions,
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,

@@ -219,7 +219,7 @@ def dev():
     # save samples to local DB
     update_samples(client_instance.samples)
 
-    # 웹소켓 연결 열기
+    # Open Websocket
     asyncio.run(
         dev_websocket_client.connect_to_gateway(
             project_uuid=project["uuid"],
