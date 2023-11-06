@@ -2,7 +2,9 @@ import os
 import sys
 import yaml
 import asyncio
-from typing import Any, Dict, Tuple, List, Union, Optional
+from threading import Thread
+from concurrent.futures import Future
+from typing import Any, Dict, Tuple, List, Union, Optional, Coroutine
 from litellm import token_counter
 
 from promptmodel.database.crud import (
@@ -160,7 +162,7 @@ def num_tokens_from_function_call_output(
 
 import asyncio
 
-def run_async_in_sync(coro):
+def run_async_in_sync(coro : Coroutine):
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:  # No running loop
@@ -169,9 +171,23 @@ def run_async_in_sync(coro):
         result = loop.run_until_complete(coro)
         loop.close()
         return result
+    
+    if loop.is_running():
+        future = Future()
+        def target(fut : Future, coro : Coroutine):
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                result = new_loop.run_until_complete(coro)
+                fut.set_result(result)
+            except Exception as e:
+                fut.set_exception(e)
+            finally:
+                new_loop.close()
+                
+        thread = Thread(target=target, args=(future, coro), daemon=True)
+        thread.start()
+        thread.join()
+        return future.result()
     else:
-        if loop.is_running():
-            future = asyncio.run_coroutine_threadsafe(coro, loop)
-            return future.result()
-        else:
-            return loop.run_until_complete(coro)
+        return loop.run_until_complete(coro)
