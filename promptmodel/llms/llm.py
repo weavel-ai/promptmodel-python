@@ -356,7 +356,7 @@ class LLM:
                     yield result
                     if result.parsed_outputs:
                         parsed_outputs = update_dict(
-                            parsed_outputs, result.parsed_outputs, functions
+                            parsed_outputs, result.parsed_outputs
                         )
                     if result.error and not error_occurs:
                         error_occurs = True

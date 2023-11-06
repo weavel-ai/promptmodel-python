@@ -39,7 +39,7 @@ from promptmodel.database.crud import (
     hide_llm_module_not_in_code,
     update_samples,
     update_llm_module_uuid,
-    rename_llm_module
+    rename_llm_module,
 )
 
 
@@ -249,162 +249,209 @@ def start_code_reloader(_client_filename, client_instance_name, dev_websocket_cl
 
 
 def update_by_changelog(
-    changelogs: list[dict],
+    changelogs: List[Dict],
     project_status: dict,
-    local_code_llm_module_name_list: list[str],
+    local_code_llm_module_name_list: List[str],
 ):
     """Update Local DB by changelog"""
     local_db_llm_module_list: list = list_llm_modules()  # {"name", "uuid"}
 
     for changelog in changelogs:
-        level:int = changelog['level']
-        logs = changelog['logs']
+        level: int = changelog["level"]
+        logs = changelog["logs"]
         if level == 1:
             for log in logs:
-                subject = log['subject']
-                action:str = log['action']
+                subject = log["subject"]
+                action: str = log["action"]
                 if subject == "llm_module":
                     local_db_llm_module_list = update_llm_module_changelog(
                         action=action,
                         project_status=project_status,
-                        uuid_list=log['identifiers'],
+                        uuid_list=log["identifiers"],
                         local_db_llm_module_list=local_db_llm_module_list,
-                        local_code_llm_module_name_list=local_code_llm_module_name_list
+                        local_code_llm_module_name_list=local_code_llm_module_name_list,
                     )
                 elif subject == "llm_module_version":
-                    is_success, local_db_llm_module_list = update_llm_module_version_changelog(
+                    (
+                        is_success,
+                        local_db_llm_module_list,
+                    ) = update_llm_module_version_changelog(
                         action=action,
                         project_status=project_status,
-                        uuid_list=log['identifiers'],
+                        uuid_list=log["identifiers"],
                         local_db_llm_module_list=local_db_llm_module_list,
-                        local_code_llm_module_name_list=local_code_llm_module_name_list
+                        local_code_llm_module_name_list=local_code_llm_module_name_list,
                     )
                     if not is_success:
                         return False
                 else:
                     pass
-            previous_version_levels = changelog['previous_version'].split(".")
-            current_version_levels = [str(int(previous_version_levels[0]) + 1), "0", "0"]
+            previous_version_levels = changelog["previous_version"].split(".")
+            current_version_levels = [
+                str(int(previous_version_levels[0]) + 1),
+                "0",
+                "0",
+            ]
             current_version = ".".join(current_version_levels)
         elif level == 2:
             for log in logs:
-                subject = log['subject']
-                action:str = log['action']
-                uuid_list:list = log['identifiers']
+                subject = log["subject"]
+                action: str = log["action"]
+                uuid_list: list = log["identifiers"]
                 if subject == "llm_module_version":
                     local_db_llm_module_list = update_llm_module_version_changelog(
                         action=action,
                         project_status=project_status,
-                        uuid_list=log['identifiers'],
+                        uuid_list=log["identifiers"],
                         local_db_llm_module_list=local_db_llm_module_list,
-                        local_code_llm_module_name_list=local_code_llm_module_name_list
+                        local_code_llm_module_name_list=local_code_llm_module_name_list,
                     )
                 else:
                     pass
-            previous_version_levels = changelog['previous_version'].split(".")
-            current_version_levels = [previous_version_levels[0], str(int(previous_version_levels[1]) + 1), "0"]
+            previous_version_levels = changelog["previous_version"].split(".")
+            current_version_levels = [
+                previous_version_levels[0],
+                str(int(previous_version_levels[1]) + 1),
+                "0",
+            ]
             current_version = ".".join(current_version_levels)
         else:
-            previous_version_levels = changelog['previous_version'].split(".")
-            current_version_levels = [previous_version_levels[0], previous_version_levels[1], str(int(previous_version_levels[2]) + 1)]
+            previous_version_levels = changelog["previous_version"].split(".")
+            current_version_levels = [
+                previous_version_levels[0],
+                previous_version_levels[1],
+                str(int(previous_version_levels[2]) + 1),
+            ]
             current_version = ".".join(current_version_levels)
-    
-        upsert_config({"project_version" : current_version}, section="dev_branch")
+
+        upsert_config({"project_version": current_version}, section="dev_branch")
     return True
+
 
 def update_llm_module_changelog(
     action: ChangeLogAction,
     project_status: dict,
-    uuid_list: list[str],
-    local_db_llm_module_list : list[dict],
-    local_code_llm_module_name_list : list[str]
+    uuid_list: List[str],
+    local_db_llm_module_list: List[Dict],
+    local_code_llm_module_name_list: List[str],
 ):
     if action == ChangeLogAction.ADD.value:
-        llm_module_list = [x for x in project_status['llm_modules'] if x['uuid'] in uuid_list]
+        llm_module_list = [
+            x for x in project_status["llm_modules"] if x["uuid"] in uuid_list
+        ]
         for llm_module in llm_module_list:
-            local_db_llm_module_name_list = [x['name'] for x in local_db_llm_module_list]
-            
-            if llm_module['name'] not in local_db_llm_module_name_list:
+            local_db_llm_module_name_list = [
+                x["name"] for x in local_db_llm_module_list
+            ]
+
+            if llm_module["name"] not in local_db_llm_module_name_list:
                 # IF llm_module not in Local DB
-                if llm_module['name'] in local_code_llm_module_name_list:
+                if llm_module["name"] in local_code_llm_module_name_list:
                     # IF llm_module in Local Code
-                    llm_module['local_usage'] = True
-                    llm_module['is_deployment'] = True
+                    llm_module["local_usage"] = True
+                    llm_module["is_deployment"] = True
                     create_llm_modules([llm_module])
                 else:
-                    llm_module['local_usage'] = False
-                    llm_module['is_deployment'] = True
+                    llm_module["local_usage"] = False
+                    llm_module["is_deployment"] = True
                     create_llm_modules([llm_module])
             else:
-                local_db_llm_module = [x for x in local_db_llm_module_list if x['name'] == llm_module['name']][0]
-                if local_db_llm_module['is_deployment'] is False:
-                    print("Creation of promptmodel with identical name was detected in local & deployment.")
+                local_db_llm_module = [
+                    x
+                    for x in local_db_llm_module_list
+                    if x["name"] == llm_module["name"]
+                ][0]
+                if local_db_llm_module["is_deployment"] is False:
+                    print(
+                        "Creation of promptmodel with identical name was detected in local & deployment."
+                    )
                     check_same = inquirer.confirm(
-                        message="Are they same promptmodel? [y/n]",
-                        default=False
+                        message="Are they same promptmodel? [y/n]", default=False
                     ).execute()
                     # check_same = input()
                     # if check_same == "y":
                     #     check_same = True
                     # else:
                     #     check_same = False
-                        
+
                     if not check_same:
                         # rename & change name in Local DB
-                        print(f"Please rename local promptmodel {llm_module['name']} to continue")
-                        validate_new_promptmodel_name = lambda name: name not in local_code_llm_module_name_list and name not in local_db_llm_module_name_list
+                        print(
+                            f"Please rename local promptmodel {llm_module['name']} to continue"
+                        )
+                        validate_new_promptmodel_name = (
+                            lambda name: name not in local_code_llm_module_name_list
+                            and name not in local_db_llm_module_name_list
+                        )
                         new_module_name = inquirer.text(
                             message="Enter the new promptmodel name:",
                             validate=lambda x: validate_new_promptmodel_name(x),
                             invalid_message="promptmodel name already exists.",
                         ).execute()
                         # new_module_name = input()
-                        rename_llm_module(local_db_llm_module['uuid'], new_module_name)
-                        
+                        rename_llm_module(local_db_llm_module["uuid"], new_module_name)
+
                         print("We changed the name of promptmodel in local DB.")
-                        print(f"Please change the name of promptmodel '{llm_module['name']}' in your project code and restart.")
+                        print(
+                            f"Please change the name of promptmodel '{llm_module['name']}' in your project code and restart."
+                        )
                         # dev 꺼버리고, 수정하고 다시 키라고 명령.
                         return False, local_db_llm_module_list
-                    update_llm_module_uuid(local_db_llm_module['uuid'], llm_module["uuid"])
-                    local_db_llm_module_list : list = list_llm_modules() 
+                    update_llm_module_uuid(
+                        local_db_llm_module["uuid"], llm_module["uuid"]
+                    )
+                    local_db_llm_module_list: list = list_llm_modules()
     else:
         # TODO: add code DELETE, CHANGE, FIX later
         pass
     return True, local_db_llm_module_list
-                    
+
+
 def update_llm_module_version_changelog(
     action: ChangeLogAction,
     project_status: dict,
-    uuid_list: list[str],
-    local_db_llm_module_list : list[dict],
-    local_code_llm_module_name_list : list[str]
+    uuid_list: List[str],
+    local_db_llm_module_list: List[Dict],
+    local_code_llm_module_name_list: List[str],
 ) -> List[Dict[str, Any]]:
-    if action == ChangeLogAction.ADD.value:            
+    if action == ChangeLogAction.ADD.value:
         # find llm_module_version in project_status['llm_module_versions'] where uuid in uuid_list
-        llm_module_version_list_in_changelog = [x for x in project_status['llm_module_versions'] if x['uuid'] in uuid_list]
-        
-        # check if llm_module_version['uuid'] is in local_db_llm_module_list
-        local_db_version_uuid_list = [str(x.uuid) for x in list(LLMModuleVersion.select())]
-        version_list_to_update = [
-            x for x in llm_module_version_list_in_changelog
-            if x['uuid'] not in local_db_version_uuid_list
+        llm_module_version_list_in_changelog = [
+            x for x in project_status["llm_module_versions"] if x["uuid"] in uuid_list
         ]
-        version_uuid_list_to_update = [x['uuid'] for x in version_list_to_update]
-        
+
+        # check if llm_module_version['uuid'] is in local_db_llm_module_list
+        local_db_version_uuid_list = [
+            str(x.uuid) for x in list(LLMModuleVersion.select())
+        ]
+        version_list_to_update = [
+            x
+            for x in llm_module_version_list_in_changelog
+            if x["uuid"] not in local_db_version_uuid_list
+        ]
+        version_uuid_list_to_update = [x["uuid"] for x in version_list_to_update]
+
         # find prompts and run_logs to update
-        prompts_to_update = [x for x in project_status['prompts'] if x['version_uuid'] in version_uuid_list_to_update]
-        run_logs_to_update = [x for x in project_status['run_logs'] if x['version_uuid'] in version_uuid_list_to_update]
-        
+        prompts_to_update = [
+            x
+            for x in project_status["prompts"]
+            if x["version_uuid"] in version_uuid_list_to_update
+        ]
+        run_logs_to_update = [
+            x
+            for x in project_status["run_logs"]
+            if x["version_uuid"] in version_uuid_list_to_update
+        ]
+
         for llm_module_version in version_list_to_update:
-            llm_module_version['candidate_version'] = llm_module_version['version']
-            del llm_module_version['version']
-            llm_module_version['status'] = LLMModuleVersionStatus.CANDIDATE.value
-            
+            llm_module_version["candidate_version"] = llm_module_version["version"]
+            del llm_module_version["version"]
+            llm_module_version["status"] = LLMModuleVersionStatus.CANDIDATE.value
+
         create_llm_module_versions(version_list_to_update)
         create_prompts(prompts_to_update)
         create_run_logs(run_logs_to_update)
-        
+
         return local_db_llm_module_list
     else:
         pass
-

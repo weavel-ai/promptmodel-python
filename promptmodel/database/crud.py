@@ -333,7 +333,7 @@ async def update_deployed_cache(project_status: dict):
     return
 
 
-def update_samples(samples: list[dict]):
+def update_samples(samples: List[Dict]):
     """Update samples"""
 
     with db.atomic():
@@ -417,7 +417,7 @@ def find_ancestor_versions(target_llm_module_uuid: Optional[str] = None):
     return targets_with_real_ancestor, target_prompts
 
 
-def _find_ancestor(target: dict, versions: list[dict]):
+def _find_ancestor(target: dict, versions: List[Dict]):
     ancestor = None
     temp = target
     if target["from_uuid"] is None:
