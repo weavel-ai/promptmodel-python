@@ -11,13 +11,17 @@ import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import completion, acompletion
-from litellm import ModelResponse, RateLimitManager
+from litellm import ModelResponse
 
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse
 from promptmodel.utils import logger
 from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
 from promptmodel.utils.output_utils import convert_str_to_type, update_dict
-from promptmodel.utils.prompt_util import num_tokens_for_messages, num_tokens_from_function_call_output, num_tokens_from_functions_input
+from promptmodel.utils.prompt_util import (
+    num_tokens_for_messages,
+    num_tokens_from_function_call_output,
+    num_tokens_from_functions_input,
+)
 
 load_dotenv()
 
@@ -50,7 +54,7 @@ class ParseResult:
 
 
 class LLM:
-    def __init__(self, rate_limit_manager: Optional[RateLimitManager] = None):
+    def __init__(self, rate_limit_manager=None):
         self._rate_limit_manager = rate_limit_manager
 
     @classmethod
@@ -239,7 +243,9 @@ class LLM:
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
                         ),
-                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
                     )
         except Exception as e:
             return LLMStreamResponse(error=True, error_log=str(e))
@@ -519,7 +525,9 @@ class LLM:
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
                         ),
-                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
                     )
         except Exception as e:
             yield LLMStreamResponse(error=True, error_log=str(e))
@@ -605,25 +613,35 @@ class LLM:
         response_ms,
         messages: List[Dict[str, str]],
         raw_output: str,
-        function_list : List[Any] = [],
+        function_list: List[Any] = [],
         function_call: Optional[dict] = None,
     ) -> ModelResponse:
-
         count_start_time = datetime.datetime.now()
-        prompt_token: int = num_tokens_for_messages(messages=messages, model=chunk["model"])
-        completion_token: int = num_tokens_for_messages(model=chunk["model"], messages=[{"role": "assistant", "content": raw_output}])
-        
+        prompt_token: int = num_tokens_for_messages(
+            messages=messages, model=chunk["model"]
+        )
+        completion_token: int = num_tokens_for_messages(
+            model=chunk["model"],
+            messages=[{"role": "assistant", "content": raw_output}],
+        )
+
         if len(function_list) > 0:
-            function_list_token = num_tokens_from_functions_input(functions=function_list, model=chunk["model"])
+            function_list_token = num_tokens_from_functions_input(
+                functions=function_list, model=chunk["model"]
+            )
             prompt_token += function_list_token
-            
+
         if function_call:
-            function_call_token = num_tokens_from_function_call_output(function_call_output=function_call, model=chunk["model"])
+            function_call_token = num_tokens_from_function_call_output(
+                function_call_output=function_call, model=chunk["model"]
+            )
             completion_token += function_call_token
-            
+
         count_end_time = datetime.datetime.now()
-        logger.debug(f"counting token time : {(count_end_time - count_start_time).total_seconds() * 1000} ms")
-        
+        logger.debug(
+            f"counting token time : {(count_end_time - count_start_time).total_seconds() * 1000} ms"
+        )
+
         usage = {
             "prompt_tokens": prompt_token,
             "completion_tokens": completion_token,
@@ -636,9 +654,11 @@ class LLM:
             usage=usage,
             response_ms=response_ms,
         )
-        res['choices'][0]['finish_reason'] = chunk["choices"][0]["finish_reason"] 
-        res['choices'][0]['message']['content'] = raw_output if raw_output != "" else None
-        res['response_ms'] = response_ms
+        res["choices"][0]["finish_reason"] = chunk["choices"][0]["finish_reason"]
+        res["choices"][0]["message"]["content"] = (
+            raw_output if raw_output != "" else None
+        )
+        res["response_ms"] = response_ms
         if function_call:
             res.choices[0]["message"]["function_call"] = function_call
         return res
@@ -774,7 +794,9 @@ class LLM:
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
                         ),
-                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
                     )
         except Exception as e:
             logger.error(e)
@@ -919,7 +941,9 @@ class LLM:
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
                         ),
-                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
                     )
         except Exception as e:
             logger.error(e)
@@ -1057,7 +1081,9 @@ class LLM:
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
                         ),
-                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
                     )
         except Exception as e:
             logger.error(e)
@@ -1202,7 +1228,9 @@ class LLM:
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
                         ),
-                        function_call=function_call if chunk["choices"][0]["finish_reason"] == "function_call" else None,
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
                     )
         except Exception as e:
             logger.error(e)

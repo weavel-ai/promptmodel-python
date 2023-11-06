@@ -13,7 +13,7 @@ from typing import (
     Union,
 )
 from rich import print
-from litellm.utils import RateLimitManager, ModelResponse
+from litellm.utils import ModelResponse
 from promptmodel.llms.llm import LLM
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
@@ -24,9 +24,7 @@ from promptmodel.utils.types import LLMResponse, LLMStreamResponse
 
 
 class LLMProxy(LLM):
-    def __init__(
-        self, name: str, rate_limit_manager: Optional[RateLimitManager] = None
-    ):
+    def __init__(self, name: str, rate_limit_manager=None):
         super().__init__(rate_limit_manager)
         self._name = name
 
@@ -224,7 +222,7 @@ class LLMProxy(LLM):
         if "function_list" in kwargs:
             call_args["functions"] = kwargs["function_list"]
         return call_args
-    
+
     async def _async_log_to_cloud(
         self,
         version_uuid: str,
@@ -235,7 +233,7 @@ class LLMProxy(LLM):
     ):
         # Perform the logging asynchronously
         api_response_dict = api_response.to_dict_recursive()
-        api_response_dict.update({"response_ms": api_response['response_ms']})
+        api_response_dict.update({"response_ms": api_response["response_ms"]})
         res = await AsyncAPIClient.execute(
             method="POST",
             path="/log_deployment_run",
@@ -280,9 +278,9 @@ class LLMProxy(LLM):
             result = loop.run_until_complete(coro)
             loop.close()  # Make sure to close the loop after use
             return result
-        
+
         future = asyncio.run_coroutine_threadsafe(coro, loop)
-        return future.result()          
+        return future.result()
 
     # def _log_to_cloud(
     #     self,

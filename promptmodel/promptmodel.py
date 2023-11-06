@@ -14,8 +14,6 @@ from typing import (
     Union,
 )
 
-from litellm import RateLimitManager
-
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
@@ -54,15 +52,15 @@ class RegisteringMeta(type):
 
 
 class PromptModel(metaclass=RegisteringMeta):
-    def __init__(self, name, rate_limit_manager: Optional[RateLimitManager] = None):
+    def __init__(self, name, rate_limit_manager=None):
         self.name = name
         self.llm_proxy = LLMProxy(name, rate_limit_manager)
 
     def get_prompts(self) -> List[Dict[str, str]]:
         """Get prompt for the promptmodel.
-        If dev mode is running(if .promptmodel/config['dev_branch']['online'] = True), it will fetch the latest tested prompt in the dev branch local DB.  
-        If dev mode is not running, it will fetch the published prompt from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)  
-        - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio. 
+        If dev mode is running(if .promptmodel/config['dev_branch']['online'] = True), it will fetch the latest tested prompt in the dev branch local DB.
+        If dev mode is not running, it will fetch the published prompt from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
+        - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
         If dev mode is initializing, it will return {}.
 
         Returns:
@@ -73,7 +71,11 @@ class PromptModel(metaclass=RegisteringMeta):
         prompts, _ = run_async_in_sync(fetch_prompts(self.name))
         return prompts
 
-    def run(self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Dict[str, Any]]] = None) -> LLMResponse:
+    def run(
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None,
+    ) -> LLMResponse:
         """Run PromptModel. It does not raise error.
 
         Args:
@@ -81,13 +83,17 @@ class PromptModel(metaclass=RegisteringMeta):
 
         Returns:
             LLMResponse: response from the promptmodel. you can find raw output in response.raw_output or response.api_response['choices'][0]['message']['content'].
-            
+
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
         return self.llm_proxy.run(inputs, function_list)
 
-    async def arun(self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Dict[str, Any]]] = None) -> LLMResponse:
+    async def arun(
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None,
+    ) -> LLMResponse:
         """Async run PromptModel. It does not raise error.
 
         Args:
@@ -95,13 +101,17 @@ class PromptModel(metaclass=RegisteringMeta):
 
         Returns:
             LLMResponse: response from the promptmodel. you can find raw output in response.raw_output or response.api_response['choices'][0]['message']['content'].
-            
+
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
         return await self.arun(inputs, function_list)
 
-    def stream(self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Dict[str, Any]]] = None) -> Generator[LLMStreamResponse, None, None]:
+    def stream(
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None,
+    ) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True. It does not raise error.
 
         Args:
@@ -109,7 +119,7 @@ class PromptModel(metaclass=RegisteringMeta):
 
         Yields:
             Generator[LLMStreamResponse, None, None]: Generator of LLMStreamResponse. you can find raw output in response.raw_output or response.api_response['choices'][0]['delta']['content'].
-            
+
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
@@ -117,8 +127,9 @@ class PromptModel(metaclass=RegisteringMeta):
             yield item
 
     async def astream(
-        self, inputs: Optional[Dict[str, Any]] = {},
-        function_list: Optional[List[Dict[str, Any]]] = None
+        self,
+        inputs: Optional[Dict[str, Any]] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Async Run PromptModel with stream=True. It does not raise error.
 
@@ -127,7 +138,7 @@ class PromptModel(metaclass=RegisteringMeta):
 
         Yields:
             AsyncGenerator[LLMStreamResponse, None]: Generator of LLMStreamResponse. you can find raw output in response.raw_output or response.api_response['choices'][0]['delta']['content'].
-            
+
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
@@ -137,7 +148,7 @@ class PromptModel(metaclass=RegisteringMeta):
     def run_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Dict[str, Any]]] = None
+        function_list: Optional[List[Dict[str, Any]]] = None,
     ) -> LLMResponse:
         """Run PromptModel and make parsed outputs. It does not raise error.
 
@@ -146,7 +157,7 @@ class PromptModel(metaclass=RegisteringMeta):
 
         Returns:
             LLMResponse: response from the promptmodel. you can find parsed outputs in response.parsed_outputs. You can also find raw output in response.api_response['choices'][0]['message']['content'].
-            
+
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
@@ -155,7 +166,7 @@ class PromptModel(metaclass=RegisteringMeta):
     async def arun_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Dict[str, Any]]] = None
+        function_list: Optional[List[Dict[str, Any]]] = None,
     ) -> LLMResponse:
         """Async Run PromptModel and make parsed outputs. It does not raise error.
 
@@ -164,7 +175,7 @@ class PromptModel(metaclass=RegisteringMeta):
 
         Returns:
             LLMResponse: response from the promptmodel. you can find parsed outputs in response.parsed_outputs. You can also find raw output in response.api_response['choices'][0]['message']['content'].
-            
+
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
@@ -173,7 +184,7 @@ class PromptModel(metaclass=RegisteringMeta):
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Dict[str, Any]]] = None
+        function_list: Optional[List[Dict[str, Any]]] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
@@ -182,7 +193,7 @@ class PromptModel(metaclass=RegisteringMeta):
 
         Yields:
             Generator[LLMStreamResponse, None, None]: Generator of LLMStreamResponse. you can find parsed outputs in response.parsed_outputs. You can also find raw output in reaponse.raw_output.
-            
+
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
         """
@@ -192,7 +203,7 @@ class PromptModel(metaclass=RegisteringMeta):
     async def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Dict[str, Any]]] = None
+        function_list: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Async Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
@@ -201,7 +212,7 @@ class PromptModel(metaclass=RegisteringMeta):
 
         Yields:
             AsyncGenerator[LLMStreamResponse, None]: Generator of LLMStreamResponse. you can find parsed outputs in response.parsed_outputs. You can also find raw output in reaponse.raw_output.
-            
+
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
         """
