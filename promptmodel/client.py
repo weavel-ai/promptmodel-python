@@ -15,7 +15,7 @@ import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.prompt_util import update_deployed_db
 from promptmodel.utils.config_utils import read_config, upsert_config
-from promptmodel.utils.types import FunctionDescription
+from promptmodel.utils.types import FunctionSchema
 from promptmodel.database.orm import initialize_db
 
 
@@ -28,20 +28,27 @@ class LLMModule:
 class Client:
     """Client main class"""
 
-    def __init__(self, use_cache: Optional[bool] = True, default_model: Optional[str] = "gpt-3.5-turbo"):
+    def __init__(
+        self,
+        use_cache: Optional[bool] = True,
+        default_model: Optional[str] = "gpt-3.5-turbo",
+    ):
         self._default_model: str = default_model
         self.llm_modules: List[LLMModule] = []
         self.samples: List[Dict[str, Any]] = []
-        self.functions : Dict[str, Dict[str, Union[FunctionDescription, Callable]]] = {}
+        self.functions: Dict[str, Dict[str, Union[FunctionSchema, Callable]]] = {}
         config = read_config()
         if (
-            config and 
-            "dev_branch" in config and (
+            config
+            and "dev_branch" in config
+            and (
                 (
-                    "online" in config['dev_branch'] and config['dev_branch']["online"] == True
-                ) or 
-                (
-                    "initializing" in config['dev_branch'] and config['dev_branch']["initializing"] == True
+                    "online" in config["dev_branch"]
+                    and config["dev_branch"]["online"] == True
+                )
+                or (
+                    "initializing" in config["dev_branch"]
+                    and config["dev_branch"]["initializing"] == True
                 )
             )
         ):
@@ -53,7 +60,7 @@ class Client:
             else:
                 upsert_config({"use_cache": False}, section="project")
                 self.cache_manager = None
-                initialize_db() # init db for local usage
+                initialize_db()  # init db for local usage
 
     def register(self, func):
         instructions = list(dis.get_instructions(func))
@@ -95,19 +102,23 @@ class Client:
                 default_model=self._default_model,
             )
         )
-        
-    def register_function(self, description: Union[Dict[str, Any], FunctionDescription], function: Callable):
-        function_name = description['name']
+
+    def register_function(
+        self, description: Union[Dict[str, Any], FunctionSchema], function: Callable
+    ):
+        function_name = description["name"]
         if isinstance(description, dict):
             try:
-                description = FunctionDescription(**description)
+                description = FunctionSchema(**description)
             except:
-                raise ValueError("description is not a valid function call description.")
-            
+                raise ValueError(
+                    "description is not a valid function call description."
+                )
+
         if function_name not in self.functions:
             self.functions[function_name] = {
-                "description" : description,
-                "function" : function,
+                "description": description,
+                "function": function,
             }
 
     def include_client(self, client: Client):
@@ -122,32 +133,36 @@ class Client:
         self.samples = list(
             {sample["name"]: sample for sample in self.samples}.values()
         )
-        
+
         self.functions.update(client.functions)
 
     def register_sample(self, name: str, content: Dict[str, Any]):
         self.samples.append({"name": name, "contents": content})
-        
+
     def _get_llm_module_name_list(self) -> List[str]:
         return [llm_module.name for llm_module in self.llm_modules]
-    
+
     def _call_register_function(self, name: str, arguments: Dict[str, str]):
-        function_to_call : Callable = self.functions[name]["function"]
+        function_to_call: Callable = self.functions[name]["function"]
         try:
             function_response = function_to_call(**arguments)
             return function_response
         except Exception as e:
             raise e
-        
+
     def _get_function_name_list(self) -> List[str]:
         return list(self.functions.keys())
-    
+
     def _get_function_descriptions(self, function_names: List[str] = []):
         try:
-            function_descriptions = [self.functions[function_name]["description"].model_dump() for function_name in function_names]
+            function_descriptions = [
+                self.functions[function_name]["description"].model_dump()
+                for function_name in function_names
+            ]
             return function_descriptions
         except Exception as e:
             raise e
+
 
 class DevApp(Client):
     def __init__(self, default_model: Optional[str] = "gpt-3.5-turbo"):
@@ -174,7 +189,7 @@ class CacheManager:
         initialize_db()
         atexit.register(self._terminate)
         # # logger.debug("CacheManager initialized")
-        asyncio.run(self.update_cache()) # updae cache first synchronously
+        asyncio.run(self.update_cache())  # updae cache first synchronously
         self.cache_thread = threading.Thread(target=self._run_cache_loop)
         self.cache_thread.daemon = True
         self.cache_thread.start()
@@ -194,7 +209,7 @@ class CacheManager:
         config = read_config()
         if not config:
             upsert_config({"version": "0.0.0"}, section="project")
-            config = {"project" : {"version": "0.0.0"}}
+            config = {"project": {"version": "0.0.0"}}
 
         # Check if we need to update the cache
         if current_time - self.last_update_time > self.update_interval:

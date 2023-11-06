@@ -13,7 +13,7 @@ from typing import (
     Union,
 )
 from rich import print
-from litellm import RateLimitManager, ModelResponse
+from litellm.utils import RateLimitManager, ModelResponse
 from promptmodel.llms.llm import LLM
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
