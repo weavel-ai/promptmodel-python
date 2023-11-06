@@ -18,7 +18,7 @@ from litellm import RateLimitManager
 
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.prompt_util import fetch_prompts
+from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
 from promptmodel.utils.types import LLMStreamResponse, LLMResponse
 from promptmodel import Client
 
@@ -70,7 +70,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         # add name to the list of llm_modules
 
-        prompts, _ = asyncio.run(fetch_prompts(self.name))
+        prompts, _ = run_async_in_sync(fetch_prompts(self.name))
         return prompts
 
     def run(self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Dict[str, Any]]] = None) -> LLMResponse:

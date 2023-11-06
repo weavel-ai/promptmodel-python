@@ -105,15 +105,15 @@ def num_tokens_for_messages(messages: List[Dict[str, str]], model : str ="gpt-3.
     if (model.endswith("-0613") or model == "gpt-3.5-turbo-16k"): 
         tokens_per_message = 3
         tokens_per_name = 1
-    
+    sum = 0
     sum = token_counter(model=model, messages=messages)
     for message in messages:
         sum += tokens_per_message
         if "name" in message:
             sum += tokens_per_name
+    return sum
 
-
-def num_tokens_from_functions_input(functions, model="gpt-3.5-turbo-0613") -> int:
+def num_tokens_from_functions_input(functions: List[Any], model="gpt-3.5-turbo-0613") -> int:
         """Return the number of tokens used by a list of functions."""
         
         num_tokens = 0
@@ -149,14 +149,29 @@ def num_tokens_from_functions_input(functions, model="gpt-3.5-turbo-0613") -> in
         return num_tokens
     
 def num_tokens_from_function_call_output(
-    function_call_output: Optional[Dict[str, str]] = None,
+    function_call_output: Dict[str, str] = {},
     model="gpt-3.5-turbo-0613"
 ) -> int:
-    if function_call_output:
-        num_tokens = 1
-        num_tokens += token_counter(model=model, text=function_call_output['name'])
-        if 'arguments' in function_call_output:
-            num_tokens += token_counter(model=model, text=function_call_output['arguments'])
-        return num_tokens
+    num_tokens = 1
+    num_tokens += token_counter(model=model, text=function_call_output['name'])
+    if 'arguments' in function_call_output:
+        num_tokens += token_counter(model=model, text=function_call_output['arguments'])
+    return num_tokens
+
+import asyncio
+
+def run_async_in_sync(coro):
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:  # No running loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(coro)
+        loop.close()
+        return result
     else:
-        return 0
+        if loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(coro, loop)
+            return future.result()
+        else:
+            return loop.run_until_complete(coro)
