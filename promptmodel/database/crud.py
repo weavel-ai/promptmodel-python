@@ -165,7 +165,7 @@ def list_run_logs(prompt_model_version_uuid: str) -> List[RunLog]:
 
 # Select one
 def get_prompt_model_uuid(prompt_model_name: str) -> Dict:
-    """Get uuid of llm module by name"""
+    """Get uuid of prompt_model by name"""
     try:
         response = PromptModel.get(PromptModel.name == prompt_model_name)
         return model_to_dict(response, recurse=False)
@@ -440,7 +440,7 @@ def _find_ancestor(target: dict, versions: List[Dict]):
     return target
 
 
-def update_candidate_version(new_candidates: dict):
+def update_candidate_prompt_model_version(new_candidates: dict):
     """Update candidate version"""
     with db.atomic():
         for uuid, version in new_candidates.items():

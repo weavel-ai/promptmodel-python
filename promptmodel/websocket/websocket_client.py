@@ -29,7 +29,7 @@ from promptmodel.database.crud import (
     update_prompt_model_version,
     find_ancestor_version,
     find_ancestor_versions,
-    update_candidate_version,
+    update_candidate_prompt_model_version,
 )
 from promptmodel.database.models import PromptModelVersion, PromptModel
 from promptmodel.utils.enums import (
@@ -220,9 +220,9 @@ class DevWebsocketClient:
                     "prompts": prompts,
                 }
 
-            elif message["type"] == LocalTask.UPDATE_CANDIDATE_VERSION_ID:
+            elif message["type"] == LocalTask.UPDATE_CANDIDATE_PROMPT_MODEL_VERSION_ID:
                 new_candidates = message["new_candidates"]
-                update_candidate_version(new_candidates)
+                update_candidate_prompt_model_version(new_candidates)
 
             elif message["type"] == LocalTask.RUN_PROMPT_MODEL:
                 prompt_model_name: str = message["prompt_model_name"]

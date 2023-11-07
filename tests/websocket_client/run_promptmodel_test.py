@@ -97,7 +97,7 @@ async def test_run_model_function_call(
     # success case
     await websocket_client._DevWebsocketClient__handle_message(
         message={
-            "type": LocalTask.RUN_LLM_MODULE,
+            "type": LocalTask.RUN_PROMPT_MODEL,
             "prompt_model_name": "test_module",
             "sample_name": "sample_1",
             "prompts": [
@@ -128,7 +128,7 @@ async def test_run_model_function_call(
     # success case with no function call
     await websocket_client._DevWebsocketClient__handle_message(
         message={
-            "type": LocalTask.RUN_LLM_MODULE,
+            "type": LocalTask.RUN_PROMPT_MODEL,
             "prompt_model_name": "test_module",
             "sample_name": "sample_1",
             "prompts": [
@@ -167,7 +167,7 @@ This is your output format. Keep the string between < type=< >>, </ > as it is.
     """
     await websocket_client._DevWebsocketClient__handle_message(
         message={
-            "type": LocalTask.RUN_LLM_MODULE,
+            "type": LocalTask.RUN_PROMPT_MODEL,
             "prompt_model_name": "test_module",
             "sample_name": "sample_1",
             "prompts": [
@@ -194,7 +194,7 @@ This is your output format. Keep the string between < type=< >>, </ > as it is.
     # early failed case due to function not existing
     await websocket_client._DevWebsocketClient__handle_message(
         message={
-            "type": LocalTask.RUN_LLM_MODULE,
+            "type": LocalTask.RUN_PROMPT_MODEL,
             "prompt_model_name": "test_module",
             "sample_name": "sample_1",
             "prompts": [
