@@ -2,7 +2,7 @@ pydantic
 peewee
 typer[all]
 cryptography
-pyyamlpyt
+pyyaml
 InquirerPy
 litellm
 python-dotenv
