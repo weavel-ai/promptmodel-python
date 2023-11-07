@@ -26,20 +26,20 @@ from promptmodel.cli.signal_handler import dev_terminate_signal_handler
 import promptmodel.utils.logger as logger
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.crypto import generate_api_key, encrypt_message
-from promptmodel.utils.enums import LLMModuleVersionStatus, ChangeLogAction
+from promptmodel.utils.enums import PromptModelVersionStatus, ChangeLogAction
 from promptmodel.websocket import DevWebsocketClient, CodeReloadHandler
 from promptmodel.database.orm import initialize_db
-from promptmodel.database.models import LLMModuleVersion
+from promptmodel.database.models import PromptModelVersion
 from promptmodel.database.crud import (
-    create_llm_modules,
-    create_llm_module_versions,
+    create_prompt_models,
+    create_prompt_model_versions,
     create_prompts,
     create_run_logs,
-    list_llm_modules,
-    hide_llm_module_not_in_code,
+    list_prompt_models,
+    hide_prompt_model_not_in_code,
     update_samples,
-    update_llm_module_uuid,
-    rename_llm_module,
+    update_prompt_model_uuid,
+    rename_prompt_model,
 )
 
 
@@ -103,39 +103,41 @@ def dev():
             {"project_version": project_status["project_version"]}, section="dev_branch"
         )
 
-        local_llm_modules = client_instance.llm_modules
-        local_llm_module_names = [x.name for x in local_llm_modules]
+        local_prompt_models = client_instance.prompt_models
+        local_prompt_model_names = [x.name for x in local_prompt_models]
 
-        # save llm_modules
-        for llm_module in project_status["llm_modules"]:
-            llm_module["is_deployment"] = True
-            if llm_module["name"] in local_llm_module_names:
-                llm_module["local_usage"] = True
+        # save prompt_models
+        for prompt_model in project_status["prompt_models"]:
+            prompt_model["is_deployment"] = True
+            if prompt_model["name"] in local_prompt_model_names:
+                prompt_model["local_usage"] = True
             else:
-                llm_module["local_usage"] = False
+                prompt_model["local_usage"] = False
 
-        create_llm_modules(project_status["llm_modules"])
+        create_prompt_models(project_status["prompt_models"])
 
-        # save llm_module_versions
-        for version in project_status["llm_module_versions"]:
+        # save prompt_model_versions
+        for version in project_status["prompt_model_versions"]:
             version["candidate_version"] = version["version"]
             del version["version"]
-            version["status"] = LLMModuleVersionStatus.CANDIDATE.value
-        create_llm_module_versions(project_status["llm_module_versions"])
+            version["status"] = PromptModelVersionStatus.CANDIDATE.value
+        create_prompt_model_versions(project_status["prompt_model_versions"])
         # save prompts
         create_prompts(project_status["prompts"])
         # save run_logs
         create_run_logs(project_status["run_logs"])
 
-        # create llm_modules from code in local DB
-        project_llm_module_names = [x["name"] for x in project_status["llm_modules"]]
+        # create prompt_models from code in local DB
+        project_prompt_model_names = [
+            x["name"] for x in project_status["prompt_models"]
+        ]
         only_in_local = list(
-            set(local_llm_module_names) - set(project_llm_module_names)
+            set(local_prompt_model_names) - set(project_prompt_model_names)
         )
-        only_in_local_llm_modules = [
+        only_in_local_prompt_models = [
             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local
         ]
-        create_llm_modules(only_in_local_llm_modules)
+        create_prompt_models(only_in_local_prompt_models)
 
     else:
         org = config["dev_branch"]["org"]
@@ -168,27 +170,29 @@ def dev():
                 "levels": [1, 2],
             },
         ).json()
-        local_code_llm_module_name_list = [x.name for x in client_instance.llm_modules]
+        local_code_prompt_model_name_list = [
+            x.name for x in client_instance.prompt_models
+        ]
         res = update_by_changelog(
-            changelogs, project_status, local_code_llm_module_name_list
+            changelogs, project_status, local_code_prompt_model_name_list
         )
         if res is False:
             print("Update Dev Stopped.")
             upsert_config({"online": False}, section="dev_branch")
             return
 
-        # local_code_llm_module_name_list 에 없는 llm_module 의 local_usage=False 설정
-        hide_llm_module_not_in_code(local_code_llm_module_name_list)
+        # local_code_prompt_model_name_list 에 없는 prompt_model 의 local_usage=False 설정
+        hide_prompt_model_not_in_code(local_code_prompt_model_name_list)
 
-        # 새로 생긴 llm_module DB에 생성
-        local_db_llm_module_names = [x["name"] for x in list_llm_modules()]
+        # 새로 생긴 prompt_model DB에 생성
+        local_db_prompt_model_names = [x["name"] for x in list_prompt_models()]
         only_in_local = list(
-            set(local_code_llm_module_name_list) - set(local_db_llm_module_names)
+            set(local_code_prompt_model_name_list) - set(local_db_prompt_model_names)
         )
-        only_in_local_llm_modules = [
+        only_in_local_prompt_models = [
             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local
         ]
-        create_llm_modules(only_in_local_llm_modules)
+        create_prompt_models(only_in_local_prompt_models)
 
     dev_url = f"{WEB_CLIENT_URL}/org/{org['slug']}/projects/{project['uuid']}/dev/{branch_name}"
 
@@ -251,10 +255,10 @@ def start_code_reloader(_client_filename, client_instance_name, dev_websocket_cl
 def update_by_changelog(
     changelogs: List[Dict],
     project_status: dict,
-    local_code_llm_module_name_list: List[str],
+    local_code_prompt_model_name_list: List[str],
 ):
     """Update Local DB by changelog"""
-    local_db_llm_module_list: list = list_llm_modules()  # {"name", "uuid"}
+    local_db_prompt_model_list: list = list_prompt_models()  # {"name", "uuid"}
 
     for changelog in changelogs:
         level: int = changelog["level"]
@@ -263,24 +267,24 @@ def update_by_changelog(
             for log in logs:
                 subject = log["subject"]
                 action: str = log["action"]
-                if subject == "llm_module":
-                    local_db_llm_module_list = update_llm_module_changelog(
+                if subject == "prompt_model":
+                    local_db_prompt_model_list = update_prompt_model_changelog(
                         action=action,
                         project_status=project_status,
                         uuid_list=log["identifiers"],
-                        local_db_llm_module_list=local_db_llm_module_list,
-                        local_code_llm_module_name_list=local_code_llm_module_name_list,
+                        local_db_prompt_model_list=local_db_prompt_model_list,
+                        local_code_prompt_model_name_list=local_code_prompt_model_name_list,
                     )
-                elif subject == "llm_module_version":
+                elif subject == "prompt_model_version":
                     (
                         is_success,
-                        local_db_llm_module_list,
-                    ) = update_llm_module_version_changelog(
+                        local_db_prompt_model_list,
+                    ) = update_prompt_model_version_changelog(
                         action=action,
                         project_status=project_status,
                         uuid_list=log["identifiers"],
-                        local_db_llm_module_list=local_db_llm_module_list,
-                        local_code_llm_module_name_list=local_code_llm_module_name_list,
+                        local_db_prompt_model_list=local_db_prompt_model_list,
+                        local_code_prompt_model_name_list=local_code_prompt_model_name_list,
                     )
                     if not is_success:
                         return False
@@ -298,13 +302,13 @@ def update_by_changelog(
                 subject = log["subject"]
                 action: str = log["action"]
                 uuid_list: list = log["identifiers"]
-                if subject == "llm_module_version":
-                    local_db_llm_module_list = update_llm_module_version_changelog(
+                if subject == "prompt_model_version":
+                    local_db_prompt_model_list = update_prompt_model_version_changelog(
                         action=action,
                         project_status=project_status,
                         uuid_list=log["identifiers"],
-                        local_db_llm_module_list=local_db_llm_module_list,
-                        local_code_llm_module_name_list=local_code_llm_module_name_list,
+                        local_db_prompt_model_list=local_db_prompt_model_list,
+                        local_code_prompt_model_name_list=local_code_prompt_model_name_list,
                     )
                 else:
                     pass
@@ -328,40 +332,40 @@ def update_by_changelog(
     return True
 
 
-def update_llm_module_changelog(
+def update_prompt_model_changelog(
     action: ChangeLogAction,
     project_status: dict,
     uuid_list: List[str],
-    local_db_llm_module_list: List[Dict],
-    local_code_llm_module_name_list: List[str],
+    local_db_prompt_model_list: List[Dict],
+    local_code_prompt_model_name_list: List[str],
 ):
     if action == ChangeLogAction.ADD.value:
-        llm_module_list = [
-            x for x in project_status["llm_modules"] if x["uuid"] in uuid_list
+        prompt_model_list = [
+            x for x in project_status["prompt_models"] if x["uuid"] in uuid_list
         ]
-        for llm_module in llm_module_list:
-            local_db_llm_module_name_list = [
-                x["name"] for x in local_db_llm_module_list
+        for prompt_model in prompt_model_list:
+            local_db_prompt_model_name_list = [
+                x["name"] for x in local_db_prompt_model_list
             ]
 
-            if llm_module["name"] not in local_db_llm_module_name_list:
-                # IF llm_module not in Local DB
-                if llm_module["name"] in local_code_llm_module_name_list:
-                    # IF llm_module in Local Code
-                    llm_module["local_usage"] = True
-                    llm_module["is_deployment"] = True
-                    create_llm_modules([llm_module])
+            if prompt_model["name"] not in local_db_prompt_model_name_list:
+                # IF prompt_model not in Local DB
+                if prompt_model["name"] in local_code_prompt_model_name_list:
+                    # IF prompt_model in Local Code
+                    prompt_model["local_usage"] = True
+                    prompt_model["is_deployment"] = True
+                    create_prompt_models([prompt_model])
                 else:
-                    llm_module["local_usage"] = False
-                    llm_module["is_deployment"] = True
-                    create_llm_modules([llm_module])
+                    prompt_model["local_usage"] = False
+                    prompt_model["is_deployment"] = True
+                    create_prompt_models([prompt_model])
             else:
-                local_db_llm_module = [
+                local_db_prompt_model = [
                     x
-                    for x in local_db_llm_module_list
-                    if x["name"] == llm_module["name"]
+                    for x in local_db_prompt_model_list
+                    if x["name"] == prompt_model["name"]
                 ][0]
-                if local_db_llm_module["is_deployment"] is False:
+                if local_db_prompt_model["is_deployment"] is False:
                     print(
                         "Creation of promptmodel with identical name was detected in local & deployment."
                     )
@@ -377,56 +381,58 @@ def update_llm_module_changelog(
                     if not check_same:
                         # rename & change name in Local DB
                         print(
-                            f"Please rename local promptmodel {llm_module['name']} to continue"
+                            f"Please rename local promptmodel {prompt_model['name']} to continue"
                         )
                         validate_new_promptmodel_name = (
-                            lambda name: name not in local_code_llm_module_name_list
-                            and name not in local_db_llm_module_name_list
+                            lambda name: name not in local_code_prompt_model_name_list
+                            and name not in local_db_prompt_model_name_list
                         )
-                        new_module_name = inquirer.text(
+                        new_model_name = inquirer.text(
                             message="Enter the new promptmodel name:",
                             validate=lambda x: validate_new_promptmodel_name(x),
                             invalid_message="promptmodel name already exists.",
                         ).execute()
-                        # new_module_name = input()
-                        rename_llm_module(local_db_llm_module["uuid"], new_module_name)
+                        # new_model_name = input()
+                        rename_prompt_model(
+                            local_db_prompt_model["uuid"], new_model_name
+                        )
 
                         print("We changed the name of promptmodel in local DB.")
                         print(
-                            f"Please change the name of promptmodel '{llm_module['name']}' in your project code and restart."
+                            f"Please change the name of promptmodel '{prompt_model['name']}' in your project code and restart."
                         )
                         # dev 꺼버리고, 수정하고 다시 키라고 명령.
-                        return False, local_db_llm_module_list
-                    update_llm_module_uuid(
-                        local_db_llm_module["uuid"], llm_module["uuid"]
+                        return False, local_db_prompt_model_list
+                    update_prompt_model_uuid(
+                        local_db_prompt_model["uuid"], prompt_model["uuid"]
                     )
-                    local_db_llm_module_list: list = list_llm_modules()
+                    local_db_prompt_model_list: list = list_prompt_models()
     else:
         # TODO: add code DELETE, CHANGE, FIX later
         pass
-    return True, local_db_llm_module_list
+    return True, local_db_prompt_model_list
 
 
-def update_llm_module_version_changelog(
+def update_prompt_model_version_changelog(
     action: ChangeLogAction,
     project_status: dict,
     uuid_list: List[str],
-    local_db_llm_module_list: List[Dict],
-    local_code_llm_module_name_list: List[str],
+    local_db_prompt_model_list: List[Dict],
+    local_code_prompt_model_name_list: List[str],
 ) -> List[Dict[str, Any]]:
     if action == ChangeLogAction.ADD.value:
-        # find llm_module_version in project_status['llm_module_versions'] where uuid in uuid_list
-        llm_module_version_list_in_changelog = [
-            x for x in project_status["llm_module_versions"] if x["uuid"] in uuid_list
+        # find prompt_model_version in project_status['prompt_model_versions'] where uuid in uuid_list
+        prompt_model_version_list_in_changelog = [
+            x for x in project_status["prompt_model_versions"] if x["uuid"] in uuid_list
         ]
 
-        # check if llm_module_version['uuid'] is in local_db_llm_module_list
+        # check if prompt_model_version['uuid'] is in local_db_prompt_model_list
         local_db_version_uuid_list = [
-            str(x.uuid) for x in list(LLMModuleVersion.select())
+            str(x.uuid) for x in list(PromptModelVersion.select())
         ]
         version_list_to_update = [
             x
-            for x in llm_module_version_list_in_changelog
+            for x in prompt_model_version_list_in_changelog
             if x["uuid"] not in local_db_version_uuid_list
         ]
         version_uuid_list_to_update = [x["uuid"] for x in version_list_to_update]
@@ -443,15 +449,15 @@ def update_llm_module_version_changelog(
             if x["version_uuid"] in version_uuid_list_to_update
         ]
 
-        for llm_module_version in version_list_to_update:
-            llm_module_version["candidate_version"] = llm_module_version["version"]
-            del llm_module_version["version"]
-            llm_module_version["status"] = LLMModuleVersionStatus.CANDIDATE.value
+        for prompt_model_version in version_list_to_update:
+            prompt_model_version["candidate_version"] = prompt_model_version["version"]
+            del prompt_model_version["version"]
+            prompt_model_version["status"] = PromptModelVersionStatus.CANDIDATE.value
 
-        create_llm_module_versions(version_list_to_update)
+        create_prompt_model_versions(version_list_to_update)
         create_prompts(prompts_to_update)
         create_run_logs(run_logs_to_update)
 
-        return local_db_llm_module_list
+        return local_db_prompt_model_list
     else:
         pass

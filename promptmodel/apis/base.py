@@ -43,7 +43,11 @@ class APIClient:
                 )
                 exit()
 
-            encrypted_key = config["user"]["encrypted_api_key"] if "encrypted_api_key" in config["user"] else None
+            encrypted_key = (
+                config["user"]["encrypted_api_key"]
+                if "encrypted_api_key" in config["user"]
+                else None
+            )
             if encrypted_key is None:
                 raise Exception("No API key found. Please run 'prompt login' first.")
             decrypted_key = decrypt_message(encrypted_key)

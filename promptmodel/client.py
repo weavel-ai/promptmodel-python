@@ -20,7 +20,7 @@ from promptmodel.database.orm import initialize_db
 
 
 @dataclass
-class LLMModule:
+class PromptModelInterface:
     name: str
     default_model: str = "gpt-3.5-turbo"
 
@@ -34,7 +34,7 @@ class Client:
         default_model: Optional[str] = "gpt-3.5-turbo",
     ):
         self._default_model: str = default_model
-        self.llm_modules: List[LLMModule] = []
+        self.prompt_models: List[PromptModelInterface] = []
         self.samples: List[Dict[str, Any]] = []
         self.functions: Dict[str, Dict[str, Union[FunctionSchema, Callable]]] = {}
         config = read_config()
@@ -79,8 +79,8 @@ class Client:
                 if next_instruction.opname == "LOAD_CONST" and isinstance(
                     next_instruction.argval, str
                 ):
-                    self.llm_modules.append(
-                        LLMModule(
+                    self.prompt_models.append(
+                        PromptModelInterface(
                             name=next_instruction.argval,
                             default_model=self._default_model,
                         )
@@ -91,13 +91,13 @@ class Client:
 
         return wrapper
 
-    def register_llm_module(self, name):
-        for llm_module in self.llm_modules:
-            if llm_module.name == name:
+    def register_prompt_model(self, name):
+        for prompt_model in self.prompt_models:
+            if prompt_model.name == name:
                 return
 
-        self.llm_modules.append(
-            LLMModule(
+        self.prompt_models.append(
+            PromptModelInterface(
                 name=name,
                 default_model=self._default_model,
             )
@@ -122,10 +122,12 @@ class Client:
             }
 
     def include_client(self, client: Client):
-        self.llm_modules.extend(client.llm_modules)
-        # delete duplicated llm_modules
-        self.llm_modules = list(
-            {llm_module.name: llm_module for llm_module in self.llm_modules}.values()
+        self.prompt_models.extend(client.prompt_models)
+        # delete duplicated prompt_models
+        self.prompt_models = list(
+            {
+                prompt_model.name: prompt_model for prompt_model in self.prompt_models
+            }.values()
         )
 
         self.samples.extend(client.samples)
@@ -139,8 +141,8 @@ class Client:
     def register_sample(self, name: str, content: Dict[str, Any]):
         self.samples.append({"name": name, "contents": content})
 
-    def _get_llm_module_name_list(self) -> List[str]:
-        return [llm_module.name for llm_module in self.llm_modules]
+    def _get_prompt_model_name_list(self) -> List[str]:
+        return [prompt_model.name for prompt_model in self.prompt_models]
 
     def _call_register_function(self, name: str, arguments: Dict[str, str]):
         function_to_call: Callable = self.functions[name]["function"]
@@ -169,7 +171,7 @@ class DevApp(Client):
         super().__init__(default_model)
 
     def include_client(self, client: Client):
-        self.llm_modules.extend(client.llm_modules)
+        self.prompt_models.extend(client.prompt_models)
 
 
 class CacheManager:

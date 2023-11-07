@@ -22,7 +22,7 @@ from promptmodel import Client
 
 
 @dataclass
-class LLMModule:
+class PromptModelInterface:
     name: str
     default_model: str
 
@@ -30,10 +30,10 @@ class LLMModule:
 class RegisteringMeta(type):
     def __call__(cls, *args, **kwargs):
         instance = super().__call__(*args, **kwargs)
-        # Find the global client instance in the current module
+        # Find the global client instance in the current context
         client = cls.find_client_instance()
         if client is not None:
-            client.register_llm_module(instance.name)
+            client.register_prompt_model(instance.name)
         return instance
 
     @staticmethod
@@ -66,7 +66,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Returns:
             List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
         """
-        # add name to the list of llm_modules
+        # add name to the list of prompt_models
 
         prompts, _ = run_async_in_sync(fetch_prompts(self.name))
         return prompts

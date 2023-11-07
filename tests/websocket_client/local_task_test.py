@@ -24,7 +24,7 @@ async def test_connect_to_gateway(mocker, websocket_client : DevWebsocketClient,
 
 @pytest.mark.asyncio
 async def test_local_tasks(mocker, websocket_client : DevWebsocketClient, mock_websocket: AsyncMock):
-    websocket_client._client.llm_modules = {}
+    websocket_client._client.prompt_models = {}
     websocket_client._client.samples = {}
     websocket_client._client.functions = {
         "test_function": "test_function"

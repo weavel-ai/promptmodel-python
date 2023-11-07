@@ -1,4 +1,4 @@
-"""LLM module for Development TestRun"""
+"""LLM for Development TestRun"""
 import re
 import os
 import json
@@ -20,7 +20,8 @@ load_dotenv()
 class OpenAIMessage(BaseModel):
     role: str
     content: str
-    
+
+
 class OpenAIFunctionMessage(BaseModel):
     role: str
     content: str
@@ -62,22 +63,28 @@ class LLMDev:
             stream=True,
             functions=functions,
         )
-        function_call = {"name" : "", "arguments" : ""}
+        function_call = {"name": "", "arguments": ""}
         finish_reason_function_call = False
         async for chunk in response:
-            if "content" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]["content"] is not None:
+            if (
+                "content" in chunk["choices"][0]["delta"]
+                and chunk["choices"][0]["delta"]["content"] is not None
+            ):
                 stream_value = chunk["choices"][0]["delta"]["content"]
-                raw_output += stream_value # append raw output
-                yield LLMStreamResponse(raw_output=stream_value) # return raw output
-                
-            if "function_call" in chunk["choices"][0]["delta"] and chunk["choices"][0]["delta"]["function_call"] is not None:
+                raw_output += stream_value  # append raw output
+                yield LLMStreamResponse(raw_output=stream_value)  # return raw output
+
+            if (
+                "function_call" in chunk["choices"][0]["delta"]
+                and chunk["choices"][0]["delta"]["function_call"] is not None
+            ):
                 for key, value in chunk["choices"][0]["delta"]["function_call"].items():
                     function_call[key] += value
 
             if chunk["choices"][0]["finish_reason"] == "function_call":
                 finish_reason_function_call = True
                 yield LLMStreamResponse(function_call=function_call)
-                
+
         # parsing
         if parsing_type and not finish_reason_function_call:
             parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)
@@ -109,9 +116,9 @@ class LLMDev:
         async for chunk in response:
             if "content" in chunk["choices"][0]["delta"]:
                 stream_value = chunk["choices"][0]["delta"]["content"]
-                raw_output += stream_value # append raw output
-                yield LLMStreamResponse(raw_output=stream_value) # return raw output
-                
+                raw_output += stream_value  # append raw output
+                yield LLMStreamResponse(raw_output=stream_value)  # return raw output
+
         # parsing
         if parsing_type:
             parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)

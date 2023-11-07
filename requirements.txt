@@ -2,7 +2,7 @@ pydantic
 peewee
 typer[all]
 cryptography
-pyyaml
+pyyamlpyt
 InquirerPy
 litellm
 python-dotenv
@@ -11,3 +11,6 @@ termcolor
 watchdog
 readerwriterlock
 httpx
+pytest
+pytest-asyncio
+pytest-mock

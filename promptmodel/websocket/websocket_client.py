@@ -16,26 +16,26 @@ import promptmodel.utils.logger as logger
 from promptmodel import Client
 from promptmodel.llms.llm_dev import LLMDev
 from promptmodel.database.crud import (
-    create_llm_module_version,
+    create_prompt_model_version,
     create_prompt,
     create_run_log,
-    list_llm_modules,
-    list_llm_module_versions,
+    list_prompt_models,
+    list_prompt_model_versions,
     list_prompts,
     list_run_logs,
     list_samples,
     get_sample_input,
-    get_llm_module_uuid,
-    update_llm_module_version,
+    get_prompt_model_uuid,
+    update_prompt_model_version,
     find_ancestor_version,
     find_ancestor_versions,
-    update_candidate_version,
+    update_candidate_prompt_model_version,
 )
-from promptmodel.database.models import LLMModuleVersion, LLMModule
+from promptmodel.database.models import PromptModelVersion, PromptModel
 from promptmodel.utils.enums import (
     ServerTask,
     LocalTask,
-    LLMModuleVersionStatus,
+    PromptModelVersionStatus,
 )
 from promptmodel.utils.types import LLMStreamResponse
 from promptmodel.constants import ENDPOINT_URL
@@ -59,18 +59,18 @@ class DevWebsocketClient:
         self._client: Client = _client
         self.rwlock = rwlock.RWLockFair()
 
-    async def _get_llm_modules(self, llm_module_name: str):
-        """Get llm_module from registry"""
+    async def _get_prompt_models(self, prompt_model_name: str):
+        """Get prompt_model from registry"""
         with self.rwlock.gen_rlock():
-            llm_module = next(
+            prompt_model = next(
                 (
-                    llm_module
-                    for llm_module in self._client.llm_modules
-                    if llm_module.name == llm_module_name
+                    prompt_model
+                    for prompt_model in self._client.prompt_models
+                    if prompt_model.name == prompt_model_name
                 ),
                 None,
             )
-        return llm_module
+        return prompt_model
 
     def update_client_instance(self, new_client):
         with self.rwlock.gen_wlock():
@@ -98,19 +98,19 @@ class DevWebsocketClient:
 
         data = None
         try:
-            if message["type"] == LocalTask.LIST_MODULES:
-                res_from_local_db = list_llm_modules()
+            if message["type"] == LocalTask.LIST_PROMPT_MODELS:
+                res_from_local_db = list_prompt_models()
                 modules_with_local_usage = [
                     module
                     for module in res_from_local_db
                     if module["local_usage"] == True
                 ]
-                data = {"llm_modules": modules_with_local_usage}
+                data = {"prompt_models": modules_with_local_usage}
 
-            elif message["type"] == LocalTask.LIST_VERSIONS:
-                llm_module_uuid = message["llm_module_uuid"]
-                res_from_local_db = list_llm_module_versions(llm_module_uuid)
-                data = {"llm_module_versions": res_from_local_db}
+            elif message["type"] == LocalTask.LIST_PROMPT_MODEL_VERSIONS:
+                prompt_model_uuid = message["prompt_model_uuid"]
+                res_from_local_db = list_prompt_model_versions(prompt_model_uuid)
+                data = {"prompt_model_versions": res_from_local_db}
 
             elif message["type"] == LocalTask.LIST_SAMPLES:
                 res_from_local_db = list_samples()
@@ -121,106 +121,111 @@ class DevWebsocketClient:
                 data = {"functions": function_name_list}
 
             elif message["type"] == LocalTask.GET_PROMPTS:
-                llm_module_version_uuid = message["llm_module_version_uuid"]
-                res_from_local_db = list_prompts(llm_module_version_uuid)
+                prompt_model_version_uuid = message["prompt_model_version_uuid"]
+                res_from_local_db = list_prompts(prompt_model_version_uuid)
                 data = {"prompts": res_from_local_db}
 
             elif message["type"] == LocalTask.GET_RUN_LOGS:
-                llm_module_version_uuid = message["llm_module_version_uuid"]
-                res_from_local_db = list_run_logs(llm_module_version_uuid)
+                prompt_model_version_uuid = message["prompt_model_version_uuid"]
+                res_from_local_db = list_run_logs(prompt_model_version_uuid)
                 data = {"run_logs": res_from_local_db}
 
-            elif message["type"] == LocalTask.CHANGE_VERSION_STATUS:
-                llm_module_version_uuid = message["llm_module_version_uuid"]
+            elif message["type"] == LocalTask.CHANGE_PROMPT_MODEL_VERSION_STATUS:
+                prompt_model_version_uuid = message["prompt_model_version_uuid"]
                 new_status = message["status"]
-                res_from_local_db = update_llm_module_version(
-                    llm_module_version_uuid=llm_module_version_uuid, status=new_status
+                res_from_local_db = update_prompt_model_version(
+                    prompt_model_version_uuid=prompt_model_version_uuid,
+                    status=new_status,
                 )
                 data = {
-                    "llm_module_version_uuid": llm_module_version_uuid,
+                    "prompt_model_version_uuid": prompt_model_version_uuid,
                     "status": new_status,
                 }
 
-            elif message["type"] == LocalTask.GET_VERSION_TO_SAVE:
-                llm_module_version_uuid = message["llm_module_version_uuid"]
+            elif message["type"] == LocalTask.GET_PROMPT_MODEL_VERSION_TO_SAVE:
+                prompt_model_version_uuid = message["prompt_model_version_uuid"]
                 # change from_uuid to candidate ancestor
-                llm_module_version, prompts = find_ancestor_version(
-                    llm_module_version_uuid
+                prompt_model_version, prompts = find_ancestor_version(
+                    prompt_model_version_uuid
                 )
                 # delete status, candidate_version, is_published
-                del llm_module_version["status"]
-                del llm_module_version["candidate_version"]
-                del llm_module_version["is_published"]
+                del prompt_model_version["status"]
+                del prompt_model_version["candidate_version"]
+                del prompt_model_version["is_published"]
 
                 for prompt in prompts:
                     del prompt["id"]
 
-                llm_module = LLMModule.get(
-                    LLMModule.uuid == llm_module_version.llm_module_uuid
+                prompt_model = PromptModel.get(
+                    PromptModel.uuid == prompt_model_version.prompt_model_uuid
                 ).__data__
-                is_deployed = llm_module["is_deployment"]
+                is_deployed = prompt_model["is_deployment"]
                 if is_deployed:
                     data = {
-                        "llm_module": {
-                            "uuid": llm_module["uuid"],
-                            "name": llm_module["name"],
-                            "project_uuid": llm_module["project_uuid"],
+                        "prompt_model": {
+                            "uuid": prompt_model["uuid"],
+                            "name": prompt_model["name"],
+                            "project_uuid": prompt_model["project_uuid"],
                         },
-                        "version": llm_module_version,
+                        "version": prompt_model_version,
                         "prompts": prompts,
                     }
                 else:
                     data = {
-                        "llm_module": None,
-                        "version": llm_module_version,
+                        "prompt_model": None,
+                        "version": prompt_model_version,
                         "prompts": prompts,
                     }
 
-            elif message["type"] == LocalTask.GET_VERSIONS_TO_SAVE:
-                target_llm_module_uuid = (
-                    message["llm_module_uuid"] if "llm_module_uuid" in message else None
+            elif message["type"] == LocalTask.GET_PROMPT_MODEL_VERSIONS_TO_SAVE:
+                target_prompt_model_uuid = (
+                    message["prompt_model_uuid"]
+                    if "prompt_model_uuid" in message
+                    else None
                 )
 
-                llm_module_versions, prompts = find_ancestor_versions(
-                    target_llm_module_uuid
+                prompt_model_versions, prompts = find_ancestor_versions(
+                    target_prompt_model_uuid
                 )
-                for llm_module_version in llm_module_versions:
-                    del llm_module_version["id"]
-                    del llm_module_version["status"]
-                    del llm_module_version["candidate_version"]
-                    del llm_module_version["is_published"]
+                for prompt_model_version in prompt_model_versions:
+                    del prompt_model_version["id"]
+                    del prompt_model_version["status"]
+                    del prompt_model_version["candidate_version"]
+                    del prompt_model_version["is_published"]
 
                 for prompt in prompts:
                     del prompt["id"]
 
-                llm_module_uuids = [
-                    version["llm_module_uuid"] for version in llm_module_versions
+                prompt_model_uuids = [
+                    version["prompt_model_uuid"] for version in prompt_model_versions
                 ]
-                llm_modules = list(
-                    LLMModule.select().where(LLMModule.uuid.in_(llm_module_uuids))
+                prompt_models = list(
+                    PromptModel.select().where(PromptModel.uuid.in_(prompt_model_uuids))
                 )
-                llm_modules = [model_to_dict(llm_module) for llm_module in llm_modules]
-                # find llm_module which is not deployed
-                llm_modules_only_in_local = []
-                for llm_module in llm_modules:
-                    if llm_module["is_deployment"] is False:
-                        del llm_module["is_deployment"]
-                        del llm_module["local_usage"]
-                        del llm_module["id"]
-                        llm_modules_only_in_local.append(llm_module)
+                prompt_models = [
+                    model_to_dict(prompt_model) for prompt_model in prompt_models
+                ]
+                # find prompt_model which is not deployed
+                prompt_models_only_in_local = []
+                for prompt_model in prompt_models:
+                    if prompt_model["is_deployment"] is False:
+                        del prompt_model["is_deployment"]
+                        del prompt_model["local_usage"]
+                        del prompt_model["id"]
+                        prompt_models_only_in_local.append(prompt_model)
 
                 data = {
-                    "llm_modules": llm_modules_only_in_local,
-                    "versions": llm_module_versions,
+                    "prompt_models": prompt_models_only_in_local,
+                    "versions": prompt_model_versions,
                     "prompts": prompts,
                 }
 
-            elif message["type"] == LocalTask.UPDATE_CANDIDATE_VERSION_ID:
+            elif message["type"] == LocalTask.UPDATE_CANDIDATE_PROMPT_MODEL_VERSION_ID:
                 new_candidates = message["new_candidates"]
-                update_candidate_version(new_candidates)
+                update_candidate_prompt_model_version(new_candidates)
 
-            elif message["type"] == LocalTask.RUN_LLM_MODULE:
-                llm_module_name: str = message["llm_module_name"]
+            elif message["type"] == LocalTask.RUN_PROMPT_MODEL:
+                prompt_model_name: str = message["prompt_model_name"]
                 sample_name: Optional[str] = message["sample_name"]
 
                 # get sample from db
@@ -233,10 +238,10 @@ class DevWebsocketClient:
                 else:
                     sample_input = None
 
-                # Check llm_module in Local Usage
-                llm_module_names = self._client._get_llm_module_name_list()
-                if llm_module_name not in llm_module_names:
-                    logger.error(f"There is no llm_module {llm_module_name}.")
+                # Check prompt_model in Local Usage
+                prompt_model_names = self._client._get_prompt_model_name_list()
+                if prompt_model_name not in prompt_model_names:
+                    logger.error(f"There is no prompt_model {prompt_model_name}.")
                     return
 
                 # Validate Variable Matching
@@ -280,19 +285,21 @@ class DevWebsocketClient:
                 # Start PromptModel Running
                 output = {"raw_output": "", "parsed_outputs": {}}
                 try:
-                    logger.info(f"Started PromptModel: {llm_module_name}")
-                    # create llm_module_dev_instance
-                    llm_module_dev = LLMDev()
-                    # fine llm_module_uuid from local db
-                    llm_module_uuid: str = get_llm_module_uuid(llm_module_name)["uuid"]
+                    logger.info(f"Started PromptModel: {prompt_model_name}")
+                    # create prompt_model_dev_instance
+                    prompt_model_dev = LLMDev()
+                    # fine prompt_model_uuid from local db
+                    prompt_model_uuid: str = get_prompt_model_uuid(prompt_model_name)[
+                        "uuid"
+                    ]
 
-                    llm_module_version_uuid: Optional[str] = message["uuid"]
-                    # If llm_module_version_uuid is None, create new version & prompt
-                    if llm_module_version_uuid is None:
-                        llm_module_version: LLMModuleVersion = (
-                            create_llm_module_version(
-                                llm_module_uuid=llm_module_uuid,
-                                status=LLMModuleVersionStatus.BROKEN.value,
+                    prompt_model_version_uuid: Optional[str] = message["uuid"]
+                    # If prompt_model_version_uuid is None, create new version & prompt
+                    if prompt_model_version_uuid is None:
+                        prompt_model_version: PromptModelVersion = (
+                            create_prompt_model_version(
+                                prompt_model_uuid=prompt_model_uuid,
+                                status=PromptModelVersionStatus.BROKEN.value,
                                 from_uuid=message["from_uuid"],
                                 model=message["model"],
                                 parsing_type=message["parsing_type"],
@@ -300,12 +307,12 @@ class DevWebsocketClient:
                                 functions=message["functions"],
                             )
                         )
-                        llm_module_version_uuid: str = llm_module_version.uuid
+                        prompt_model_version_uuid: str = prompt_model_version.uuid
 
                         prompts = message["prompts"]
                         for prompt in prompts:
                             create_prompt(
-                                version_uuid=llm_module_version_uuid,
+                                version_uuid=prompt_model_version_uuid,
                                 role=prompt["role"],
                                 step=prompt["step"],
                                 content=prompt["content"],
@@ -313,7 +320,7 @@ class DevWebsocketClient:
                         # send message to backend
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
-                            "llm_module_version_uuid": llm_module_version_uuid,
+                            "prompt_model_version_uuid": prompt_model_version_uuid,
                             "status": "running",
                         }
                         data.update(response)
@@ -371,7 +378,7 @@ class DevWebsocketClient:
 
                     res: AsyncGenerator[
                         LLMStreamResponse, None
-                    ] = llm_module_dev.dev_run(
+                    ] = prompt_model_dev.dev_run(
                         messages=messages_for_run,
                         parsing_type=parsing_type,
                         functions=function_descriptions,
@@ -420,15 +427,15 @@ class DevWebsocketClient:
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-                    
+
                     # IF function_call in response -> call function -> call LLM once more
                     if function_call:
                         # make function_call_log
                         function_call_log = {
-                            "name" : function_call['name'],
-                            "arguments" : function_call['arguments'],
-                            "response" : None,
-                            "initial_raw_output" : output["raw_output"],
+                            "name": function_call["name"],
+                            "arguments": function_call["arguments"],
+                            "response": None,
+                            "initial_raw_output": output["raw_output"],
                         }
 
                         # call function
@@ -448,12 +455,12 @@ class DevWebsocketClient:
                                 "status": "failed",
                                 "log": f"Function call Failed, {error}",
                             }
-                            update_llm_module_version(
-                                llm_module_version_uuid=llm_module_version_uuid,
-                                status=LLMModuleVersionStatus.BROKEN.value,
+                            update_prompt_model_version(
+                                prompt_model_version_uuid=prompt_model_version_uuid,
+                                status=PromptModelVersionStatus.BROKEN.value,
                             )
                             create_run_log(
-                                llm_module_version_uuid=llm_module_version_uuid,
+                                prompt_model_version_uuid=prompt_model_version_uuid,
                                 inputs=sample_input,
                                 raw_output=output["raw_output"],
                                 parsed_outputs=output["parsed_outputs"],
@@ -472,7 +479,7 @@ class DevWebsocketClient:
                         )
                         res_after_function_call: AsyncGenerator[
                             LLMStreamResponse, None
-                        ] = llm_module_dev.dev_chat(
+                        ] = prompt_model_dev.dev_chat(
                             messages_for_run, parsing_type, model
                         )
 
@@ -510,28 +517,26 @@ class DevWebsocketClient:
                             data.update(response)
                             # logger.debug(f"Sent response: {data}")
                             await ws.send(json.dumps(data, cls=CustomJSONEncoder))
-                                
+
                     if (
                         message["output_keys"] is not None
-                        and message['parsing_type'] is not None
-                        and set(output["parsed_outputs"].keys()) != set(
-                            message["output_keys"]
-                        ) or (
-                            parsing_success is False
-                        )
+                        and message["parsing_type"] is not None
+                        and set(output["parsed_outputs"].keys())
+                        != set(message["output_keys"])
+                        or (parsing_success is False)
                     ):
                         error_log = error_log if error_log else "Key matching failed."
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
                             "status": "failed",
-                            "log" : f"parsing failed, {error_log}"
+                            "log": f"parsing failed, {error_log}",
                         }
-                        update_llm_module_version(
-                            llm_module_version_uuid=llm_module_version_uuid,
-                            status=LLMModuleVersionStatus.BROKEN.value,
+                        update_prompt_model_version(
+                            prompt_model_version_uuid=prompt_model_version_uuid,
+                            status=PromptModelVersionStatus.BROKEN.value,
                         )
                         create_run_log(
-                            llm_module_version_uuid=llm_module_version_uuid,
+                            prompt_model_version_uuid=prompt_model_version_uuid,
                             inputs=sample_input,
                             raw_output=output["raw_output"],
                             parsed_outputs=output["parsed_outputs"],
@@ -540,18 +545,18 @@ class DevWebsocketClient:
                         response.update(data)
                         await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                         return
-                                    
+
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
                         "status": "completed",
                     }
-                    update_llm_module_version(
-                        llm_module_version_uuid=llm_module_version_uuid,
-                        status=LLMModuleVersionStatus.WORKING.value,
+                    update_prompt_model_version(
+                        prompt_model_version_uuid=prompt_model_version_uuid,
+                        status=PromptModelVersionStatus.WORKING.value,
                     )
 
                     create_run_log(
-                        llm_module_version_uuid=llm_module_version_uuid,
+                        prompt_model_version_uuid=prompt_model_version_uuid,
                         inputs=sample_input,
                         raw_output=output["raw_output"],
                         parsed_outputs=output["parsed_outputs"],

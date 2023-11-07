@@ -17,7 +17,8 @@ from peewee import (
 )
 
 from promptmodel.database.config import BaseModel
-from promptmodel.utils.enums import LLMModuleVersionStatus, ParsingType
+from promptmodel.utils.enums import PromptModelVersionStatus, ParsingType
+
 
 class JSONField(TextField):
     def db_value(self, value):
@@ -26,7 +27,8 @@ class JSONField(TextField):
     def python_value(self, value):
         return json.loads(value)
 
-class LLMModule(BaseModel):
+
+class PromptModel(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     created_at = DateTimeField(default=datetime.datetime.now)
     project_uuid = UUIDField()
@@ -37,20 +39,20 @@ class LLMModule(BaseModel):
     )  # mark if the module is published to the cloud
 
 
-class LLMModuleVersion(BaseModel):
+class PromptModelVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     created_at = DateTimeField(default=datetime.datetime.now)
     from_uuid = UUIDField(null=True)
-    llm_module_uuid = ForeignKeyField(
-        LLMModule,
-        field=LLMModule.uuid,
+    prompt_model_uuid = ForeignKeyField(
+        PromptModel,
+        field=PromptModel.uuid,
         backref="versions",
         on_delete="CASCADE",
     )
     status = CharField(
         constraints=[
             Check(
-                f"status IN ('{LLMModuleVersionStatus.BROKEN.value}', '{LLMModuleVersionStatus.WORKING.value}', '{LLMModuleVersionStatus.CANDIDATE.value}')"
+                f"status IN ('{PromptModelVersionStatus.BROKEN.value}', '{PromptModelVersionStatus.WORKING.value}', '{PromptModelVersionStatus.CANDIDATE.value}')"
             )
         ]
     )
@@ -64,7 +66,7 @@ class LLMModuleVersion(BaseModel):
             Check(
                 f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQUARE_BRACKET.value}', '{ParsingType.DOUBLE_SQUARE_BRACKET.value}')"
             )
-        ]
+        ],
     )
     output_keys = JSONField(null=True, default=None)
     functions = JSONField(default=[])
@@ -74,8 +76,8 @@ class Prompt(BaseModel):
     id = AutoField()
     created_at = DateTimeField(default=datetime.datetime.now)
     version_uuid = ForeignKeyField(
-        LLMModuleVersion,
-        field=LLMModuleVersion.uuid,
+        PromptModelVersion,
+        field=PromptModelVersion.uuid,
         backref="prompts",
         on_delete="CASCADE",
     )
@@ -88,8 +90,8 @@ class RunLog(BaseModel):
     id = AutoField()
     created_at = DateTimeField(default=datetime.datetime.now)
     version_uuid = ForeignKeyField(
-        LLMModuleVersion,
-        field=LLMModuleVersion.uuid,
+        PromptModelVersion,
+        field=PromptModelVersion.uuid,
         backref="run_logs",
         on_delete="CASCADE",
     )
@@ -106,17 +108,18 @@ class SampleInputs(BaseModel):
     name = TextField(unique=True)
     contents = JSONField()
 
-class DeployedLLMModule(BaseModel):
+
+class DeployedPromptModel(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     name = CharField()
 
 
-class DeployedLLMModuleVersion(BaseModel):
+class DeployedPromptModelVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     from_uuid = UUIDField(null=True)
-    llm_module_uuid = ForeignKeyField(
-        DeployedLLMModule,
-        field=DeployedLLMModule.uuid,
+    prompt_model_uuid = ForeignKeyField(
+        DeployedPromptModel,
+        field=DeployedPromptModel.uuid,
         backref="versions",
         on_delete="CASCADE",
     )
@@ -131,18 +134,17 @@ class DeployedLLMModuleVersion(BaseModel):
             Check(
                 f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQUARE_BRACKET.value}', '{ParsingType.DOUBLE_SQUARE_BRACKET.value}')"
             )
-        ]
+        ],
     )
     output_keys = JSONField(null=True, default=None)
     functions = JSONField(default=[])
 
-    
 
 class DeployedPrompt(BaseModel):
     id = AutoField()
     version_uuid = ForeignKeyField(
-        DeployedLLMModuleVersion,
-        field=DeployedLLMModuleVersion.uuid,
+        DeployedPromptModelVersion,
+        field=DeployedPromptModelVersion.uuid,
         backref="prompts",
         on_delete="CASCADE",
     )
