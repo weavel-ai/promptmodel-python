@@ -36,7 +36,7 @@ setup(
         "watchdog",
         "readerwriterlock",
     ],
-    python_requires=">=3.7.1",
+    python_requires=">=3.8.10",
     keywords=[
         "weavel",
         "agent",

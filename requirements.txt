@@ -10,7 +10,7 @@ websockets
 termcolor
 watchdog
 readerwriterlock
-httpx
+httpx[http2]
 pytest
 pytest-asyncio
 pytest-mock
