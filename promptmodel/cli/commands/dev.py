@@ -23,7 +23,7 @@ from promptmodel.constants import ENDPOINT_URL, WEB_CLIENT_URL
 from promptmodel.cli.commands.init import init as promptmodel_init
 from promptmodel.cli.utils import get_org, get_project
 from promptmodel.cli.signal_handler import dev_terminate_signal_handler
-import promptmodel.utils.logger as logger
+from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.crypto import generate_api_key, encrypt_message
 from promptmodel.utils.enums import PromptModelVersionStatus, ChangeLogAction

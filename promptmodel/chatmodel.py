@@ -1,0 +1,106 @@
+from __future__ import annotations
+import asyncio
+
+from dataclasses import dataclass
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
+
+import promptmodel.utils.logger as logger
+from promptmodel.llms.llm_proxy import LLMProxy
+from promptmodel.utils.prompt_util import (
+    fetch_prompts,
+    run_async_in_sync,
+    fetch_chat_model,
+)
+from promptmodel.utils.types import LLMStreamResponse, LLMResponse
+from promptmodel import Client
+
+
+class RegisteringMeta(type):
+    def __call__(cls, *args, **kwargs):
+        instance: ChatModel = super().__call__(*args, **kwargs)
+        # Find the global client instance in the current context
+        client = cls.find_client_instance()
+        if client is not None:
+            client.register_chat_model(instance.name)
+        return instance
+
+    @staticmethod
+    def find_client_instance():
+        import sys
+
+        # Get the current frame
+        frame = sys._getframe(2)
+        # Get global variables in the current frame
+        global_vars = frame.f_globals
+        # Find an instance of Client among global variables
+        for var_name, var_val in global_vars.items():
+            if isinstance(var_val, Client):
+                return var_val
+        return None
+
+
+class ChatModel(metaclass=RegisteringMeta):
+    def __init__(self, name, rate_limit_manager=None):
+        self.name = name
+        self.llm_proxy = LLMProxy(name, rate_limit_manager)
+
+    def get_prompts(self) -> List[Dict[str, str]]:
+        """Get prompt for the promptmodel.
+        If dev mode is running(if .promptmodel/config['dev_branch']['online'] = True), it will fetch the latest tested prompt in the dev branch local DB.
+        If dev mode is not running, it will fetch the published prompt from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
+        - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
+        If dev mode is initializing, it will return {}.
+
+        Returns:
+            List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
+        """
+        # add name to the list of prompt_models
+
+        # instruction, detail = run_async_in_sync(fetch_chat_model(self.name))
+        # return instruction
+
+    def chat(
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None,
+    ) -> LLMResponse:
+        """Run PromptModel. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
+
+        Returns:
+            LLMResponse: response from the promptmodel. you can find raw output in response.raw_output or response.api_response['choices'][0]['message']['content'].
+
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
+        """
+        return self.llm_proxy.run(inputs, function_list)
+
+    async def achat(
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Dict[str, Any]]] = None,
+    ) -> LLMResponse:
+        """Async run PromptModel. It does not raise error.
+
+        Args:
+            inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
+
+        Returns:
+            LLMResponse: response from the promptmodel. you can find raw output in response.raw_output or response.api_response['choices'][0]['message']['content'].
+
+        Error:
+            It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
+        """
+        return await self.arun(inputs, function_list)
