@@ -34,6 +34,10 @@ class RegisteringMeta(type):
         client = cls.find_client_instance()
         if client is not None:
             client.register_prompt_model(instance.name)
+        else:
+            raise SyntaxError(
+                "You must create a Client instance before using PromptModel."
+            )
         return instance
 
     @staticmethod

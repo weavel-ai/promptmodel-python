@@ -276,11 +276,14 @@ class LLMProxy(LLM):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             result = loop.run_until_complete(coro)
-            loop.close()  # Make sure to close the loop after use
+            # loop.close()  # Make sure to close the loop after use
             return result
 
-        future = asyncio.run_coroutine_threadsafe(coro, loop)
-        return future.result()
+        if loop.is_running():
+            # nest_asyncio.apply already done
+            return loop.run_until_complete(coro)
+        else:
+            return loop.run_until_complete(coro)
 
     # def _log_to_cloud(
     #     self,

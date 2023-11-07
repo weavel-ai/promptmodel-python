@@ -1,12 +1,13 @@
 import random
 
+
 def select_version(versions):
-    epsilon = 1e-10  
-    ratios = [version['ratio'] for version in versions]
-    
+    epsilon = 1e-10
+    ratios = [version["ratio"] for version in versions]
+
     if not abs(sum(ratios) - 1.0) <= epsilon:
         raise ValueError("Sum of ratios must be 1.0")
-    
+
     cumulative_ratios = []
     cumulative_sum = 0
     for ratio in ratios:
