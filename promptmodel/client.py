@@ -6,6 +6,7 @@ import inspect
 import threading
 import time
 import atexit
+import nest_asyncio
 from dataclasses import dataclass
 from typing import Callable, Dict, Any, List, Optional, Union
 from websockets.client import connect, WebSocketClientProtocol
@@ -28,11 +29,16 @@ class PromptModelInterface:
 class Client:
     """Client main class"""
 
+    _nest_asyncio_applied = False
+
     def __init__(
         self,
         use_cache: Optional[bool] = True,
         default_model: Optional[str] = "gpt-3.5-turbo",
     ):
+        if not Client._nest_asyncio_applied:
+            nest_asyncio.apply()
+            Client._nest_asyncio_applied = True
         self._default_model: str = default_model
         self.prompt_models: List[PromptModelInterface] = []
         self.samples: List[Dict[str, Any]] = []

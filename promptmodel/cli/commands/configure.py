@@ -13,7 +13,7 @@ from ...utils.crypto import generate_api_key, encrypt_message
 
 def configure():
     """Saves user's default organization and project."""
-    
+
     orgs = APIClient.execute(method="GET", path="/list_orgs").json()
     choices = [
         {

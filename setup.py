@@ -35,6 +35,7 @@ setup(
         "termcolor",
         "watchdog",
         "readerwriterlock",
+        "nest-asyncio",
     ],
     python_requires=">=3.8.10",
     keywords=[
