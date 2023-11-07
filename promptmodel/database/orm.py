@@ -1,13 +1,13 @@
 import os
 
 from .models import (
-    LLMModule,
-    LLMModuleVersion,
+    PromptModel,
+    PromptModelVersion,
     Prompt,
     RunLog,
     SampleInputs,
-    DeployedLLMModule,
-    DeployedLLMModuleVersion,
+    DeployedPromptModel,
+    DeployedPromptModelVersion,
     DeployedPrompt,
 )
 from .config import db
@@ -20,16 +20,16 @@ def initialize_db():
     if db.is_closed():
         db.connect()
         with db.atomic():
-            if not LLMModule.table_exists():
+            if not PromptModel.table_exists():
                 db.create_tables(
                     [
-                        LLMModule,
-                        LLMModuleVersion,
+                        PromptModel,
+                        PromptModelVersion,
                         Prompt,
                         RunLog,
                         SampleInputs,
-                        DeployedLLMModule,
-                        DeployedLLMModuleVersion,
+                        DeployedPromptModel,
+                        DeployedPromptModelVersion,
                         DeployedPrompt,
                     ]
                 )

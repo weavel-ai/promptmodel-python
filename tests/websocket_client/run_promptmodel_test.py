@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from websockets.exceptions import ConnectionClosedOK
 from promptmodel.websocket.websocket_client import DevWebsocketClient
 from promptmodel.utils.enums import LocalTask, ParsingType
-from promptmodel.database.models import LLMModuleVersion
+from promptmodel.database.models import PromptModelVersion
 from promptmodel.utils.types import FunctionSchema
 
 
 @dataclass
-class LLMModule:
+class PromptModelInterface:
     name: str
     default_model: str = "gpt-3.5-turbo"
 
@@ -43,7 +43,7 @@ get_current_weather_desc = {
 async def test_run_model_function_call(
     mocker, websocket_client: DevWebsocketClient, mock_websocket: AsyncMock
 ):
-    websocket_client._client.llm_modules = [LLMModule("test_module")]
+    websocket_client._client.prompt_models = [PromptModelInterface("test_module")]
     websocket_client._client.samples = {
         "sample_1": {"user_message": "What is the weather like in Boston?"}
     }
@@ -53,9 +53,9 @@ async def test_run_model_function_call(
             "function": get_current_weather,
         }
     }
-    llm_module_uuid = uuid4()
+    prompt_model_uuid = uuid4()
     param = {
-        "llm_module_uuid": llm_module_uuid,
+        "prompt_model_uuid": prompt_model_uuid,
         "uuid": uuid4(),
         "status": "broken",
         "from_uuid": None,
@@ -64,7 +64,7 @@ async def test_run_model_function_call(
         "output_keys": None,
         "functions": [],
     }
-    mock_version = LLMModuleVersion(**param)
+    mock_version = PromptModelVersion(**param)
     mocker.patch(
         "promptmodel.websocket.websocket_client.get_sample_input",
         new_callable=MagicMock,
@@ -74,12 +74,12 @@ async def test_run_model_function_call(
         },
     )
     mocker.patch(
-        "promptmodel.websocket.websocket_client.get_llm_module_uuid",
+        "promptmodel.websocket.websocket_client.get_prompt_model_uuid",
         new_callable=MagicMock,
-        return_value={"uuid": llm_module_uuid},
+        return_value={"uuid": prompt_model_uuid},
     )
     mocker.patch(
-        "promptmodel.websocket.websocket_client.create_llm_module_version",
+        "promptmodel.websocket.websocket_client.create_prompt_model_version",
         new_callable=MagicMock,
         return_value=mock_version,
     )
@@ -87,7 +87,7 @@ async def test_run_model_function_call(
         "promptmodel.websocket.websocket_client.create_prompt", new_callable=MagicMock
     )
     mocker.patch(
-        "promptmodel.websocket.websocket_client.update_llm_module_version",
+        "promptmodel.websocket.websocket_client.update_prompt_model_version",
         new_callable=MagicMock,
     )
     create_run_log_mock = mocker.patch(
@@ -98,7 +98,7 @@ async def test_run_model_function_call(
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_LLM_MODULE,
-            "llm_module_name": "test_module",
+            "prompt_model_name": "test_module",
             "sample_name": "sample_1",
             "prompts": [
                 {
@@ -129,7 +129,7 @@ async def test_run_model_function_call(
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_LLM_MODULE,
-            "llm_module_name": "test_module",
+            "prompt_model_name": "test_module",
             "sample_name": "sample_1",
             "prompts": [
                 {
@@ -168,7 +168,7 @@ This is your output format. Keep the string between < type=< >>, </ > as it is.
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_LLM_MODULE,
-            "llm_module_name": "test_module",
+            "prompt_model_name": "test_module",
             "sample_name": "sample_1",
             "prompts": [
                 {"role": "system", "content": system_prompt_with_format, "step": 1},
@@ -195,7 +195,7 @@ This is your output format. Keep the string between < type=< >>, </ > as it is.
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_LLM_MODULE,
-            "llm_module_name": "test_module",
+            "prompt_model_name": "test_module",
             "sample_name": "sample_1",
             "prompts": [
                 {

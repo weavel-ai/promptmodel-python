@@ -2,18 +2,18 @@ import json
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4, UUID
 from promptmodel.database.models import (
-    LLMModule,
-    LLMModuleVersion,
+    PromptModel,
+    PromptModelVersion,
     Prompt,
     RunLog,
     SampleInputs,
-    DeployedLLMModule,
-    DeployedLLMModuleVersion,
+    DeployedPromptModel,
+    DeployedPromptModelVersion,
     DeployedPrompt,
 )
 from peewee import Model, Case
 from playhouse.shortcuts import model_to_dict
-from promptmodel.utils.enums import LLMModuleVersionStatus, ParsingType
+from promptmodel.utils.enums import PromptModelVersionStatus, ParsingType
 from promptmodel.utils.random_utils import select_version
 from promptmodel.utils import logger
 from promptmodel.database.config import db
@@ -21,20 +21,20 @@ from rich import print
 
 
 # Insert
-def create_llm_module(name: str, project_uuid: str):
-    """Create a new LLM module with the given name."""
-    return LLMModule.create(uuid=uuid4(), name=name, project_uuid=project_uuid)
+def create_prompt_model(name: str, project_uuid: str):
+    """Create a new PromptModel with the given name."""
+    return PromptModel.create(uuid=uuid4(), name=name, project_uuid=project_uuid)
 
 
-def create_llm_modules(llm_module_list: list):
-    """Create LLM modules with List of Dict"""
+def create_prompt_models(prompt_model_list: list):
+    """Create PromptModels with List of Dict"""
     with db.atomic():
-        LLMModule.insert_many(llm_module_list).execute()
+        PromptModel.insert_many(prompt_model_list).execute()
     return
 
 
-def create_llm_module_version(
-    llm_module_uuid: str,
+def create_prompt_model_version(
+    prompt_model_uuid: str,
     from_uuid: Optional[str],
     status: str,
     model: str,
@@ -42,11 +42,11 @@ def create_llm_module_version(
     output_keys: Optional[List[str]] = None,
     functions: List[str] = [],
 ):
-    """Create a new LLM module version with the given parameters."""
-    return LLMModuleVersion.create(
+    """Create a new PromptModel version with the given parameters."""
+    return PromptModelVersion.create(
         uuid=uuid4(),
         from_uuid=from_uuid,
-        llm_module_uuid=llm_module_uuid,
+        prompt_model_uuid=prompt_model_uuid,
         status=status,
         model=model,
         parsing_type=parsing_type,
@@ -55,10 +55,10 @@ def create_llm_module_version(
     )
 
 
-def create_llm_module_versions(llm_module_version_list: list):
-    """Create LLM module versions with List of Dict"""
+def create_prompt_model_versions(prompt_model_version_list: list):
+    """Create PromptModel versions with List of Dict"""
     with db.atomic():
-        LLMModuleVersion.insert_many(llm_module_version_list).execute()
+        PromptModelVersion.insert_many(prompt_model_version_list).execute()
     return
 
 
@@ -85,7 +85,7 @@ def create_prompts(prompt_list: list):
 
 
 def create_run_log(
-    llm_module_version_uuid: str,
+    prompt_model_version_uuid: str,
     inputs: str,
     raw_output: str,
     parsed_outputs: str,
@@ -94,7 +94,7 @@ def create_run_log(
 ):
     """Create a new run log with the given parameters."""
     return RunLog.create(
-        version_uuid=llm_module_version_uuid,
+        version_uuid=prompt_model_version_uuid,
         inputs=inputs,
         raw_output=raw_output,
         parsed_outputs=parsed_outputs,
@@ -111,37 +111,37 @@ def create_run_logs(run_log_list: list):
 
 
 # Update For delayed Insert
-def update_llm_module_version(llm_module_version_uuid: str, status: str):
-    """Update the status of the given LLM module version."""
+def update_prompt_model_version(prompt_model_version_uuid: str, status: str):
+    """Update the status of the given PromptModel version."""
     return (
-        LLMModuleVersion.update(status=status)
-        .where(LLMModuleVersion.uuid == llm_module_version_uuid)
+        PromptModelVersion.update(status=status)
+        .where(PromptModelVersion.uuid == prompt_model_version_uuid)
         .execute()
     )
 
 
 # Select all
-def list_llm_modules() -> List[Dict]:
-    """List all LLM modules."""
-    response: List[LLMModule] = list(LLMModule.select())
+def list_prompt_models() -> List[Dict]:
+    """List all PromptModels."""
+    response: List[PromptModel] = list(PromptModel.select())
     return [model_to_dict(x, recurse=False) for x in response]
 
 
-def list_llm_module_versions(llm_module_uuid: str) -> List[Dict]:
-    """List all LLM module versions for the given LLM module."""
-    response: List[LLMModuleVersion] = list(
-        LLMModuleVersion.select()
-        .where(LLMModuleVersion.llm_module_uuid == llm_module_uuid)
-        .order_by(LLMModuleVersion.created_at)
+def list_prompt_model_versions(prompt_model_uuid: str) -> List[Dict]:
+    """List all PromptModel versions for the given PromptModel."""
+    response: List[PromptModelVersion] = list(
+        PromptModelVersion.select()
+        .where(PromptModelVersion.prompt_model_uuid == prompt_model_uuid)
+        .order_by(PromptModelVersion.created_at)
     )
     return [model_to_dict(x, recurse=False) for x in response]
 
 
-def list_prompts(llm_module_version_uuid: str) -> List[Dict]:
-    """List all prompts for the given LLM module version."""
+def list_prompts(prompt_model_version_uuid: str) -> List[Dict]:
+    """List all prompts for the given PromptModel version."""
     response: List[Prompt] = list(
         Prompt.select()
-        .where(Prompt.version_uuid == llm_module_version_uuid)
+        .where(Prompt.version_uuid == prompt_model_version_uuid)
         .order_by(Prompt.step)
     )
     return [model_to_dict(x, recurse=False) for x in response]
@@ -153,21 +153,21 @@ def list_samples():
     return [x.__data__ for x in response]
 
 
-def list_run_logs(llm_module_version_uuid: str) -> List[RunLog]:
-    """List all run logs for the given LLM module version."""
+def list_run_logs(prompt_model_version_uuid: str) -> List[RunLog]:
+    """List all run logs for the given PromptModel version."""
     response: List[RunLog] = list(
         RunLog.select()
-        .where(RunLog.version_uuid == llm_module_version_uuid)
+        .where(RunLog.version_uuid == prompt_model_version_uuid)
         .order_by(RunLog.created_at.desc())
     )
     return [model_to_dict(x, recurse=False) for x in response]
 
 
 # Select one
-def get_llm_module_uuid(llm_module_name: str) -> Dict:
+def get_prompt_model_uuid(prompt_model_name: str) -> Dict:
     """Get uuid of llm module by name"""
     try:
-        response = LLMModule.get(LLMModule.name == llm_module_name)
+        response = PromptModel.get(PromptModel.name == prompt_model_name)
         return model_to_dict(response, recurse=False)
     except:
         return None
@@ -184,15 +184,15 @@ def get_sample_input(sample_name: str) -> Dict:
         return None
 
 
-def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]:
+def get_latest_version_prompts(prompt_model_name: str) -> Tuple[List[Prompt], str]:
     try:
         with db.atomic():
             latest_run_log: RunLog = (
                 RunLog.select()
-                .join(LLMModuleVersion)
+                .join(PromptModelVersion)
                 .where(
-                    LLMModuleVersion.llm_module_uuid
-                    == LLMModule.get(LLMModule.name == llm_module_name).uuid
+                    PromptModelVersion.prompt_model_uuid
+                    == PromptModel.get(PromptModel.name == prompt_model_name).uuid
                 )
                 .order_by(RunLog.created_at.desc())
                 .get()
@@ -204,9 +204,9 @@ def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]
                 .order_by(Prompt.step.asc())
             )
 
-            version: LLMModuleVersion = (
-                LLMModuleVersion.select()
-                .where(LLMModuleVersion.uuid == latest_run_log.version_uuid.uuid)
+            version: PromptModelVersion = (
+                PromptModelVersion.select()
+                .where(PromptModelVersion.uuid == latest_run_log.version_uuid.uuid)
                 .get()
             )
 
@@ -224,16 +224,16 @@ def get_latest_version_prompts(llm_module_name: str) -> Tuple[List[Prompt], str]
         return None, None
 
 
-def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], str]:
+def get_deployed_prompts(prompt_model_name: str) -> Tuple[List[DeployedPrompt], str]:
     try:
         with db.atomic():
-            versions: List[DeployedLLMModuleVersion] = list(
-                DeployedLLMModuleVersion.select()
-                .join(DeployedLLMModule)
+            versions: List[DeployedPromptModelVersion] = list(
+                DeployedPromptModelVersion.select()
+                .join(DeployedPromptModel)
                 .where(
-                    DeployedLLMModuleVersion.llm_module_uuid
-                    == DeployedLLMModule.get(
-                        DeployedLLMModule.name == llm_module_name
+                    DeployedPromptModelVersion.prompt_model_uuid
+                    == DeployedPromptModel.get(
+                        DeployedPromptModel.name == prompt_model_name
                     ).uuid
                 )
             )
@@ -270,46 +270,46 @@ def get_deployed_prompts(llm_module_name: str) -> Tuple[List[DeployedPrompt], st
 
 
 # Update
-def update_is_deployment_llm_module(llm_module_uuid: str, is_deployment: bool):
-    """Update the name of the given LLM module."""
+def update_is_deployment_prompt_model(prompt_model_uuid: str, is_deployment: bool):
+    """Update the name of the given PromptModel."""
     return (
-        LLMModule.update(is_deployment=is_deployment)
-        .where(LLMModule.uuid == llm_module_uuid)
+        PromptModel.update(is_deployment=is_deployment)
+        .where(PromptModel.uuid == prompt_model_uuid)
         .execute()
     )
 
 
-def update_local_usage_llm_module(llm_module_uuid: str, local_usage: bool):
-    """Update the name of the given LLM module."""
+def update_local_usage_prompt_model(prompt_model_uuid: str, local_usage: bool):
+    """Update the name of the given PromptModel."""
     return (
-        LLMModule.update(local_usage=local_usage)
-        .where(LLMModule.uuid == llm_module_uuid)
+        PromptModel.update(local_usage=local_usage)
+        .where(PromptModel.uuid == prompt_model_uuid)
         .execute()
     )
 
 
-def update_local_usage_llm_module_by_name(llm_module_name: str, local_usage: bool):
-    """Update the name of the given LLM module."""
+def update_local_usage_prompt_model_by_name(prompt_model_name: str, local_usage: bool):
+    """Update the name of the given PromptModel."""
     return (
-        LLMModule.update(local_usage=local_usage)
-        .where(LLMModule.name == llm_module_name)
+        PromptModel.update(local_usage=local_usage)
+        .where(PromptModel.name == prompt_model_name)
         .execute()
     )
 
 
-def rename_llm_module(llm_module_uuid: str, new_name: str):
-    """Update the name of the given LLM module."""
+def rename_prompt_model(prompt_model_uuid: str, new_name: str):
+    """Update the name of the given PromptModel."""
     return (
-        LLMModule.update(name=new_name)
-        .where(LLMModule.uuid == llm_module_uuid)
+        PromptModel.update(name=new_name)
+        .where(PromptModel.uuid == prompt_model_uuid)
         .execute()
     )
 
 
-def hide_llm_module_not_in_code(local_llm_module_list: list):
+def hide_prompt_model_not_in_code(local_prompt_model_list: list):
     return (
-        LLMModule.update(local_usage=False)
-        .where(LLMModule.name.not_in(local_llm_module_list))
+        PromptModel.update(local_usage=False)
+        .where(PromptModel.name.not_in(local_prompt_model_list))
         .execute()
     )
 
@@ -318,17 +318,17 @@ async def update_deployed_cache(project_status: dict):
     """Update Deployed Prompts Cache"""
     # TODO: 효율적으로 수정
     # 현재는 delete all & insert all
-    llm_modules = project_status["llm_modules"]
-    llm_module_versions = project_status["llm_module_versions"]
-    for version in llm_module_versions:
+    prompt_models = project_status["prompt_models"]
+    prompt_model_versions = project_status["prompt_model_versions"]
+    for version in prompt_model_versions:
         if version["is_published"] is True:
             version["ratio"] = 1.0
     prompts = project_status["prompts"]
 
     with db.atomic():
-        DeployedLLMModule.delete().execute()
-        DeployedLLMModule.insert_many(llm_modules).execute()
-        DeployedLLMModuleVersion.insert_many(llm_module_versions).execute()
+        DeployedPromptModel.delete().execute()
+        DeployedPromptModel.insert_many(prompt_models).execute()
+        DeployedPromptModelVersion.insert_many(prompt_model_versions).execute()
         DeployedPrompt.insert_many(prompts).execute()
     return
 
@@ -342,38 +342,40 @@ def update_samples(samples: List[Dict]):
     return
 
 
-def update_llm_module_uuid(local_uuid, new_uuid):
-    """Update llm_module_uuid"""
+def update_prompt_model_uuid(local_uuid, new_uuid):
+    """Update prompt_model_uuid"""
     with db.atomic():
-        local_llm_module: LLMModule = LLMModule.get(LLMModule.uuid == local_uuid)
-        LLMModule.create(
+        local_prompt_model: PromptModel = PromptModel.get(
+            PromptModel.uuid == local_uuid
+        )
+        PromptModel.create(
             uuid=new_uuid,
-            name=local_llm_module.name,
-            project_uuid=local_llm_module.project_uuid,
-            created_at=local_llm_module.created_at,
-            local_usage=local_llm_module.local_usage,
+            name=local_prompt_model.name,
+            project_uuid=local_prompt_model.project_uuid,
+            created_at=local_prompt_model.created_at,
+            local_usage=local_prompt_model.local_usage,
             is_deployment=True,
         )
-        LLMModuleVersion.update(llm_module_uuid=new_uuid).where(
-            LLMModuleVersion.llm_module_uuid == local_uuid
+        PromptModelVersion.update(prompt_model_uuid=new_uuid).where(
+            PromptModelVersion.prompt_model_uuid == local_uuid
         ).execute()
-        LLMModule.delete().where(LLMModule.uuid == local_uuid).execute()
+        PromptModel.delete().where(PromptModel.uuid == local_uuid).execute()
     return
 
 
 def find_ancestor_version(
-    llm_module_version_uuid: str, versions: Optional[list] = None
+    prompt_model_version_uuid: str, versions: Optional[list] = None
 ):
     """Find ancestor version"""
 
     # get all versions
     if versions is None:
-        response = list(LLMModuleVersion.select())
+        response = list(PromptModelVersion.select())
         versions = [model_to_dict(x, recurse=False) for x in response]
 
     # find target version
     target = list(
-        filter(lambda version: version["uuid"] == llm_module_version_uuid, versions)
+        filter(lambda version: version["uuid"] == prompt_model_version_uuid, versions)
     )[0]
 
     target = _find_ancestor(target, versions)
@@ -383,22 +385,23 @@ def find_ancestor_version(
     return target, prompts
 
 
-def find_ancestor_versions(target_llm_module_uuid: Optional[str] = None):
+def find_ancestor_versions(target_prompt_model_uuid: Optional[str] = None):
     """find ancestor versions for each versions in input"""
     # get all versions
-    if target_llm_module_uuid is not None:
+    if target_prompt_model_uuid is not None:
         response = list(
-            LLMModuleVersion.select().where(
-                LLMModuleVersion.llm_module_uuid == target_llm_module_uuid
+            PromptModelVersion.select().where(
+                PromptModelVersion.prompt_model_uuid == target_prompt_model_uuid
             )
         )
     else:
-        response = list(LLMModuleVersion.select())
+        response = list(PromptModelVersion.select())
     versions = [model_to_dict(x, recurse=False) for x in response]
 
     targets = list(
         filter(
-            lambda version: version["status"] == LLMModuleVersionStatus.CANDIDATE.value
+            lambda version: version["status"]
+            == PromptModelVersionStatus.CANDIDATE.value
             and version["candidate_version"] is None,
             versions,
         )
@@ -442,19 +445,20 @@ def update_candidate_version(new_candidates: dict):
     with db.atomic():
         for uuid, version in new_candidates.items():
             (
-                LLMModuleVersion.update(candidate_version=version)
-                .where(LLMModuleVersion.uuid == uuid)
+                PromptModelVersion.update(candidate_version=version)
+                .where(PromptModelVersion.uuid == uuid)
                 .execute()
             )
-        # Find LLMModule
-        llm_module_versions: List[LLMModuleVersion] = list(
-            LLMModuleVersion.select().where(
-                LLMModuleVersion.uuid.in_(list(new_candidates.keys()))
+        # Find PromptModel
+        prompt_model_versions: List[PromptModelVersion] = list(
+            PromptModelVersion.select().where(
+                PromptModelVersion.uuid.in_(list(new_candidates.keys()))
             )
         )
-        llm_module_uuids = [
-            llm_module.llm_module_uuid.uuid for llm_module in llm_module_versions
+        prompt_model_uuids = [
+            prompt_model.prompt_model_uuid.uuid
+            for prompt_model in prompt_model_versions
         ]
-        LLMModule.update(is_deployment=True).where(
-            LLMModule.uuid.in_(llm_module_uuids)
+        PromptModel.update(is_deployment=True).where(
+            PromptModel.uuid.in_(prompt_model_uuids)
         ).execute()
