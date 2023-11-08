@@ -71,10 +71,6 @@ def dev():
             invalid_message="Branch name already exists or contains spaces.",
         ).execute()
 
-        upsert_config(
-            {"name": branch_name, "project": project, "org": org}, section="dev_branch"
-        )
-
         print("\nCreating local development branch...")
         created_dev_branch_row = APIClient.execute(
             method="POST",
@@ -82,7 +78,14 @@ def dev():
             params={"name": branch_name, "project_uuid": project["uuid"]},
         )
         upsert_config(
-            {"uuid": created_dev_branch_row.json()["uuid"]}, section="dev_branch"
+            {
+                "name": branch_name,
+                "project": project,
+                "org": org,
+                "uuid": created_dev_branch_row.json()["uuid"],
+                "project_version": "0.0.0",
+            },
+            section="dev_branch",
         )
 
         # connect
