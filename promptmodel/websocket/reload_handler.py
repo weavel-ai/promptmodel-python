@@ -12,7 +12,7 @@ from promptmodel.utils import logger
 from promptmodel import Client
 from promptmodel.database.crud import (
     list_prompt_models,
-    update_local_usage_prompt_model_by_name,
+    update_used_in_code_prompt_model_by_name,
     create_prompt_models,
     create_prompt_model_versions,
     create_prompts,
@@ -80,14 +80,14 @@ class CodeReloadHandler(FileSystemEventHandler):
             for prompt_model in self.dev_websocket_client._client.prompt_models
         ]
 
-        # 사라진 prompt_models 에 대해 local db prompt_model.local_usage False Update
+        # 사라진 prompt_models 에 대해 local db prompt_model.used_in_code False Update
         removed_name_list = list(
             set(old_prompt_model_name_list) - set(new_prompt_model_name_list)
         )
         for removed_name in removed_name_list:
-            update_local_usage_prompt_model_by_name(removed_name, False)
+            update_used_in_code_prompt_model_by_name(removed_name, False)
 
-        # 새로 생긴 prompt_model 에 대해 local db prompt_model.local_usage True Update
+        # 새로 생긴 prompt_model 에 대해 local db prompt_model.used_in_code True Update
         # TODO: 좀 더 specific 한 API와 연결 필요
         config = read_config()
         org = config["dev_branch"]["org"]
@@ -107,7 +107,7 @@ class CodeReloadHandler(FileSystemEventHandler):
                 "levels": [1, 2],
             },
         ).json()
-        # IF local_usage=False 인 name=name 이 있을 경우, local_usage=True
+        # IF used_in_code=False 인 name=name 이 있을 경우, used_in_code=True
         update_by_changelog_for_reload(
             changelogs=changelogs,
             project_status=project_status,
@@ -116,7 +116,7 @@ class CodeReloadHandler(FileSystemEventHandler):
 
         for prompt_model in new_client_instance.prompt_models:
             if prompt_model.name not in old_prompt_model_name_list:
-                update_local_usage_prompt_model_by_name(prompt_model.name, True)
+                update_used_in_code_prompt_model_by_name(prompt_model.name, True)
 
         # create prompt_models in local DB
         db_prompt_model_list = list_prompt_models()
@@ -229,12 +229,12 @@ def update_prompt_model_changelog(
                 # IF prompt_model not in Local DB
                 if prompt_model["name"] in local_code_prompt_model_name_list:
                     # IF prompt_model in Local Code
-                    prompt_model["local_usage"] = True
-                    prompt_model["is_deployment"] = True
+                    prompt_model["used_in_code"] = True
+                    prompt_model["is_deployed"] = True
                     create_prompt_models([prompt_model])
                 else:
-                    prompt_model["local_usage"] = False
-                    prompt_model["is_deployment"] = True
+                    prompt_model["used_in_code"] = False
+                    prompt_model["is_deployed"] = True
                     create_prompt_models([prompt_model])
             else:
                 # Fix UUID of prompt_model
@@ -271,8 +271,6 @@ def update_prompt_model_version_changelog(
         ]
 
         for prompt_model_version in prompt_model_version_list_to_update:
-            prompt_model_version["candidate_version"] = prompt_model_version["version"]
-            del prompt_model_version["version"]
             prompt_model_version["status"] = PromptModelVersionStatus.CANDIDATE.value
 
         create_prompt_model_versions(prompt_model_version_list_to_update)

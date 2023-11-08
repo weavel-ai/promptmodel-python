@@ -33,10 +33,10 @@ class PromptModel(BaseModel):
     created_at = DateTimeField(default=datetime.datetime.now)
     project_uuid = UUIDField()
     name = CharField()
-    local_usage = BooleanField(default=True)
-    is_deployment = BooleanField(
+    used_in_code = BooleanField(default=True)
+    is_deployed = BooleanField(
         default=False
-    )  # mark if the module is published to the cloud
+    )  # mark if the module is pushed to the cloud
 
 
 class PromptModelVersion(BaseModel):
@@ -57,8 +57,9 @@ class PromptModelVersion(BaseModel):
         ]
     )
     model = CharField()
-    candidate_version = IntegerField(null=True)
+    version = IntegerField(null=True)
     is_published = BooleanField(default=False)
+    is_deployed = BooleanField(default=False)
     parsing_type = CharField(
         null=True,
         default=None,
@@ -98,7 +99,7 @@ class RunLog(BaseModel):
     inputs = JSONField(null=True, default={})
     raw_output = TextField()
     parsed_outputs = JSONField(null=True, default={})
-    is_deployment = BooleanField(default=False)
+    run_from_deployment = BooleanField(default=False)
     function_call = JSONField(null=True, default={})
 
 

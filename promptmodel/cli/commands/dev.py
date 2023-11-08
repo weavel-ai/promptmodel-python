@@ -71,15 +71,21 @@ def dev():
             invalid_message="Branch name already exists or contains spaces.",
         ).execute()
 
-        upsert_config(
-            {"name": branch_name, "project": project, "org": org}, section="dev_branch"
-        )
-
         print("\nCreating local development branch...")
-        APIClient.execute(
+        created_dev_branch_row = APIClient.execute(
             method="POST",
             path="/create_dev_branch",
             params={"name": branch_name, "project_uuid": project["uuid"]},
+        )
+        upsert_config(
+            {
+                "name": branch_name,
+                "project": project,
+                "org": org,
+                "uuid": created_dev_branch_row.json()["uuid"],
+                "project_version": "0.0.0",
+            },
+            section="dev_branch",
         )
 
         # connect
@@ -108,18 +114,16 @@ def dev():
 
         # save prompt_models
         for prompt_model in project_status["prompt_models"]:
-            prompt_model["is_deployment"] = True
+            prompt_model["is_deployed"] = True
             if prompt_model["name"] in local_prompt_model_names:
-                prompt_model["local_usage"] = True
+                prompt_model["used_in_code"] = True
             else:
-                prompt_model["local_usage"] = False
+                prompt_model["used_in_code"] = False
 
         create_prompt_models(project_status["prompt_models"])
 
         # save prompt_model_versions
         for version in project_status["prompt_model_versions"]:
-            version["candidate_version"] = version["version"]
-            del version["version"]
             version["status"] = PromptModelVersionStatus.CANDIDATE.value
         create_prompt_model_versions(project_status["prompt_model_versions"])
         # save prompts
@@ -181,7 +185,7 @@ def dev():
             upsert_config({"online": False}, section="dev_branch")
             return
 
-        # local_code_prompt_model_name_list 에 없는 prompt_model 의 local_usage=False 설정
+        # local_code_prompt_model_name_list 에 없는 prompt_model 의 used_in_code=False 설정
         hide_prompt_model_not_in_code(local_code_prompt_model_name_list)
 
         # 새로 생긴 prompt_model DB에 생성
@@ -352,12 +356,12 @@ def update_prompt_model_changelog(
                 # IF prompt_model not in Local DB
                 if prompt_model["name"] in local_code_prompt_model_name_list:
                     # IF prompt_model in Local Code
-                    prompt_model["local_usage"] = True
-                    prompt_model["is_deployment"] = True
+                    prompt_model["used_in_code"] = True
+                    prompt_model["is_deployed"] = True
                     create_prompt_models([prompt_model])
                 else:
-                    prompt_model["local_usage"] = False
-                    prompt_model["is_deployment"] = True
+                    prompt_model["used_in_code"] = False
+                    prompt_model["is_deployed"] = True
                     create_prompt_models([prompt_model])
             else:
                 local_db_prompt_model = [
@@ -365,7 +369,7 @@ def update_prompt_model_changelog(
                     for x in local_db_prompt_model_list
                     if x["name"] == prompt_model["name"]
                 ][0]
-                if local_db_prompt_model["is_deployment"] is False:
+                if local_db_prompt_model["is_deployed"] is False:
                     print(
                         "Creation of promptmodel with identical name was detected in local & deployment."
                     )
@@ -450,8 +454,6 @@ def update_prompt_model_version_changelog(
         ]
 
         for prompt_model_version in version_list_to_update:
-            prompt_model_version["candidate_version"] = prompt_model_version["version"]
-            del prompt_model_version["version"]
             prompt_model_version["status"] = PromptModelVersionStatus.CANDIDATE.value
 
         create_prompt_model_versions(version_list_to_update)
