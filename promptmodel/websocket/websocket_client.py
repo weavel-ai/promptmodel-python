@@ -37,6 +37,7 @@ from promptmodel.utils.enums import (
     LocalTask,
     PromptModelVersionStatus,
 )
+from promptmodel.utils.config_utils import upsert_config, read_config
 from promptmodel.utils.types import LLMStreamResponse
 from promptmodel.constants import ENDPOINT_URL
 
@@ -100,12 +101,12 @@ class DevWebsocketClient:
         try:
             if message["type"] == LocalTask.LIST_PROMPT_MODELS:
                 res_from_local_db = list_prompt_models()
-                modules_with_local_usage = [
+                modules_with_used_in_code = [
                     module
                     for module in res_from_local_db
-                    if module["local_usage"] == True
+                    if module["used_in_code"] == True
                 ]
-                data = {"prompt_models": modules_with_local_usage}
+                data = {"prompt_models": modules_with_used_in_code}
 
             elif message["type"] == LocalTask.LIST_PROMPT_MODEL_VERSIONS:
                 prompt_model_uuid = message["prompt_model_uuid"]
@@ -148,10 +149,11 @@ class DevWebsocketClient:
                 prompt_model_version, prompts = find_ancestor_version(
                     prompt_model_version_uuid
                 )
-                # delete status, candidate_version, is_published
+                # delete status, is_published
                 del prompt_model_version["status"]
-                del prompt_model_version["candidate_version"]
                 del prompt_model_version["is_published"]
+                config = read_config()
+                prompt_model_version["dev_branch_uuid"] = config["dev_branch"]["uuid"]
 
                 for prompt in prompts:
                     del prompt["id"]
@@ -159,8 +161,8 @@ class DevWebsocketClient:
                 prompt_model = PromptModel.get(
                     PromptModel.uuid == prompt_model_version.prompt_model_uuid
                 ).__data__
-                is_deployed = prompt_model["is_deployment"]
-                if is_deployed:
+                is_deployed = prompt_model["is_deployed"]
+                if not is_deployed:
                     data = {
                         "prompt_model": {
                             "uuid": prompt_model["uuid"],
@@ -187,10 +189,12 @@ class DevWebsocketClient:
                 prompt_model_versions, prompts = find_ancestor_versions(
                     target_prompt_model_uuid
                 )
+                
+                config = read_config()
                 for prompt_model_version in prompt_model_versions:
+                    prompt_model_version["dev_branch_uuid"] = config["dev_branch"]["uuid"]
                     del prompt_model_version["id"]
                     del prompt_model_version["status"]
-                    del prompt_model_version["candidate_version"]
                     del prompt_model_version["is_published"]
 
                 for prompt in prompts:
@@ -208,9 +212,9 @@ class DevWebsocketClient:
                 # find prompt_model which is not deployed
                 prompt_models_only_in_local = []
                 for prompt_model in prompt_models:
-                    if prompt_model["is_deployment"] is False:
-                        del prompt_model["is_deployment"]
-                        del prompt_model["local_usage"]
+                    if prompt_model["is_deployed"] is False:
+                        del prompt_model["is_deployed"]
+                        del prompt_model["used_in_code"]
                         del prompt_model["id"]
                         prompt_models_only_in_local.append(prompt_model)
 

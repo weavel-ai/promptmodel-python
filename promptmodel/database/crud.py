@@ -11,13 +11,11 @@ from promptmodel.database.models import (
     DeployedPromptModelVersion,
     DeployedPrompt,
 )
-from peewee import Model, Case
 from playhouse.shortcuts import model_to_dict
 from promptmodel.utils.enums import PromptModelVersionStatus, ParsingType
 from promptmodel.utils.random_utils import select_version
 from promptmodel.utils import logger
 from promptmodel.database.config import db
-from rich import print
 
 
 # Insert
@@ -89,7 +87,7 @@ def create_run_log(
     inputs: str,
     raw_output: str,
     parsed_outputs: str,
-    is_deployment: bool = False,
+    is_deployed: bool = False,
     function_call: Optional[dict] = None,
 ):
     """Create a new run log with the given parameters."""
@@ -98,7 +96,7 @@ def create_run_log(
         inputs=inputs,
         raw_output=raw_output,
         parsed_outputs=parsed_outputs,
-        is_deployment=is_deployment,
+        is_deployed=is_deployed,
         function_call=function_call,
     )
 
@@ -270,28 +268,30 @@ def get_deployed_prompts(prompt_model_name: str) -> Tuple[List[DeployedPrompt], 
 
 
 # Update
-def update_is_deployment_prompt_model(prompt_model_uuid: str, is_deployment: bool):
+def update_is_deployed_prompt_model(prompt_model_uuid: str, is_deployed: bool):
     """Update the name of the given PromptModel."""
     return (
-        PromptModel.update(is_deployment=is_deployment)
+        PromptModel.update(is_deployed=is_deployed)
         .where(PromptModel.uuid == prompt_model_uuid)
         .execute()
     )
 
 
-def update_local_usage_prompt_model(prompt_model_uuid: str, local_usage: bool):
+def update_used_in_code_prompt_model(prompt_model_uuid: str, used_in_code: bool):
     """Update the name of the given PromptModel."""
     return (
-        PromptModel.update(local_usage=local_usage)
+        PromptModel.update(used_in_code=used_in_code)
         .where(PromptModel.uuid == prompt_model_uuid)
         .execute()
     )
 
 
-def update_local_usage_prompt_model_by_name(prompt_model_name: str, local_usage: bool):
+def update_used_in_code_prompt_model_by_name(
+    prompt_model_name: str, used_in_code: bool
+):
     """Update the name of the given PromptModel."""
     return (
-        PromptModel.update(local_usage=local_usage)
+        PromptModel.update(used_in_code=used_in_code)
         .where(PromptModel.name == prompt_model_name)
         .execute()
     )
@@ -308,7 +308,7 @@ def rename_prompt_model(prompt_model_uuid: str, new_name: str):
 
 def hide_prompt_model_not_in_code(local_prompt_model_list: list):
     return (
-        PromptModel.update(local_usage=False)
+        PromptModel.update(used_in_code=False)
         .where(PromptModel.name.not_in(local_prompt_model_list))
         .execute()
     )
@@ -353,8 +353,8 @@ def update_prompt_model_uuid(local_uuid, new_uuid):
             name=local_prompt_model.name,
             project_uuid=local_prompt_model.project_uuid,
             created_at=local_prompt_model.created_at,
-            local_usage=local_prompt_model.local_usage,
-            is_deployment=True,
+            used_in_code=local_prompt_model.used_in_code,
+            is_deployed=True,
         )
         PromptModelVersion.update(prompt_model_uuid=new_uuid).where(
             PromptModelVersion.prompt_model_uuid == local_uuid
@@ -402,7 +402,7 @@ def find_ancestor_versions(target_prompt_model_uuid: Optional[str] = None):
         filter(
             lambda version: version["status"]
             == PromptModelVersionStatus.CANDIDATE.value
-            and version["candidate_version"] is None,
+            and version["version"] is None,
             versions,
         )
     )
@@ -430,7 +430,7 @@ def _find_ancestor(target: dict, versions: List[Dict]):
             new_temp = [
                 version for version in versions if version["uuid"] == temp["from_uuid"]
             ][0]
-            if new_temp["candidate_version"] is not None:
+            if new_temp["version"] is not None:
                 ancestor = new_temp
                 break
             else:
@@ -445,7 +445,7 @@ def update_candidate_prompt_model_version(new_candidates: dict):
     with db.atomic():
         for uuid, version in new_candidates.items():
             (
-                PromptModelVersion.update(candidate_version=version)
+                PromptModelVersion.update(version=version, is_deployed=True)
                 .where(PromptModelVersion.uuid == uuid)
                 .execute()
             )
@@ -459,6 +459,6 @@ def update_candidate_prompt_model_version(new_candidates: dict):
             prompt_model.prompt_model_uuid.uuid
             for prompt_model in prompt_model_versions
         ]
-        PromptModel.update(is_deployment=True).where(
+        PromptModel.update(is_deployed=True).where(
             PromptModel.uuid.in_(prompt_model_uuids)
         ).execute()
