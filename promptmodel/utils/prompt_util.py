@@ -2,19 +2,18 @@ import os
 import sys
 import yaml
 import asyncio
+from datetime import datetime
 from threading import Thread
-from concurrent.futures import Future
 from typing import Any, Dict, Tuple, List, Union, Optional, Coroutine
 from litellm import token_counter
 
 from promptmodel.database.crud import (
     get_latest_version_prompts,
     get_deployed_prompts,
-    update_deployed_cache,
 )
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
-from promptmodel.apis.base import APIClient, AsyncAPIClient
+from promptmodel.promptmodel_init import CacheManager, update_deployed_db
 
 
 async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
@@ -44,8 +43,14 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
             and "use_cache" in config["project"]
             and config["project"]["use_cache"] == True
         ):
+            cache_manager = CacheManager()
             # call update_local API in background task
-            asyncio.create_task(update_deployed_db(config))
+            cache_update_thread = Thread(
+                target=cache_manager.cache_update_background_task, args=(config,)
+            )
+            cache_update_thread.daemon = True
+            cache_update_thread.start()
+
             # get prompt from local DB by ratio
             prompt_rows, version_detail = get_deployed_prompts(name)
             if prompt_rows is None:
@@ -59,30 +64,6 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
         return [
             {"role": prompt.role, "content": prompt.content} for prompt in prompt_rows
         ], version_detail
-
-
-async def update_deployed_db(config):
-    if "project" not in config or "version" not in config["project"]:
-        cached_project_version = "0.0.0"
-    else:
-        cached_project_version = config["project"]["version"]
-    try:
-        res = await AsyncAPIClient.execute(
-            method="GET",
-            path="/check_update",
-            params={"cached_version": cached_project_version},
-            use_cli_key=False,
-        )
-        res = res.json()
-        if res["need_update"]:
-            # update local DB with res['project_status']
-            project_status = res["project_status"]
-            await update_deployed_cache(project_status)
-            upsert_config({"version": res["version"]}, section="project")
-        else:
-            upsert_config({"version": res["version"]}, section="project")
-    except Exception as exception:
-        logger.error(f"Deployment cache update error: {exception}")
 
 
 def set_inputs_to_prompts(inputs: Dict[str, Any], prompts: List[Dict[str, str]]):

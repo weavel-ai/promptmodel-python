@@ -1,6 +1,4 @@
-import inspect
 import asyncio
-from concurrent.futures import Future
 from typing import (
     Any,
     AsyncGenerator,
@@ -16,7 +14,6 @@ from rich import print
 from litellm.utils import ModelResponse
 from promptmodel.llms.llm import LLM
 from promptmodel.utils import logger
-from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
 from promptmodel.utils.output_utils import update_dict
 from promptmodel.apis.base import APIClient, AsyncAPIClient
@@ -126,7 +123,6 @@ class LLMProxy(LLM):
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
-            print(call_args)
 
             # Call the method with the arguments
             llm_response: LLMResponse = method(**call_args)
@@ -233,7 +229,13 @@ class LLMProxy(LLM):
     ):
         # Perform the logging asynchronously
         api_response_dict = api_response.to_dict_recursive()
-        api_response_dict.update({"response_ms": api_response["response_ms"]})
+        api_response_dict.update(
+            {
+                "response_ms": api_response["response_ms"]
+                if "response_ms" in api_response
+                else api_response.response_ms
+            }
+        )
         res = await AsyncAPIClient.execute(
             method="POST",
             path="/log_deployment_run",
@@ -284,44 +286,6 @@ class LLMProxy(LLM):
             return loop.run_until_complete(coro)
         else:
             return loop.run_until_complete(coro)
-
-    # def _log_to_cloud(
-    #     self,
-    #     version_uuid: str,
-    #     inputs: dict,
-    #     api_response: ModelResponse,
-    #     parsed_outputs: dict,
-    #     metadata: dict,
-    # ):
-    #     # Log to cloud
-    #     # logging if only status = deployed
-    #     config = read_config()
-    #     if "dev_branch" in config and (
-    #         config["dev_branch"]["initializing"] or config["dev_branch"]["online"]
-    #     ):
-    #         return
-
-    #     api_response_dict = api_response.to_dict_recursive()
-    #     api_response_dict.update({"response_ms": api_response['response_ms']})
-    #     res = asyncio.run(
-    #         AsyncAPIClient.execute(
-    #             method="POST",
-    #             path="/log_deployment_run",
-    #             params={
-    #                 "version_uuid": version_uuid,
-    #             },
-    #             json={
-    #                 "inputs": inputs,
-    #                 "api_response": api_response_dict,
-    #                 "parsed_outputs": parsed_outputs,
-    #                 "metadata": metadata,
-    #             },
-    #             use_cli_key=False,
-    #         )
-    #     )
-    #     if res.status_code != 200:
-    #         print(f"[red]Failed to log to cloud: {res.json()}[/red]")
-    #     return
 
     def run(
         self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None

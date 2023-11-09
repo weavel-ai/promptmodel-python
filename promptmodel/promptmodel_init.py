@@ -6,10 +6,13 @@ import atexit
 import time
 
 from typing import Optional
+from datetime import datetime
 
 from promptmodel.utils.config_utils import upsert_config, read_config
+from promptmodel.utils import logger
 from promptmodel.database.orm import initialize_db
-from promptmodel.utils.prompt_util import update_deployed_db
+from promptmodel.database.crud import update_deployed_cache
+from promptmodel.apis.base import AsyncAPIClient
 
 
 def init(use_cache: Optional[bool] = True):
@@ -48,19 +51,24 @@ class CacheManager:
     def __new__(cls):
         with cls._lock:
             if cls._instance is None:
-                cls._instance = super(CacheManager, cls).__new__(cls)
+                instance = super(CacheManager, cls).__new__(cls)
+                instance.last_update_time = 0  # to manage update frequency
+                instance.update_interval = 10  # seconds, 6 hours
+                instance.program_alive = True
+                instance.background_tasks = []
+                initialize_db()
+                atexit.register(instance._terminate)
+                asyncio.run(instance.update_cache())  # updae cache first synchronously
+                instance.cache_thread = threading.Thread(
+                    target=instance._run_cache_loop
+                )
+                instance.cache_thread.daemon = True
+                instance.cache_thread.start()
+                cls._instance = instance
         return cls._instance
 
-    def __init__(self):
-        self.last_update_time = 0  # to manage update frequency
-        self.update_interval = 60 * 60 * 6  # seconds, 6 hours
-        self.program_alive = True
-        initialize_db()
-        atexit.register(self._terminate)
-        asyncio.run(self.update_cache())  # updae cache first synchronously
-        self.cache_thread = threading.Thread(target=self._run_cache_loop)
-        self.cache_thread.daemon = True
-        self.cache_thread.start()
+    def cache_update_background_task(self, config):
+        asyncio.run(update_deployed_db(config))
 
     def _run_cache_loop(self):
         asyncio.run(self._update_cache_periodically())
@@ -77,6 +85,13 @@ class CacheManager:
         if not config:
             upsert_config({"version": "0.0.0"}, section="project")
             config = {"project": {"version": "0.0.0"}}
+        if "project" not in config:
+            upsert_config({"version": "0.0.0"}, section="project")
+            config = {"project": {"version": "0.0.0"}}
+
+        if "version" not in config["project"]:
+            upsert_config({"version": "0.0.0"}, section="project")
+            config = {"project": {"version": "0.0.0"}}
 
         # Check if we need to update the cache
         if current_time - self.last_update_time > self.update_interval:
@@ -87,3 +102,36 @@ class CacheManager:
 
     def _terminate(self):
         self.program_alive = False
+
+    # async def cleanup_background_tasks(self):
+    #     for task in self.background_tasks:
+    #         if not task.done():
+    #             task.cancel()
+    #         try:
+    #             await task
+    #         except asyncio.CancelledError:
+    #             pass  # 작업이 취소됨
+
+
+async def update_deployed_db(config):
+    if "project" not in config or "version" not in config["project"]:
+        cached_project_version = "0.0.0"
+    else:
+        cached_project_version = config["project"]["version"]
+    try:
+        res = await AsyncAPIClient.execute(
+            method="GET",
+            path="/check_update",
+            params={"cached_version": cached_project_version},
+            use_cli_key=False,
+        )
+        res = res.json()
+        if res["need_update"]:
+            # update local DB with res['project_status']
+            project_status = res["project_status"]
+            await update_deployed_cache(project_status)
+            upsert_config({"version": res["version"]}, section="project")
+        else:
+            upsert_config({"version": res["version"]}, section="project")
+    except Exception as exception:
+        logger.error(f"Deployment cache update error: {exception}")

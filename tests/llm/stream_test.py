@@ -48,11 +48,6 @@ def test_stream(mocker):
     mock_response.status_code = 200
     mock_execute.return_value = mock_response
     mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
-    mocker.patch(
-        "promptmodel.llms.llm_proxy.read_config",
-        new_callable=MagicMock,
-        return_value={},
-    )
 
     llm_proxy._sync_log_to_cloud(
         version_uuid="test",
@@ -129,11 +124,6 @@ def test_stream_with_functions(mocker):
     mock_response.status_code = 200
     mock_execute.return_value = mock_response
     mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
-    mocker.patch(
-        "promptmodel.llms.llm_proxy.read_config",
-        new_callable=MagicMock,
-        return_value={},
-    )
 
     llm_proxy._sync_log_to_cloud(
         version_uuid="test",
@@ -191,11 +181,6 @@ async def test_astream(mocker):
     mock_response.status_code = 200
     mock_execute.return_value = mock_response
     mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
-    mocker.patch(
-        "promptmodel.llms.llm_proxy.read_config",
-        new_callable=MagicMock,
-        return_value={},
-    )
 
     await llm_proxy._async_log_to_cloud(
         version_uuid="test",
@@ -273,11 +258,6 @@ async def test_astream_with_functions(mocker):
     mock_response.status_code = 200
     mock_execute.return_value = mock_response
     mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
-    mocker.patch(
-        "promptmodel.llms.llm_proxy.read_config",
-        new_callable=MagicMock,
-        return_value={},
-    )
 
     await llm_proxy._async_log_to_cloud(
         version_uuid="test",

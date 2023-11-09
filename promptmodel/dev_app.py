@@ -1,23 +1,10 @@
 from __future__ import annotations
-import asyncio
 import dis
-import json
-import inspect
-import threading
-import time
-import atexit
 import nest_asyncio
 from dataclasses import dataclass
 from typing import Callable, Dict, Any, List, Optional, Union
-from websockets.client import connect, WebSocketClientProtocol
-from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
-import promptmodel.utils.logger as logger
-from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.prompt_util import update_deployed_db
-from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.types import FunctionSchema
-from promptmodel.database.orm import initialize_db
 
 
 @dataclass
@@ -69,10 +56,16 @@ class DevClient:
 
 
 class DevApp:
+    _nest_asyncio_applied = False
+
     def __init__(self):
         self.prompt_models: List[PromptModelInterface] = []
         self.samples: List[Dict[str, Any]] = []
         self.functions: Dict[str, Dict[str, Union[FunctionSchema, Callable]]] = {}
+
+        if not DevApp._nest_asyncio_applied:
+            DevApp._nest_asyncio_applied = True
+            nest_asyncio.apply()
 
     def include_client(self, client: DevClient):
         self.prompt_models.extend(client.prompt_models)

@@ -453,6 +453,14 @@ class DevWebsocketClient:
                                 function_call["name"], function_call_args
                             )
                             function_call_log["response"] = function_response
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_RUN.value,
+                                "status": "running",
+                                "function_response": function_response,
+                            }
+                            data.update(response)
+                            # logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         except Exception as error:
                             logger.error(f"{error}")
 
@@ -476,13 +484,17 @@ class DevWebsocketClient:
                             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                             return
                         # call LLM once more
-                        messages_for_run.append(
+                        messages_for_run += [
+                            {
+                                "role": "assistant",
+                                "function_call": function_call,
+                            },
                             {
                                 "role": "function",
                                 "name": function_call["name"],
                                 "content": str(function_response),
-                            }
-                        )
+                            },
+                        ]
                         res_after_function_call: AsyncGenerator[
                             LLMStreamResponse, None
                         ] = prompt_model_dev.dev_chat(
