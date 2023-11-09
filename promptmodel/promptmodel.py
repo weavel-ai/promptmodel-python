@@ -105,7 +105,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return await self.arun(inputs, function_list)
+        return await self.llm_proxy.arun(inputs, function_list)
 
     def stream(
         self,
