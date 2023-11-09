@@ -43,13 +43,13 @@ get_current_weather_desc = {
 async def test_run_model_function_call(
     mocker, websocket_client: DevWebsocketClient, mock_websocket: AsyncMock
 ):
-    websocket_client._client.prompt_models = [PromptModelInterface("test_module")]
-    websocket_client._client.samples = {
+    websocket_client._devapp.prompt_models = [PromptModelInterface("test_module")]
+    websocket_client._devapp.samples = {
         "sample_1": {"user_message": "What is the weather like in Boston?"}
     }
-    websocket_client._client.functions = {
+    websocket_client._devapp.functions = {
         "get_current_weather": {
-            "description": FunctionSchema(**get_current_weather_desc),
+            "schema": FunctionSchema(**get_current_weather_desc),
             "function": get_current_weather,
         }
     }

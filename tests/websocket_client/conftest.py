@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from promptmodel.websocket.websocket_client import DevWebsocketClient
-from promptmodel.client import Client
+from promptmodel.dev_app import DevApp
 
 
 async def echo_coroutine(*args, **kwargs):
@@ -12,7 +12,7 @@ async def echo_coroutine(*args, **kwargs):
 
 @pytest.fixture
 def websocket_client():
-    websocket_client = DevWebsocketClient(_client=Client(use_cache=False))
+    websocket_client = DevWebsocketClient(_devapp=DevApp())
     return websocket_client
 
 

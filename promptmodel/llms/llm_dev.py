@@ -18,14 +18,10 @@ load_dotenv()
 
 
 class OpenAIMessage(BaseModel):
-    role: str
-    content: str
-
-
-class OpenAIFunctionMessage(BaseModel):
-    role: str
-    content: str
-    name: str
+    role: Optional[str] = None
+    content: Optional[str] = ""
+    function_call: Optional[Dict[str, Any]] = None
+    name: Optional[str] = None
 
 
 class LLMDev:
@@ -34,21 +30,18 @@ class LLMDev:
 
     def __validate_openai_messages(
         self, messages: List[Dict[str, str]]
-    ) -> List[Union[OpenAIMessage, OpenAIFunctionMessage]]:
+    ) -> List[OpenAIMessage]:
         """Validate and convert list of dictionaries to list of OpenAIMessage."""
         res = []
         for message in messages:
-            if "role" in message and message["role"] == "function":
-                res.append(OpenAIFunctionMessage(**message))
-            else:
-                res.append(OpenAIMessage(**message))
+            res.append(OpenAIMessage(**message))
         return res
 
     async def dev_run(
         self,
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
-        functions: [List[Any]] = [],
+        functions: List[Any] = [],
         model: Optional[str] = None,
     ) -> AsyncGenerator[Any, None]:
         """Parse & stream output from openai chat completion."""
@@ -57,7 +50,7 @@ class LLMDev:
         response = await acompletion(
             model=_model,
             messages=[
-                message.model_dump()
+                message.model_dump(exclude_none=True)
                 for message in self.__validate_openai_messages(messages)
             ],
             stream=True,
@@ -108,7 +101,7 @@ class LLMDev:
         response = await acompletion(
             model=_model,
             messages=[
-                message.model_dump()
+                message.model_dump(exclude_none=True)
                 for message in self.__validate_openai_messages(messages)
             ],
             stream=True,

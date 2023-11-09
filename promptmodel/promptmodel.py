@@ -18,7 +18,7 @@ import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
 from promptmodel.utils.types import LLMStreamResponse, LLMResponse
-from promptmodel import Client
+from promptmodel import DevClient
 
 
 @dataclass
@@ -29,15 +29,11 @@ class PromptModelInterface:
 
 class RegisteringMeta(type):
     def __call__(cls, *args, **kwargs):
-        instance = super().__call__(*args, **kwargs)
+        instance: "PromptModel" = super().__call__(*args, **kwargs)
         # Find the global client instance in the current context
-        client = cls.find_client_instance()
+        client: Optional[DevClient] = cls.find_client_instance()
         if client is not None:
             client.register_prompt_model(instance.name)
-        else:
-            raise SyntaxError(
-                "You must create a Client instance before using PromptModel."
-            )
         return instance
 
     @staticmethod
@@ -48,9 +44,9 @@ class RegisteringMeta(type):
         frame = sys._getframe(2)
         # Get global variables in the current frame
         global_vars = frame.f_globals
-        # Find an instance of Client among global variables
+        # Find an instance of DevClient among global variables
         for var_name, var_val in global_vars.items():
-            if isinstance(var_val, Client):
+            if isinstance(var_val, DevClient):
                 return var_val
         return None
 

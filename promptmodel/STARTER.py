@@ -1,11 +1,11 @@
-"""This single file is needed to build the Client development dashboard."""
+"""This single file is needed to build the DevApp development dashboard."""
 
-from promptmodel import Client
+from promptmodel import DevApp
 
 # Example imports
 # from <dirname> import <objectname>
 
-app = Client()
+app = DevApp()
 
 # Example usage
 # This is needed to integrate your codebase with the prompt engineering dashboard

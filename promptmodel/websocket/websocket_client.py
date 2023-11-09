@@ -13,7 +13,7 @@ from readerwriterlock import rwlock
 from playhouse.shortcuts import model_to_dict
 
 import promptmodel.utils.logger as logger
-from promptmodel import Client
+from promptmodel import DevApp
 from promptmodel.llms.llm_dev import LLMDev
 from promptmodel.database.crud import (
     create_prompt_model_version,
@@ -56,8 +56,8 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 
 class DevWebsocketClient:
-    def __init__(self, _client: Client):
-        self._client: Client = _client
+    def __init__(self, _devapp: DevApp):
+        self._devapp: DevApp = _devapp
         self.rwlock = rwlock.RWLockFair()
 
     async def _get_prompt_models(self, prompt_model_name: str):
@@ -66,16 +66,16 @@ class DevWebsocketClient:
             prompt_model = next(
                 (
                     prompt_model
-                    for prompt_model in self._client.prompt_models
+                    for prompt_model in self._devapp.prompt_models
                     if prompt_model.name == prompt_model_name
                 ),
                 None,
             )
         return prompt_model
 
-    def update_client_instance(self, new_client):
+    def update_devapp_instance(self, new_devapp):
         with self.rwlock.gen_wlock():
-            self._client = new_client
+            self._devapp = new_devapp
             if self.ws:
                 asyncio.run(
                     self.ws.send(
@@ -118,7 +118,7 @@ class DevWebsocketClient:
                 data = {"samples": res_from_local_db}
 
             elif message["type"] == LocalTask.LIST_FUNCTIONS:
-                function_name_list = self._client._get_function_name_list()
+                function_name_list = self._devapp._get_function_name_list()
                 data = {"functions": function_name_list}
 
             elif message["type"] == LocalTask.GET_PROMPTS:
@@ -189,10 +189,12 @@ class DevWebsocketClient:
                 prompt_model_versions, prompts = find_ancestor_versions(
                     target_prompt_model_uuid
                 )
-                
+
                 config = read_config()
                 for prompt_model_version in prompt_model_versions:
-                    prompt_model_version["dev_branch_uuid"] = config["dev_branch"]["uuid"]
+                    prompt_model_version["dev_branch_uuid"] = config["dev_branch"][
+                        "uuid"
+                    ]
                     del prompt_model_version["id"]
                     del prompt_model_version["status"]
                     del prompt_model_version["is_published"]
@@ -243,7 +245,7 @@ class DevWebsocketClient:
                     sample_input = None
 
                 # Check prompt_model in Local Usage
-                prompt_model_names = self._client._get_prompt_model_name_list()
+                prompt_model_names = self._devapp._get_prompt_model_name_list()
                 if prompt_model_name not in prompt_model_names:
                     logger.error(f"There is no prompt_model {prompt_model_name}.")
                     return
@@ -360,13 +362,13 @@ class DevWebsocketClient:
                     function_call = None
                     function_call_log = None
 
-                    # get function descriptions from register & send to LLM
+                    # get function schemas from register & send to LLM
                     function_names: List[str] = message["functions"]
                     logger.debug(f"function_names : {function_names}")
                     try:
-                        function_descriptions: List[
+                        function_schemas: List[
                             str
-                        ] = self._client._get_function_descriptions(function_names)
+                        ] = self._devapp._get_function_schemas(function_names)
                     except Exception as error:
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
@@ -378,14 +380,14 @@ class DevWebsocketClient:
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
 
-                    logger.debug(f"functions : {function_descriptions}")
+                    logger.debug(f"functions : {function_schemas}")
 
                     res: AsyncGenerator[
                         LLMStreamResponse, None
                     ] = prompt_model_dev.dev_run(
                         messages=messages_for_run,
                         parsing_type=parsing_type,
-                        functions=function_descriptions,
+                        functions=function_schemas,
                         model=model,
                     )
                     async for item in res:
@@ -447,10 +449,18 @@ class DevWebsocketClient:
                             function_call_args: Dict[str, Any] = json.loads(
                                 function_call["arguments"]
                             )
-                            function_response = self._client._call_register_function(
+                            function_response = self._devapp._call_register_function(
                                 function_call["name"], function_call_args
                             )
                             function_call_log["response"] = function_response
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_RUN.value,
+                                "status": "running",
+                                "function_response": function_response,
+                            }
+                            data.update(response)
+                            # logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         except Exception as error:
                             logger.error(f"{error}")
 
@@ -474,13 +484,17 @@ class DevWebsocketClient:
                             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                             return
                         # call LLM once more
-                        messages_for_run.append(
+                        messages_for_run += [
+                            {
+                                "role": "assistant",
+                                "function_call": function_call,
+                            },
                             {
                                 "role": "function",
                                 "name": function_call["name"],
                                 "content": str(function_response),
-                            }
-                        )
+                            },
+                        ]
                         res_after_function_call: AsyncGenerator[
                             LLMStreamResponse, None
                         ] = prompt_model_dev.dev_chat(
@@ -607,9 +621,7 @@ class DevWebsocketClient:
                     # ping_timeout=1,
                     # timeout=3600 * 24,  # Timeout is set to 24 hours
                 ) as ws:
-                    logger.success(
-                        "Connected to gateway. Your Client Dev is now online! 🎉"
-                    )
+                    logger.success("Connected to gateway. Your DevApp is now online! 🎉")
                     self.ws = ws
                     while True:
                         message = await ws.recv()

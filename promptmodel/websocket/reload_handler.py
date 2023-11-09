@@ -9,7 +9,7 @@ from watchdog.events import FileSystemEventHandler
 from promptmodel.apis.base import APIClient
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
-from promptmodel import Client
+from promptmodel import DevApp, DevClient
 from promptmodel.database.crud import (
     list_prompt_models,
     update_used_in_code_prompt_model_by_name,
@@ -31,13 +31,15 @@ from promptmodel.websocket.websocket_client import DevWebsocketClient
 class CodeReloadHandler(FileSystemEventHandler):
     def __init__(
         self,
-        _client_filename: str,
+        _devapp_filename: str,
         _instance_name: str,
         dev_websocket_client: DevWebsocketClient,
     ):
-        self._client_filename: str = _client_filename
-        self.client_instance_name: str = _instance_name
-        self.dev_websocket_client: DevWebsocketClient = dev_websocket_client  # 저장
+        self._devapp_filename: str = _devapp_filename
+        self.devapp_instance_name: str = _instance_name
+        self.dev_websocket_client: DevWebsocketClient = (
+            dev_websocket_client  # save dev_websocket_client instance
+        )
         self.timer = None
 
     def on_modified(self, event):
@@ -51,10 +53,10 @@ class CodeReloadHandler(FileSystemEventHandler):
 
     def reload_code(self, modified_file_path: str):
         print(
-            f"[violet]promptmodel:dev:[/violet]  Reloading {self._client_filename} module due to changes..."
+            f"[violet]promptmodel:dev:[/violet]  Reloading {self._devapp_filename} module due to changes..."
         )
         relative_modified_path = os.path.relpath(modified_file_path, os.getcwd())
-        # Reload the client module
+        # Reload the devapp module
         module_name = relative_modified_path.replace("./", "").replace("/", ".")[
             :-3
         ]  # assuming the file is in the PYTHONPATH
@@ -63,21 +65,21 @@ class CodeReloadHandler(FileSystemEventHandler):
             module = sys.modules[module_name]
             importlib.reload(module)
 
-        reloaded_module = importlib.reload(sys.modules[self._client_filename])
+        reloaded_module = importlib.reload(sys.modules[self._devapp_filename])
         print(
-            f"[violet]promptmodel:dev:[/violet]  {self._client_filename} module reloaded successfully."
+            f"[violet]promptmodel:dev:[/violet]  {self._devapp_filename} module reloaded successfully."
         )
 
-        new_client_instance: Client = getattr(
-            reloaded_module, self.client_instance_name
+        new_devapp_instance: DevApp = getattr(
+            reloaded_module, self.devapp_instance_name
         )
-        # print(new_client_instance.prompt_models)
+        # print(new_devapp_instance.prompt_models)
         new_prompt_model_name_list = [
-            prompt_model.name for prompt_model in new_client_instance.prompt_models
+            prompt_model.name for prompt_model in new_devapp_instance.prompt_models
         ]
         old_prompt_model_name_list = [
             prompt_model.name
-            for prompt_model in self.dev_websocket_client._client.prompt_models
+            for prompt_model in self.dev_websocket_client._devapp.prompt_models
         ]
 
         # 사라진 prompt_models 에 대해 local db prompt_model.used_in_code False Update
@@ -114,7 +116,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             local_code_prompt_model_name_list=new_prompt_model_name_list,
         )
 
-        for prompt_model in new_client_instance.prompt_models:
+        for prompt_model in new_devapp_instance.prompt_models:
             if prompt_model.name not in old_prompt_model_name_list:
                 update_used_in_code_prompt_model_by_name(prompt_model.name, True)
 
@@ -130,8 +132,8 @@ class CodeReloadHandler(FileSystemEventHandler):
         create_prompt_models(only_in_local_prompt_models)
 
         # update samples in local DB
-        update_samples(new_client_instance.samples)
-        self.dev_websocket_client.update_client_instance(new_client_instance)
+        update_samples(new_devapp_instance.samples)
+        self.dev_websocket_client.update_devapp_instance(new_devapp_instance)
 
 
 def update_by_changelog_for_reload(
