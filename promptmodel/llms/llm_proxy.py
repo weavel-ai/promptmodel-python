@@ -323,7 +323,7 @@ class LLMProxy(LLM):
         self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
     ) -> LLMResponse:
         kwargs = {"function_list": function_list} if function_list else {}
-        return self._wrap_async_gen(super().arun_and_parse)(inputs, **kwargs)
+        return self._wrap_async_method(super().arun_and_parse)(inputs, **kwargs)
 
     def stream_and_parse(
         self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
