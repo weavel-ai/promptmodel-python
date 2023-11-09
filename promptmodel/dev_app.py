@@ -23,50 +23,40 @@ from promptmodel.database.orm import initialize_db
 @dataclass
 class PromptModelInterface:
     name: str
-    default_model: str = "gpt-3.5-turbo"
 
 
-class Client:
-    """Client main class"""
+class DevClient:
+    """DevClient main class"""
 
-    _nest_asyncio_applied = False
-
-    def __init__(
-        self,
-        use_cache: Optional[bool] = True,
-        default_model: Optional[str] = "gpt-3.5-turbo",
-    ):
-        if not Client._nest_asyncio_applied:
-            nest_asyncio.apply()
-            Client._nest_asyncio_applied = True
-        self._default_model: str = default_model
+    def __init__(self):
+        # if not DevClient._nest_asyncio_applied:
+        #     nest_asyncio.apply()
+        #     DevClient._nest_asyncio_applied = True
         self.prompt_models: List[PromptModelInterface] = []
-        self.samples: List[Dict[str, Any]] = []
-        self.functions: Dict[str, Dict[str, Union[FunctionSchema, Callable]]] = {}
-        config = read_config()
-        if (
-            config
-            and "dev_branch" in config
-            and (
-                (
-                    "online" in config["dev_branch"]
-                    and config["dev_branch"]["online"] == True
-                )
-                or (
-                    "initializing" in config["dev_branch"]
-                    and config["dev_branch"]["initializing"] == True
-                )
-            )
-        ):
-            self.cache_manager = None
-        else:
-            if use_cache:
-                upsert_config({"use_cache": True}, section="project")
-                self.cache_manager = CacheManager()
-            else:
-                upsert_config({"use_cache": False}, section="project")
-                self.cache_manager = None
-                initialize_db()  # init db for local usage
+        # config = read_config()
+        # if (
+        #     config
+        #     and "dev_branch" in config
+        #     and (
+        #         (
+        #             "online" in config["dev_branch"]
+        #             and config["dev_branch"]["online"] == True
+        #         )
+        #         or (
+        #             "initializing" in config["dev_branch"]
+        #             and config["dev_branch"]["initializing"] == True
+        #         )
+        #     )
+        # ):
+        #     self.cache_manager = None
+        # else:
+        #     if use_cache:
+        #         upsert_config({"use_cache": True}, section="project")
+        #         self.cache_manager = CacheManager()
+        #     else:
+        #         upsert_config({"use_cache": False}, section="project")
+        #         self.cache_manager = None
+        #         initialize_db()  # init db for local usage
 
     def register(self, func):
         instructions = list(dis.get_instructions(func))
@@ -86,10 +76,7 @@ class Client:
                     next_instruction.argval, str
                 ):
                     self.prompt_models.append(
-                        PromptModelInterface(
-                            name=next_instruction.argval,
-                            default_model=self._default_model,
-                        )
+                        PromptModelInterface(name=next_instruction.argval)
                     )
 
         def wrapper(*args, **kwargs):
@@ -102,53 +89,36 @@ class Client:
             if prompt_model.name == name:
                 return
 
-        self.prompt_models.append(
-            PromptModelInterface(
-                name=name,
-                default_model=self._default_model,
-            )
-        )
-
-    def register_function(
-        self, description: Union[Dict[str, Any], FunctionSchema], function: Callable
-    ):
-        function_name = description["name"]
-        if isinstance(description, dict):
-            try:
-                description = FunctionSchema(**description)
-            except:
-                raise ValueError(
-                    "description is not a valid function call description."
-                )
-
-        if function_name not in self.functions:
-            self.functions[function_name] = {
-                "description": description,
-                "function": function,
-            }
-
-    def include_client(self, client: Client):
-        self.prompt_models.extend(client.prompt_models)
-        # delete duplicated prompt_models
-        self.prompt_models = list(
-            {
-                prompt_model.name: prompt_model for prompt_model in self.prompt_models
-            }.values()
-        )
-
-        self.samples.extend(client.samples)
-        # delete duplicated samples
-        self.samples = list(
-            {sample["name"]: sample for sample in self.samples}.values()
-        )
-
-        self.functions.update(client.functions)
-
-    def register_sample(self, name: str, content: Dict[str, Any]):
-        self.samples.append({"name": name, "contents": content})
+        self.prompt_models.append(PromptModelInterface(name=name))
 
     def _get_prompt_model_name_list(self) -> List[str]:
         return [prompt_model.name for prompt_model in self.prompt_models]
+
+
+class DevApp:
+    def __init__(self):
+        self.prompt_models: List[PromptModelInterface] = []
+        self.samples: List[Dict[str, Any]] = []
+        self.functions: Dict[str, Dict[str, Union[FunctionSchema, Callable]]] = {}
+
+    def include_client(self, client: DevClient):
+        self.prompt_models.extend(client.prompt_models)
+
+    def register_function(
+        self, schema: Union[Dict[str, Any], FunctionSchema], function: Callable
+    ):
+        function_name = schema["name"]
+        if isinstance(schema, dict):
+            try:
+                schema = FunctionSchema(**schema)
+            except:
+                raise ValueError("schema is not a valid function call schema.")
+
+        if function_name not in self.functions:
+            self.functions[function_name] = {
+                "schema": schema,
+                "function": function,
+            }
 
     def _call_register_function(self, name: str, arguments: Dict[str, str]):
         function_to_call: Callable = self.functions[name]["function"]
@@ -161,23 +131,21 @@ class Client:
     def _get_function_name_list(self) -> List[str]:
         return list(self.functions.keys())
 
-    def _get_function_descriptions(self, function_names: List[str] = []):
+    def _get_function_schemas(self, function_names: List[str] = []):
         try:
-            function_descriptions = [
-                self.functions[function_name]["description"].model_dump()
+            function_schemas = [
+                self.functions[function_name]["schema"].model_dump()
                 for function_name in function_names
             ]
-            return function_descriptions
+            return function_schemas
         except Exception as e:
             raise e
 
+    def register_sample(self, name: str, content: Dict[str, Any]):
+        self.samples.append({"name": name, "contents": content})
 
-class DevApp(Client):
-    def __init__(self, default_model: Optional[str] = "gpt-3.5-turbo"):
-        super().__init__(default_model)
-
-    def include_client(self, client: Client):
-        self.prompt_models.extend(client.prompt_models)
+    def _get_prompt_model_name_list(self) -> List[str]:
+        return [prompt_model.name for prompt_model in self.prompt_models]
 
 
 class CacheManager:

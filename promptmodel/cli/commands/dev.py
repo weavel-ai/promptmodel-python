@@ -17,7 +17,7 @@ from rich import print
 from InquirerPy import inquirer
 from watchdog.observers import Observer
 
-from promptmodel import Client
+from promptmodel import DevApp
 from promptmodel.apis.base import APIClient
 from promptmodel.constants import ENDPOINT_URL, WEB_CLIENT_URL
 from promptmodel.cli.commands.init import init as promptmodel_init
@@ -44,20 +44,20 @@ from promptmodel.database.crud import (
 
 
 def dev():
-    """Creates a new prompt development environment, and opens up Client in the browser."""
+    """Creates a new prompt development environment, and opens up DevApp in the browser."""
     upsert_config({"initializing": True}, "dev_branch")
     signal.signal(signal.SIGINT, dev_terminate_signal_handler)
     promptmodel_init(from_cli=False)
 
-    _client_filename, client_instance_name = "promptmodel_dev:app".split(":")
+    _devapp_filename, devapp_instance_name = "promptmodel_dev:app".split(":")
 
     # Init local database & open
     initialize_db()
 
     config = read_config()
 
-    client_module = importlib.import_module(_client_filename)
-    client_instance: Client = getattr(client_module, client_instance_name)
+    devapp_module = importlib.import_module(_devapp_filename)
+    devapp_instance: DevApp = getattr(devapp_module, devapp_instance_name)
 
     if "name" not in config["dev_branch"]:
         org = get_org(config)
@@ -109,7 +109,7 @@ def dev():
             {"project_version": project_status["project_version"]}, section="dev_branch"
         )
 
-        local_prompt_models = client_instance.prompt_models
+        local_prompt_models = devapp_instance.prompt_models
         local_prompt_model_names = [x.name for x in local_prompt_models]
 
         # save prompt_models
@@ -175,7 +175,7 @@ def dev():
             },
         ).json()
         local_code_prompt_model_name_list = [
-            x.name for x in client_instance.prompt_models
+            x.name for x in devapp_instance.prompt_models
         ]
         res = update_by_changelog(
             changelogs, project_status, local_code_prompt_model_name_list
@@ -201,13 +201,13 @@ def dev():
     dev_url = f"{WEB_CLIENT_URL}/org/{org['slug']}/projects/{project['uuid']}/dev/{branch_name}"
 
     # Open websocket connection to backend server
-    dev_websocket_client = DevWebsocketClient(_client=client_instance)
+    dev_websocket_client = DevWebsocketClient(_devapp=devapp_instance)
 
     import threading
 
     reloader_thread = threading.Thread(
         target=start_code_reloader,
-        args=(_client_filename, client_instance_name, dev_websocket_client),
+        args=(_devapp_filename, devapp_instance_name, dev_websocket_client),
     )
     reloader_thread.daemon = True  # Set the thread as a daemon
     reloader_thread.start()
@@ -225,7 +225,7 @@ def dev():
 
     upsert_config({"online": True, "initializing": False}, section="dev_branch")
     # save samples to local DB
-    update_samples(client_instance.samples)
+    update_samples(devapp_instance.samples)
 
     # Open Websocket
     asyncio.run(
@@ -240,9 +240,9 @@ def dev():
 app = typer.Typer(invoke_without_command=True, callback=dev)
 
 
-def start_code_reloader(_client_filename, client_instance_name, dev_websocket_client):
+def start_code_reloader(_devapp_filename, devapp_instance_name, dev_websocket_client):
     event_handler = CodeReloadHandler(
-        _client_filename, client_instance_name, dev_websocket_client
+        _devapp_filename, devapp_instance_name, dev_websocket_client
     )
     observer = Observer()
     observer.schedule(event_handler, path=".", recursive=True)
