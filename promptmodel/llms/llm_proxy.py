@@ -52,11 +52,12 @@ class LLMProxy(LLM):
                 yield item
 
             # add string_cache in model_response
-            if "message" not in raw_response.choices[0]:
-                raw_response.choices[0]["message"] = {}
-            if "content" not in raw_response.choices[0]["message"]:
-                raw_response.choices[0]["message"]["content"] = string_cache
-                raw_response.choices[0]["message"]["role"] = "assistant"
+            if raw_response:
+                if "message" not in raw_response.choices[0]:
+                    raw_response.choices[0]["message"] = {}
+                if "content" not in raw_response.choices[0]["message"]:
+                    raw_response.choices[0]["message"]["content"] = string_cache
+                    raw_response.choices[0]["message"]["role"] = "assistant"
 
             metadata = {
                 "error_occurs": error_occurs,
@@ -85,7 +86,7 @@ class LLMProxy(LLM):
             string_cache = ""  # to store aggregated string values
             error_occurs = False
             error_log = None
-            raw_response: ModelResponse = None
+            raw_response: Optional[ModelResponse] = None
             async for item in stream_response:
                 if item.api_response:
                     raw_response = item.api_response
@@ -99,11 +100,12 @@ class LLMProxy(LLM):
                 yield item
 
             # add string_cache in model_response
-            if "message" not in raw_response.choices[0]:
-                raw_response.choices[0]["message"] = {}
-            if "content" not in raw_response.choices[0]["message"]:
-                raw_response.choices[0]["message"]["content"] = string_cache
-                raw_response.choices[0]["message"]["role"] = "assistant"
+            if raw_response:
+                if "message" not in raw_response.choices[0]:
+                    raw_response.choices[0]["message"] = {}
+                if "content" not in raw_response.choices[0]["message"]:
+                    raw_response.choices[0]["message"]["content"] = string_cache
+                    raw_response.choices[0]["message"]["role"] = "assistant"
 
             metadata = {
                 "error_occurs": error_occurs,
@@ -222,20 +224,23 @@ class LLMProxy(LLM):
     async def _async_log_to_cloud(
         self,
         version_uuid: str,
-        inputs: dict,
-        api_response: ModelResponse,
-        parsed_outputs: dict,
-        metadata: dict,
+        inputs: Optional[Dict] = None,
+        api_response: Optional[ModelResponse] = None,
+        parsed_outputs: Optional[Dict] = None,
+        metadata: Optional[Dict] = None,
     ):
         # Perform the logging asynchronously
-        api_response_dict = api_response.to_dict_recursive()
-        api_response_dict.update(
-            {
-                "response_ms": api_response["response_ms"]
-                if "response_ms" in api_response
-                else api_response.response_ms
-            }
-        )
+        if api_response:
+            api_response_dict = api_response.to_dict_recursive()
+            api_response_dict.update(
+                {
+                    "response_ms": api_response["response_ms"]
+                    if "response_ms" in api_response
+                    else api_response.response_ms
+                }
+            )
+        else:
+            api_response_dict = None
         res = await AsyncAPIClient.execute(
             method="POST",
             path="/log_deployment_run",
@@ -257,10 +262,10 @@ class LLMProxy(LLM):
     def _sync_log_to_cloud(
         self,
         version_uuid: str,
-        inputs: dict,
-        api_response: ModelResponse,
-        parsed_outputs: dict,
-        metadata: dict,
+        inputs: Optional[Dict] = None,
+        api_response: Optional[ModelResponse] = None,
+        parsed_outputs: Optional[Dict] = None,
+        metadata: Optional[Dict] = None,
     ):
         coro = self._async_log_to_cloud(
             version_uuid,
