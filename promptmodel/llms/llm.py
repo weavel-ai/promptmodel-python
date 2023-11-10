@@ -56,8 +56,10 @@ class LLM:
 
     @classmethod
     def __parse_output_pattern__(
-        cls, raw_output: str, parsing_type: ParsingType
+        cls, raw_output: str, parsing_type: Optional[ParsingType] = None
     ) -> ParseResult:
+        if parsing_type is None:
+            return None
         parsing_pattern = get_pattern_by_type(parsing_type)
         whole_pattern = parsing_pattern["whole"]
         parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
@@ -140,24 +142,14 @@ class LLM:
         """Return the response from openai chat completion."""
         response = None
         try:
-            if self._rate_limit_manager:
-                response = await self._rate_limit_manager.acompletion(
-                    model=model,
-                    messages=[
-                        message.model_dump(exclude_none=True)
-                        for message in self.__validate_openai_messages(messages)
-                    ],
-                    functions=functions,
-                )
-            else:
-                response = await acompletion(
-                    model=model,
-                    messages=[
-                        message.model_dump(exclude_none=True)
-                        for message in self.__validate_openai_messages(messages)
-                    ],
-                    functions=functions,
-                )
+            response = await acompletion(
+                model=model,
+                messages=[
+                    message.model_dump(exclude_none=True)
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                functions=functions,
+            )
             content = (
                 response.choices[0]["message"]["content"]
                 if "content" in response.choices[0]["message"]
@@ -199,55 +191,47 @@ class LLM:
                 stream=True,
                 functions=functions,
             )
-
-            raw_output = ""
-            function_call = {"name": "", "arguments": ""}
-
-            for chunk in response:
-                if (
-                    "content" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["content"] is not None
+            
+            for result in self.__llm_stream_response_generator__(
+                    messages, response, start_time, functions
                 ):
-                    raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(
-                        raw_output=chunk["choices"][0]["delta"]["content"]
-                    )
-
-                if (
-                    "function_call" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["function_call"] is not None
-                ):
-                    for key, value in chunk["choices"][0]["delta"][
-                        "function_call"
-                    ].items():
-                        function_call[key] += value
-
-                if chunk["choices"][0]["finish_reason"] != None:
-                    end_time = datetime.datetime.now()
-                    response_ms = (end_time - start_time).total_seconds() * 1000
-                    # TODO: make token_usage
-                    yield LLMStreamResponse(
-                        api_response=self.make_model_response(
-                            chunk,
-                            response_ms,
-                            messages,
-                            raw_output,
-                            function_list=functions,
-                            function_call=function_call
-                            if chunk["choices"][0]["finish_reason"] == "function_call"
-                            else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
-                    )
+                    yield result
         except Exception as e:
             return LLMStreamResponse(error=True, error_log=str(e))
+
+    async def astream(
+        self,
+        messages: List[Dict[str, str]],
+        functions: List[Any] = [],
+        model: Optional[str] = DEFAULT_MODEL,
+        *args,
+        **kwargs,
+    ) -> Generator[LLMStreamResponse, None, None]:
+        """Parse & stream output from openai chat completion."""
+        response = None
+        try:
+            start_time = datetime.datetime.now()
+            response = await acompletion(
+                model=model,
+                messages=[
+                    message.model_dump(exclude_none=True)
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                stream=True,
+                functions=functions,
+            )
+
+            async for result in self.__llm_stream_response_agenerator__(
+                    messages, response, start_time, functions
+                ):
+                    yield result
+        except Exception as e:
+            yield LLMStreamResponse(error=True, error_log=str(e))
 
     def run_and_parse(
         self,
         messages: List[Dict[str, str]],
-        parsing_type: ParsingType,
+        parsing_type: Optional[ParsingType] = None,
         functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
@@ -266,7 +250,7 @@ class LLM:
             )
             raw_output = response.choices[0]["message"]["content"]
 
-            parse_result: ParseResult = self.__parse_output_pattern__(
+            parse_result: Optional[ParseResult] = self.__parse_output_pattern__(
                 raw_output, parsing_type
             )
             error_log = parse_result.error_log
@@ -288,7 +272,7 @@ class LLM:
             return LLMResponse(
                 api_response=response,
                 raw_output=raw_output,
-                parsed_outputs=parse_result.parsed_outputs,
+                parsed_outputs=parse_result.parsed_outputs if parse_result else None,
                 function_call=call_func,
                 error=not parse_success,
                 error_log=error_log,
@@ -298,74 +282,6 @@ class LLM:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
                 return LLMResponse(api_response=None, error=True, error_log=str(e))
-
-    def stream_and_parse(
-        self,
-        messages: List[Dict[str, str]],
-        parsing_type: ParsingType,
-        functions: List[Any] = [],
-        output_keys: Optional[List[str]] = None,
-        model: Optional[str] = DEFAULT_MODEL,
-        **kwargs,
-    ) -> Generator[LLMStreamResponse, None, None]:
-        """Parse & stream output from openai chat completion."""
-        response = None
-        try:
-            if parsing_type == ParsingType.COLON.value:
-                # cannot stream colon type
-                yield LLMStreamResponse(
-                    error=True, error_log="Cannot stream colon type"
-                )
-                return
-            start_time = datetime.datetime.now()
-            response = completion(
-                model=model,
-                messages=[
-                    message.model_dump(exclude_none=True)
-                    for message in self.__validate_openai_messages(messages)
-                ],
-                stream=True,
-                functions=functions,
-            )
-
-            parsed_outputs = {}
-            error_occurs = False
-            error_log = ""
-            if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
-                for result in self.__double_type_sp_generator__(
-                    messages, response, parsing_type, start_time, functions
-                ):
-                    yield result
-                    if result.parsed_outputs:
-                        parsed_outputs = update_dict(
-                            parsed_outputs, result.parsed_outputs
-                        )
-                    if result.error and not error_occurs:
-                        error_occurs = True
-                        error_log = result.error_log
-            else:
-                for result in self.__single_type_sp_generator__(
-                    messages, response, parsing_type, start_time
-                ):
-                    yield result
-                    if result.parsed_outputs:
-                        parsed_outputs = update_dict(
-                            parsed_outputs, result.parsed_outputs
-                        )
-                    if result.error and not error_occurs:
-                        error_occurs = True
-                        error_log = result.error_log
-
-            if (
-                output_keys is not None
-                and set(parsed_outputs.keys()) != set(output_keys)
-            ) and not error_occurs:
-                error_occurs = True
-                error_log = "Output keys do not match with parsed output keys"
-                yield LLMStreamResponse(error=True, error_log=error_log)
-
-        except Exception as e:
-            return LLMStreamResponse(error=True, error_log=str(e))
 
     async def arun_and_parse(
         self,
@@ -392,25 +308,16 @@ class LLM:
         Now generate the output:
         """
         response = None
+        parsed_success = True
         try:
-            if self._rate_limit_manager:
-                response = await self._rate_limit_manager.acompletion(
-                    model=model,
-                    messages=[
-                        message.model_dump(exclude_none=True)
-                        for message in self.__validate_openai_messages(messages)
-                    ],
-                    functions=functions,
-                )
-            else:
-                response = await acompletion(
-                    model=model,
-                    messages=[
-                        message.model_dump(exclude_none=True)
-                        for message in self.__validate_openai_messages(messages)
-                    ],
-                    functions=functions,
-                )
+            response = await acompletion(
+                model=model,
+                messages=[
+                    message.model_dump(exclude_none=True)
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                functions=functions,
+            )
             raw_output = response.choices[0]["message"]["content"]
             parse_result: ParseResult = self.__parse_output_pattern__(
                 raw_output, parsing_type
@@ -451,80 +358,84 @@ class LLM:
             else:
                 return LLMResponse(api_response=None, error=True, error_log=str(e))
 
-    async def astream(
+    def stream_and_parse(
         self,
         messages: List[Dict[str, str]],
+        parsing_type: Optional[ParsingType] = None,
         functions: List[Any] = [],
+        output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
-        *args,
         **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
         response = None
         try:
+            if parsing_type == ParsingType.COLON.value:
+                # cannot stream colon type
+                yield LLMStreamResponse(
+                    error=True, error_log="Cannot stream colon type"
+                )
+                return
             start_time = datetime.datetime.now()
-            if self._rate_limit_manager:
-                response = await self._rate_limit_manager.acompletion(
-                    model=model,
-                    messages=[
-                        message.model_dump(exclude_none=True)
-                        for message in self.__validate_openai_messages(messages)
-                    ],
-                    stream=True,
-                    functions=functions,
-                )
+            response = completion(
+                model=model,
+                messages=[
+                    message.model_dump(exclude_none=True)
+                    for message in self.__validate_openai_messages(messages)
+                ],
+                stream=True,
+                functions=functions,
+            )
+
+            parsed_outputs = {}
+            error_occurs = False
+            error_log = ""
+
+            if parsing_type is None:
+                for result in self.__llm_stream_response_generator__(
+                    messages, response, start_time, functions
+                ):
+                    yield result
+
+                    if result.error and not error_occurs:
+                        error_occurs = True
+                        error_log = result.error_log
+
+            elif parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
+                for result in self.__double_type_sp_generator__(
+                    messages, response, parsing_type, start_time, functions
+                ):
+                    yield result
+                    if result.parsed_outputs:
+                        parsed_outputs = update_dict(
+                            parsed_outputs, result.parsed_outputs
+                        )
+                    if result.error and not error_occurs:
+                        error_occurs = True
+                        error_log = result.error_log
             else:
-                response = await acompletion(
-                    model=model,
-                    messages=[
-                        message.model_dump(exclude_none=True)
-                        for message in self.__validate_openai_messages(messages)
-                    ],
-                    stream=True,
-                    functions=functions,
-                )
-            raw_output = ""
-            function_call = {"name": "", "arguments": ""}
-
-            async for chunk in response:
-                if (
-                    "content" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["content"] is not None
+                for result in self.__single_type_sp_generator__(
+                    messages, response, parsing_type, start_time
                 ):
-                    raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(
-                        raw_output=chunk["choices"][0]["delta"]["content"]
-                    )
+                    yield result
+                    if result.parsed_outputs:
+                        parsed_outputs = update_dict(
+                            parsed_outputs, result.parsed_outputs
+                        )
+                    if result.error and not error_occurs:
+                        error_occurs = True
+                        error_log = result.error_log
 
-                if (
-                    "function_call" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["function_call"] is not None
-                ):
-                    for key, value in chunk["choices"][0]["delta"][
-                        "function_call"
-                    ].items():
-                        function_call[key] += value
+            if (
+                output_keys is not None
+                and set(parsed_outputs.keys()) != set(output_keys)
+            ) and not error_occurs:
+                error_occurs = True
+                error_log = "Output keys do not match with parsed output keys"
+                yield LLMStreamResponse(error=True, error_log=error_log)
 
-                if chunk["choices"][0]["finish_reason"] != None:
-                    end_time = datetime.datetime.now()
-                    response_ms = (end_time - start_time).total_seconds() * 1000
-                    yield LLMStreamResponse(
-                        api_response=self.make_model_response(
-                            chunk,
-                            response_ms,
-                            messages,
-                            raw_output,
-                            function_list=functions,
-                            function_call=function_call
-                            if chunk["choices"][0]["finish_reason"] == "function_call"
-                            else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
-                    )
         except Exception as e:
-            yield LLMStreamResponse(error=True, error_log=str(e))
+            return LLMStreamResponse(error=True, error_log=str(e))
 
     async def astream_and_parse(
         self,
@@ -556,7 +467,17 @@ class LLM:
 
             parsed_outputs = {}
             error_occurs = False
-            if parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
+            if parsing_type is None:
+                async for result in self.__llm_stream_response_agenerator__(
+                    messages, response, start_time, functions
+                ):
+                    yield result
+
+                    if result.error and not error_occurs:
+                        error_occurs = True
+                        error_log = result.error_log
+
+            elif parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
                 async for result in self.__double_type_sp_agenerator__(
                     messages, response, parsing_type, start_time, functions
                 ):
@@ -589,17 +510,6 @@ class LLM:
 
         except Exception as e:
             yield LLMStreamResponse(error=True, error_log=str(e))
-
-    # async def aget_embedding(self, context: str) -> List[float]:
-    #     """
-    #     Return the embedding of the context.
-    #     """
-    #     context = context.replace("\n", " ")
-    #     response = await openai.Embedding.acreate(
-    #         input=[context], model="text-embedding-ada-002"
-    #     )
-    #     embedding = response["data"][0]["embedding"]
-    #     return embedding
 
     def make_model_response(
         self,
@@ -764,6 +674,57 @@ class LLM:
                                     )
                                     buffer = ""
                                 break
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
+                        function_call[key] += value
+
+                if chunk["choices"][0]["finish_reason"] != None:
+                    end_time = datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield LLMStreamResponse(
+                        api_response=self.make_model_response(
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_list=functions,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
+                        ),
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
+                    )
+        except Exception as e:
+            logger.error(e)
+            yield LLMStreamResponse(error=True, error_log=str(e))
+
+    def __llm_stream_response_generator__(
+        self,
+        messages: List[Dict[str, str]],
+        response: Generator,
+        start_time: datetime.datetime,
+        functions: List[Any] = [],
+    ):
+        raw_output = ""
+        function_call = {"name": "", "arguments": ""}
+        try:
+            for chunk in response:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
+                    raw_output += chunk["choices"][0]["delta"]["content"]
+                    yield LLMStreamResponse(
+                        raw_output=chunk["choices"][0]["delta"]["content"]
+                    )
 
                 if (
                     "function_call" in chunk["choices"][0]["delta"]
@@ -1051,6 +1012,57 @@ class LLM:
                                     )
                                     buffer = ""
                                 break
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
+                        function_call[key] += value
+
+                if chunk["choices"][0]["finish_reason"] != None:
+                    end_time = datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield LLMStreamResponse(
+                        api_response=self.make_model_response(
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_list=functions,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
+                        ),
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
+                    )
+        except Exception as e:
+            logger.error(e)
+            yield LLMStreamResponse(error=True, error_log=str(e))
+
+    async def __llm_stream_response_agenerator__(
+        self,
+        messages: List[Dict[str, str]],
+        response: AsyncGenerator,
+        start_time: datetime.datetime,
+        functions: List[Any] = [],
+    ):
+        raw_output = ""
+        function_call = {"name": "", "arguments": ""}
+        try:
+            async for chunk in response:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
+                    raw_output += chunk["choices"][0]["delta"]["content"]
+                    yield LLMStreamResponse(
+                        raw_output=chunk["choices"][0]["delta"]["content"]
+                    )
 
                 if (
                     "function_call" in chunk["choices"][0]["delta"]
