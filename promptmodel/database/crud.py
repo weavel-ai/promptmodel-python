@@ -327,6 +327,8 @@ async def update_deployed_cache(project_status: dict):
 
     with db.atomic():
         DeployedPromptModel.delete().execute()
+        DeployedPromptModelVersion.delete().execute()
+        DeployedPrompt.delete().execute()
         DeployedPromptModel.insert_many(prompt_models).execute()
         DeployedPromptModelVersion.insert_many(prompt_model_versions).execute()
         DeployedPrompt.insert_many(prompts).execute()
