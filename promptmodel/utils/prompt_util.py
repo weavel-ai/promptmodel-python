@@ -7,12 +7,14 @@ from threading import Thread
 from typing import Any, Dict, Tuple, List, Union, Optional, Coroutine
 from litellm import token_counter
 
+from promptmodel.apis.base import AsyncAPIClient
 from promptmodel.database.crud import (
     get_latest_version_prompts,
     get_deployed_prompts,
 )
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
+from promptmodel.utils.random_utils import select_version
 from promptmodel.promptmodel_init import CacheManager, update_deployed_db
 
 
@@ -55,15 +57,50 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
             prompt_rows, version_detail = get_deployed_prompts(name)
             if prompt_rows is None:
                 return [], {}
+
+            return [
+                {"role": prompt.role, "content": prompt.content}
+                for prompt in prompt_rows
+            ], version_detail
+
         else:
-            await update_deployed_db(config)  # wait for update local DB cache
-            prompt_rows, version_detail = get_deployed_prompts(name)
+            prompts_data = await AsyncAPIClient.execute(
+                method="GET",
+                path="/fetch_published_prompt_model_version",
+                params={"prompt_model_name": name},
+                use_cli_key=False,
+            )
+            prompt_model_versions = prompts_data["prompt_model_versions"]
+            prompts = prompts_data["prompts"]
+            for version in prompt_model_versions:
+                if version["is_published"] is True:
+                    version["ratio"] = 1.0
+            selected_version = select_version(prompt_model_versions)
+
+            prompt_rows = list(
+                filter(
+                    lambda prompt: str(prompt["version_uuid"])
+                    == str(selected_version["uuid"]),
+                    prompts,
+                )
+            )
+            # sort prompt_rows by step
+            prompt_rows = sorted(prompt_rows, key=lambda prompt: prompt["step"])
+
+            version_detail = {
+                "model": selected_version["model"],
+                "uuid": selected_version["uuid"],
+                "parsing_type": selected_version["parsing_type"],
+                "output_keys": selected_version["output_keys"],
+            }
+
             if prompt_rows is None:
                 return [], {}
 
-        return [
-            {"role": prompt.role, "content": prompt.content} for prompt in prompt_rows
-        ], version_detail
+            return [
+                {"role": prompt["role"], "content": prompt["content"]}
+                for prompt in prompt_rows
+            ], version_detail
 
 
 def set_inputs_to_prompts(inputs: Dict[str, Any], prompts: List[Dict[str, str]]):
