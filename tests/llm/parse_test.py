@@ -560,27 +560,6 @@ async def test_run_and_parsing(mocker):
             "finish_reason": "function_call",
         }
     ]
-    mock_api_response = {
-        "id": "chatcmpl-8GPN4B6KfJhVqjQK86SAwzvwZe79f",
-        "object": "chat.completion",
-        "created": 1698921466,
-        "model": "gpt-3.5-turbo-0613",
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": "[key type=str]ab[/key]",
-                    # "function_call": {
-                    # "name": "get_current_weather",
-                    # "arguments": "{\n  \"location\": \"Boston, MA\"\n}"
-                    # }
-                },
-                "finish_reason": "function_call",
-            }
-        ],
-        "usage": {"prompt_tokens": 82, "completion_tokens": 18, "total_tokens": 100},
-    }
     mock_completion = mocker.patch(
         "promptmodel.llms.llm.completion", return_value=mock_response
     )
