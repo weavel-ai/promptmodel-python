@@ -64,12 +64,16 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
             ], version_detail
 
         else:
-            prompts_data = await AsyncAPIClient.execute(
-                method="GET",
-                path="/fetch_published_prompt_model_version",
-                params={"prompt_model_name": name},
-                use_cli_key=False,
-            )
+            try:
+                prompts_data = await AsyncAPIClient.execute(
+                    method="GET",
+                    path="/fetch_published_prompt_model_version",
+                    params={"prompt_model_name": name},
+                    use_cli_key=False,
+                )
+                prompts_data = prompts_data.json()
+            except Exception as e:
+                raise e
             prompt_model_versions = prompts_data["prompt_model_versions"]
             prompts = prompts_data["prompts"]
             for version in prompt_model_versions:
