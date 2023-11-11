@@ -8,7 +8,7 @@ if testmode == "true":
     # ENDPOINT_URL = (
     #     "https://promptmodel-fastapi-server-weavel-be-pr-107.up.railway.app/api/cli"
     # )
-    ENDPOINT_URL = "https://promptmodel.up.railway.app/api/cli"
+    ENDPOINT_URL = "https://weavel.serveo.net/api/cli"
     # WEB_CLIENT_URL = "http://localhost:3000"
     WEB_CLIENT_URL = "https://app.promptmodel.run"
 else:

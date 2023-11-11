@@ -432,7 +432,10 @@ def _find_ancestor(target: dict, versions: List[Dict]):
             new_temp = [
                 version for version in versions if version["uuid"] == temp["from_uuid"]
             ][0]
-            if new_temp["version"] is not None:
+            if (
+                new_temp["version"] is not None
+                or new_temp["status"] == PromptModelVersionStatus.CANDIDATE.value
+            ):
                 ancestor = new_temp
                 break
             else:
