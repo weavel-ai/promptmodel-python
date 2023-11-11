@@ -9,7 +9,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="promptmodel",
-    version="0.0.24",
+    version="0.0.25",
     packages=find_namespace_packages(),
     entry_points={
         "console_scripts": [
@@ -29,7 +29,7 @@ setup(
         "cryptography",
         "pyyaml",
         "InquirerPy",
-        "litellm",
+        "litellm==0.13.2",
         "python-dotenv",
         "websockets",
         "termcolor",
