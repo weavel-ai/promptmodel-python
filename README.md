@@ -14,7 +14,7 @@
         <a href="https://pypi.org/project/promptmodel" target="_blank">
             <img src="https://img.shields.io/pypi/v/promptmodel.svg" alt="PyPI Version">
         </a>
-        <a href="https://discord.gg/4pUM3C4rbA" target="_blank">
+        <a href="https://discord.gg/2Y36M36tZf" target="_blank">
             <img src="https://dcbadge.vercel.app/api/server/dVTtyEU4?style=flat">
         </a>
     </div>
