@@ -220,7 +220,6 @@ class DevWebsocketClient:
                         del prompt_model["id"]
 
                         prompt_models_only_in_local.append(prompt_model)
-                print(prompt_model_versions)
                 data = {
                     "prompt_models": prompt_models_only_in_local,
                     "versions": prompt_model_versions,

@@ -346,6 +346,8 @@ def update_samples(samples: List[Dict]):
 
 def update_prompt_model_uuid(local_uuid, new_uuid):
     """Update prompt_model_uuid"""
+    if local_uuid == new_uuid:
+        return
     with db.atomic():
         local_prompt_model: PromptModel = PromptModel.get(
             PromptModel.uuid == local_uuid
