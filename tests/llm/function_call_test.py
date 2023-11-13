@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from typing import Generator, AsyncGenerator, Dict, List, Any, Optional
 from litellm import ModelResponse
 
-from .constants import function_shemas
+from ..constants import function_shemas
 from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse

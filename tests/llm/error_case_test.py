@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from typing import Generator, AsyncGenerator, Dict, List, Any, Optional
 from litellm import ModelResponse
 
-from .constants import function_shemas
+from ..constants import function_shemas
 from promptmodel.llms.llm import LLM, ParseResult
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse
@@ -109,7 +109,12 @@ def string_to_generator(input_string: str):
     def generator():
         for char in input_string:
             yield generator_format(char)
-        yield {"choices": [{"delta": {"content": None}, "finish_reason": "stop"}]}
+        yield {
+            "id": "test",
+            "created": "Test",
+            "model": "gpt-3.5-turbo",
+            "choices": [{"delta": {"content": None}, "finish_reason": "stop"}],
+        }
 
     return generator()
 
@@ -121,7 +126,12 @@ async def string_to_agenerator(input_string: str):
     async def agenerator():
         for char in input_string:
             yield generator_format(char)
-        yield {"choices": [{"delta": {"content": None}, "finish_reason": "stop"}]}
+        yield {
+            "id": "test",
+            "created": "Test",
+            "model": "gpt-3.5-turbo",
+            "choices": [{"delta": {"content": None}, "finish_reason": "stop"}],
+        }
 
     return agenerator()
 
@@ -214,13 +224,15 @@ def test_stream_and_parse_error_cases(mocker):
         messages=[{"role": "user", "content": "hello"}],
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
-        functions=[function_shemas],
+        functions=function_shemas,
     )
     results: List[LLMStreamResponse] = []
     for chunk in res:
         results.append(chunk)
+        # print(chunk.__dict__)
     assert len([result for result in results if result.error == True]) > 0
     error_log = [result.error_log for result in results if result.error == True][0]
+    print([result.error_log for result in results if result.error == True])
     assert error_log == "Output keys do not match with parsed output keys"
 
     # Double Bracket failed case - error in parsing
@@ -345,7 +357,7 @@ async def test_astream_and_parse_error_cases(mocker):
         messages=[{"role": "user", "content": "hello"}],
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
-        functions=[function_shemas],
+        functions=function_shemas,
     )
     results: List[LLMStreamResponse] = []
     async for chunk in res:

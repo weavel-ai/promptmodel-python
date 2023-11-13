@@ -157,35 +157,47 @@ async def test_run_model_function_call(
     )
 
     # success case with parsing
+    mocker.patch(
+        "promptmodel.websocket.websocket_client.get_sample_input",
+        new_callable=MagicMock,
+        return_value={
+            "name": "sample_2",
+            "contents": {"user_message": "Nice to Meet you!"},
+        },
+    )
     system_prompt_with_format = """
 You are a helpful assistant.
 
-This is your output format. Keep the string between "<" and ">" as it is.
-<temperature type=float>
+This is your output format. Keep the string between "[" and "]" as same as given below. You MUST FOLLOW this output format.
+Output Format:
+[response type=str]
 (value here)
-</temperature>
+[/response]
     """
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_PROMPT_MODEL,
             "prompt_model_name": "test_module",
-            "sample_name": "sample_1",
+            "sample_name": "sample_2",
             "prompts": [
                 {"role": "system", "content": system_prompt_with_format, "step": 1},
                 {"role": "user", "content": "{user_message}", "step": 2},
             ],
-            "model": "gpt-3.5-turbo",
+            "model": "gpt-4-1106-preview",
             "uuid": None,
             "from_uuid": None,
-            "parsing_type": ParsingType.HTML.value,
-            "output_keys": ["temperature"],
+            "parsing_type": ParsingType.SQUARE_BRACKET.value,
+            "output_keys": ["response"],
             "functions": ["get_current_weather"],
         },
         ws=mock_websocket,
     )
     create_run_log_mock.assert_called_once()
     _, kwargs = create_run_log_mock.call_args
-    assert kwargs["function_call"] is not None, "function_call is None"
+    assert kwargs["function_call"] is None, "function_call is not None"
+    print(kwargs["parsed_outputs"])
+    assert "response" in kwargs["parsed_outputs"], "response not in parsed_outputs"
+    assert len(list(set(kwargs["parsed_outputs"].keys()))) == 1
     create_run_log_mock.reset_mock()
     print(
         "======================================================================================="

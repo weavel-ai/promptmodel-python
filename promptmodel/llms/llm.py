@@ -131,10 +131,8 @@ class LLM:
             )
         except Exception as e:
             if response is not None:
-                print("hi")
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
-                print("hello")
                 return LLMResponse(api_response=None, error=True, error_log=str(e))
 
     async def arun(
@@ -386,7 +384,6 @@ class LLM:
     ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
         response = None
-
         try:
             if parsing_type == ParsingType.COLON.value:
                 # cannot stream colon type
@@ -860,8 +857,6 @@ class LLM:
                                 break
                             else:
                                 # no start token, no stream_pause (not inside of tag)
-                                print(buffer)
-                                print(type(buffer))
                                 if buffer:
                                     yield LLMStreamResponse(
                                         parsed_outputs={active_key: buffer}
