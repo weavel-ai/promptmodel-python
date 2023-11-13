@@ -51,7 +51,7 @@ class ParsingType(str, Enum):
 
 class ParsingPattern(dict, Enum):
     COLON = {
-        "start": r"(.*?): \n",
+        "start": r"(\w+)\s+type=([\w,\s\[\]]+): \n",
         "start_fstring": "{key}: \n",
         "end_fstring": None,
         "whole": r"(.*?): (.*?)\n",
@@ -75,7 +75,7 @@ class ParsingPattern(dict, Enum):
         "end_token": r"]",
     }
     HTML = {
-        "start": r"<(.*?)>",
+        "start": r"<(\w+)\s+type=([\w,\s\[\]]+)>",
         "start_fstring": "<{key} type={type}>",
         "end_fstring": "</{key}>",
         "whole": r"<(\w+)\s+type=([\w,\s\[\]]+)>(.*?)</\1>",  # also captures type

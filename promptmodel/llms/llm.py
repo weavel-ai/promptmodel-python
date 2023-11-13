@@ -68,7 +68,7 @@ class LLM:
         whole_pattern = parsing_pattern["whole"]
         parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
         parsed_outputs = {}
-        error = False
+        error: bool = False
         error_log: str = None
 
         try:
@@ -77,9 +77,9 @@ class LLM:
                 type_str = parsed_result[1]
                 value = convert_str_to_type(parsed_result[2], type_str)
                 parsed_outputs[key] = value
-        except Exception as error:
+        except Exception as e:
             error = True
-            error_log = str(error)
+            error_log = str(e)
 
         return ParseResult(
             parsed_outputs=parsed_outputs,
@@ -103,7 +103,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
-    ):
+    ) -> LLMResponse:
         """Return the response from openai chat completion."""
         response = None
         try:
@@ -130,9 +130,11 @@ class LLM:
                 api_response=response, raw_output=content, function_call=call_func
             )
         except Exception as e:
-            if response:
+            if response is not None:
+                print("hi")
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
+                print("hello")
                 return LLMResponse(api_response=None, error=True, error_log=str(e))
 
     async def arun(
@@ -142,7 +144,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
-    ):
+    ) -> LLMResponse:
         """Return the response from openai chat completion."""
         response = None
         try:
@@ -168,7 +170,7 @@ class LLM:
                 api_response=response, raw_output=content, function_call=call_func
             )
         except Exception as e:
-            if response:
+            if response is not None:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
                 return LLMResponse(api_response=None, error=True, error_log=str(e))
@@ -180,7 +182,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
-    ):
+    ) -> Generator[LLMStreamResponse, None, None]:
         """Stream openai chat completion."""
         response = None
         try:
@@ -201,7 +203,7 @@ class LLM:
             ):
                 yield result
         except Exception as e:
-            return LLMStreamResponse(error=True, error_log=str(e))
+            yield LLMStreamResponse(error=True, error_log=str(e))
 
     async def astream(
         self,
@@ -210,7 +212,7 @@ class LLM:
         model: Optional[str] = DEFAULT_MODEL,
         *args,
         **kwargs,
-    ) -> Generator[LLMStreamResponse, None, None]:
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
         response = None
         try:
@@ -239,7 +241,7 @@ class LLM:
         functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
-    ) -> Dict[str, str]:
+    ) -> LLMResponse:
         """Parse and return output from openai chat completion."""
         response = None
         parsed_success = True
@@ -290,7 +292,7 @@ class LLM:
                 error_log=error_log,
             )
         except Exception as e:
-            if response:
+            if response is not None:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
                 return LLMResponse(api_response=None, error=True, error_log=str(e))
@@ -302,7 +304,7 @@ class LLM:
         functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
-    ) -> Dict[str, str]:
+    ) -> LLMResponse:
         """Generate openai chat completion asynchronously, and parse the output.
         Example prompt is as follows:
         -----
@@ -368,7 +370,7 @@ class LLM:
                 error_log=error_log,
             )
         except Exception as e:
-            if response:
+            if response is not None:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
             else:
                 return LLMResponse(api_response=None, error=True, error_log=str(e))
@@ -510,7 +512,7 @@ class LLM:
                     yield LLMStreamResponse(error=True, error_log=error_log)
 
         except Exception as e:
-            return LLMStreamResponse(error=True, error_log=str(e))
+            yield LLMStreamResponse(error=True, error_log=str(e))
 
     async def astream_and_parse(
         self,
@@ -701,6 +703,203 @@ class LLM:
             res.choices[0]["message"]["function_call"] = function_call
         return res
 
+    def __llm_stream_response_generator__(
+        self,
+        messages: List[Dict[str, str]],
+        response: Generator,
+        start_time: datetime.datetime,
+        functions: List[Any] = [],
+    ) -> Generator[LLMStreamResponse, None, None]:
+        raw_output = ""
+        function_call = {"name": "", "arguments": ""}
+        try:
+            for chunk in response:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
+                    raw_output += chunk["choices"][0]["delta"]["content"]
+                    yield LLMStreamResponse(
+                        raw_output=chunk["choices"][0]["delta"]["content"]
+                    )
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
+                        function_call[key] += value
+
+                if chunk["choices"][0]["finish_reason"] != None:
+                    end_time = datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield LLMStreamResponse(
+                        api_response=self.make_model_response(
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_list=functions,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
+                        ),
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
+                    )
+        except Exception as e:
+            logger.error(e)
+            yield LLMStreamResponse(error=True, error_log=str(e))
+
+    def __single_type_sp_generator__(
+        self,
+        messages: List[Dict[str, str]],
+        response: Generator,
+        parsing_type: ParsingType,
+        start_time: datetime.datetime,
+        functions: List[Any] = [],
+    ) -> Generator[LLMStreamResponse, None, None]:
+        try:
+            parsing_pattern = get_pattern_by_type(parsing_type)
+            start_tag = parsing_pattern["start"]
+            start_fstring = parsing_pattern["start_fstring"]
+            end_fstring = parsing_pattern["end_fstring"]
+            start_token = parsing_pattern["start_token"]
+            end_token = parsing_pattern["end_token"]
+
+            buffer = ""
+            raw_output = ""
+            active_key = None
+            stream_pause = False
+            end_tag = None
+            function_call = {"name": "", "arguments": ""}
+            for chunk in response:
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
+                    stream_value: str = chunk["choices"][0]["delta"]["content"]
+                    raw_output += stream_value
+                    yield LLMStreamResponse(raw_output=stream_value)
+                    buffer += stream_value
+                    while True:
+                        if active_key is None:
+                            keys = re.findall(start_tag, buffer, flags=re.DOTALL)
+                            # if len(keys) > 1:
+                            #     yield LLMStreamResponse(
+                            #         error=True,
+                            #         error_log="Parsing error : Nested key detected",
+                            #     )
+                            #     break
+                            if len(keys) == 0:
+                                break  # no key
+                            active_key, active_type = keys[
+                                0
+                            ]  # Updated to unpack both key and type
+                            end_tag = end_fstring.format(key=active_key)
+                            # delete start tag from buffer
+                            start_pattern = start_fstring.format(
+                                key=active_key, type=active_type
+                            )
+                            buffer = buffer.split(start_pattern)[-1]
+                        else:
+                            if (
+                                stream_value.find(start_token) != -1
+                            ):  # start token appers in chunk -> pause
+                                stream_pause = True
+                                break
+                            elif stream_pause:
+                                if (
+                                    buffer.find(end_tag) != -1
+                                ):  # if end tag appears in buffer
+                                    yield LLMStreamResponse(
+                                        parsed_outputs={
+                                            active_key: buffer.split(end_tag)[
+                                                0
+                                            ].replace(end_tag, "")
+                                        }
+                                    )
+                                    buffer = buffer.split(end_tag)[-1]
+                                    active_key = None
+                                    stream_pause = False
+                                elif (
+                                    stream_value.find(end_token) != -1
+                                ):  # if pattern ends  = ("[blah]" != end_pattern) appeared in buffer
+                                    if (
+                                        active_type == "List"
+                                        or active_type == "Dict"
+                                        and end_token.find("]") != -1
+                                    ):
+                                        try:
+                                            buffer_dict = json.loads(buffer)
+                                            stream_pause = False
+                                            continue
+                                        except Exception as exception:
+                                            logger.error(exception)
+                                            yield LLMStreamResponse(
+                                                error=True,
+                                                error_log="Parsing error : Invalid end tag detected",
+                                                parsed_outputs={
+                                                    active_key: buffer.split(
+                                                        start_token
+                                                    )[0]
+                                                },
+                                            )
+                                            stream_pause = False
+                                            buffer = ""
+                                    yield LLMStreamResponse(
+                                        error=True,
+                                        error_log="Parsing error : Invalid end tag detected",
+                                        parsed_outputs={active_key: buffer},
+                                    )
+                                    stream_pause = False
+                                    buffer = ""
+                                break
+                            else:
+                                # no start token, no stream_pause (not inside of tag)
+                                print(buffer)
+                                print(type(buffer))
+                                if buffer:
+                                    yield LLMStreamResponse(
+                                        parsed_outputs={active_key: buffer}
+                                    )
+                                    buffer = ""
+                                break
+
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
+                        function_call[key] += value
+
+                if chunk["choices"][0]["finish_reason"] != None:
+                    end_time = datetime.datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield LLMStreamResponse(
+                        api_response=self.make_model_response(
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            function_list=functions,
+                            function_call=function_call
+                            if chunk["choices"][0]["finish_reason"] == "function_call"
+                            else None,
+                        ),
+                        function_call=function_call
+                        if chunk["choices"][0]["finish_reason"] == "function_call"
+                        else None,
+                    )
+        except Exception as e:
+            logger.error(e)
+            yield LLMStreamResponse(error=True, error_log=str(e))
+
     def __double_type_sp_generator__(
         self,
         messages: List[Dict[str, str]],
@@ -708,7 +907,7 @@ class LLM:
         parsing_type: ParsingType,
         start_time: datetime.datetime,
         functions: List[Any] = [],
-    ):
+    ) -> Generator[LLMStreamResponse, None, None]:
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
             start_tag = parsing_pattern["start"]
@@ -736,12 +935,12 @@ class LLM:
                     while True:
                         if active_key is None:
                             keys = re.findall(start_tag, buffer, flags=re.DOTALL)
-                            if len(keys) > 1:
-                                yield LLMStreamResponse(
-                                    error=True,
-                                    error_log="Parsing error : Nested key detected",
-                                )
-                                break
+                            # if len(keys) > 1:
+                            #     yield LLMStreamResponse(
+                            #         error=True,
+                            #         error_log="Parsing error : Nested key detected",
+                            #     )
+                            #     break
                             if len(keys) == 0:
                                 break  # no key
                             active_key, active_type = keys[0]
@@ -840,17 +1039,17 @@ class LLM:
             logger.error(e)
             yield LLMStreamResponse(error=True, error_log=str(e))
 
-    def __llm_stream_response_generator__(
+    async def __llm_stream_response_agenerator__(
         self,
         messages: List[Dict[str, str]],
-        response: Generator,
+        response: AsyncGenerator,
         start_time: datetime.datetime,
         functions: List[Any] = [],
-    ):
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         raw_output = ""
         function_call = {"name": "", "arguments": ""}
         try:
-            for chunk in response:
+            async for chunk in response:
                 if (
                     "content" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["content"] is not None
@@ -891,14 +1090,14 @@ class LLM:
             logger.error(e)
             yield LLMStreamResponse(error=True, error_log=str(e))
 
-    def __single_type_sp_generator__(
+    async def __single_type_sp_agenerator__(
         self,
         messages: List[Dict[str, str]],
-        response: Generator,
+        response: AsyncGenerator,
         parsing_type: ParsingType,
         start_time: datetime.datetime,
         functions: List[Any] = [],
-    ):
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
             start_tag = parsing_pattern["start"]
@@ -913,7 +1112,7 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            for chunk in response:
+            async for chunk in response:
                 if (
                     "content" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["content"] is not None
@@ -926,12 +1125,12 @@ class LLM:
                     while True:
                         if active_key is None:
                             keys = re.findall(start_tag, buffer, flags=re.DOTALL)
-                            if len(keys) > 1:
-                                yield LLMStreamResponse(
-                                    error=True,
-                                    error_log="Parsing error : Nested key detected",
-                                )
-                                break
+                            # if len(keys) > 1:
+                            #     yield LLMStreamResponse(
+                            #         error=True,
+                            #         error_log="Parsing error : Nested key detected",
+                            #     )
+                            #     break
                             if len(keys) == 0:
                                 break  # no key
 
@@ -1045,7 +1244,7 @@ class LLM:
         parsing_type: ParsingType,
         start_time: datetime.datetime,
         functions: List[Any] = [],
-    ):
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
             start_tag = parsing_pattern["start"]
@@ -1073,12 +1272,12 @@ class LLM:
                     while True:
                         if active_key is None:
                             keys = re.findall(start_tag, buffer, flags=re.DOTALL)
-                            if len(keys) > 1:
-                                yield LLMStreamResponse(
-                                    error=True,
-                                    error_log="Parsing error : Nested key detected",
-                                )
-                                break
+                            # if len(keys) > 1:
+                            #     yield LLMStreamResponse(
+                            #         error=True,
+                            #         error_log="Parsing error : Nested key detected",
+                            #     )
+                            #     break
                             if len(keys) == 0:
                                 break  # no key
                             active_key, active_type = keys[0]
@@ -1137,204 +1336,6 @@ class LLM:
                                             buffer = ""
                                             stream_pause = False
                                             break
-                                break
-                            else:
-                                # no start token, no stream_pause (not inside of tag)
-                                if buffer:
-                                    yield LLMStreamResponse(
-                                        parsed_outputs={active_key: buffer}
-                                    )
-                                    buffer = ""
-                                break
-
-                if (
-                    "function_call" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["function_call"] is not None
-                ):
-                    for key, value in chunk["choices"][0]["delta"][
-                        "function_call"
-                    ].items():
-                        function_call[key] += value
-
-                if chunk["choices"][0]["finish_reason"] != None:
-                    end_time = datetime.datetime.now()
-                    response_ms = (end_time - start_time).total_seconds() * 1000
-                    yield LLMStreamResponse(
-                        api_response=self.make_model_response(
-                            chunk,
-                            response_ms,
-                            messages,
-                            raw_output,
-                            function_list=functions,
-                            function_call=function_call
-                            if chunk["choices"][0]["finish_reason"] == "function_call"
-                            else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
-                    )
-        except Exception as e:
-            logger.error(e)
-            yield LLMStreamResponse(error=True, error_log=str(e))
-
-    async def __llm_stream_response_agenerator__(
-        self,
-        messages: List[Dict[str, str]],
-        response: AsyncGenerator,
-        start_time: datetime.datetime,
-        functions: List[Any] = [],
-    ):
-        raw_output = ""
-        function_call = {"name": "", "arguments": ""}
-        try:
-            async for chunk in response:
-                if (
-                    "content" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["content"] is not None
-                ):
-                    raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(
-                        raw_output=chunk["choices"][0]["delta"]["content"]
-                    )
-
-                if (
-                    "function_call" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["function_call"] is not None
-                ):
-                    for key, value in chunk["choices"][0]["delta"][
-                        "function_call"
-                    ].items():
-                        function_call[key] += value
-
-                if chunk["choices"][0]["finish_reason"] != None:
-                    end_time = datetime.datetime.now()
-                    response_ms = (end_time - start_time).total_seconds() * 1000
-                    yield LLMStreamResponse(
-                        api_response=self.make_model_response(
-                            chunk,
-                            response_ms,
-                            messages,
-                            raw_output,
-                            function_list=functions,
-                            function_call=function_call
-                            if chunk["choices"][0]["finish_reason"] == "function_call"
-                            else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
-                    )
-        except Exception as e:
-            logger.error(e)
-            yield LLMStreamResponse(error=True, error_log=str(e))
-
-    async def __single_type_sp_agenerator__(
-        self,
-        messages: List[Dict[str, str]],
-        response: AsyncGenerator,
-        parsing_type: ParsingType,
-        start_time: datetime.datetime,
-        functions: List[Any] = [],
-    ):
-        try:
-            parsing_pattern = get_pattern_by_type(parsing_type)
-            start_tag = parsing_pattern["start"]
-            start_fstring = parsing_pattern["start_fstring"]
-            end_fstring = parsing_pattern["end_fstring"]
-            start_token = parsing_pattern["start_token"]
-            end_token = parsing_pattern["end_token"]
-
-            buffer = ""
-            raw_output = ""
-            active_key = None
-            stream_pause = False
-            end_tag = None
-            function_call = {"name": "", "arguments": ""}
-            async for chunk in response:
-                if (
-                    "content" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["content"] is not None
-                ):
-                    stream_value: str = chunk["choices"][0]["delta"]["content"]
-                    raw_output += stream_value
-                    yield LLMStreamResponse(raw_output=stream_value)
-                    buffer += stream_value
-
-                    while True:
-                        if active_key is None:
-                            keys = re.findall(start_tag, buffer, flags=re.DOTALL)
-                            if len(keys) > 1:
-                                yield LLMStreamResponse(
-                                    error=True,
-                                    error_log="Parsing error : Nested key detected",
-                                )
-                                break
-                            if len(keys) == 0:
-                                break  # no key
-
-                            active_key, active_type = keys[
-                                0
-                            ]  # Updated to unpack both key and type
-                            end_tag = end_fstring.format(key=active_key)
-                            # delete start tag from buffer
-                            start_pattern = start_fstring.format(
-                                key=active_key, type=active_type
-                            )
-                            buffer = buffer.split(start_pattern)[-1]
-
-                        else:
-                            if (
-                                stream_value.find(start_token) != -1
-                            ):  # start token appers in chunk -> pause
-                                stream_pause = True
-                                break
-                            elif stream_pause:
-                                if (
-                                    buffer.find(end_tag) != -1
-                                ):  # if end tag appears in buffer
-                                    yield LLMStreamResponse(
-                                        parsed_outputs={
-                                            active_key: buffer.split(end_tag)[
-                                                0
-                                            ].replace(end_tag, "")
-                                        }
-                                    )
-                                    buffer = buffer.split(end_tag)[-1]
-                                    active_key = None
-                                    stream_pause = False
-                                elif (
-                                    stream_value.find(end_token) != -1
-                                ):  # if pattern ends  = ("[blah]" != end_pattern) appeared in buffer
-                                    if (
-                                        active_type == "List"
-                                        or active_type == "Dict"
-                                        and end_token.find("]") != -1
-                                    ):
-                                        try:
-                                            buffer_dict = json.loads(buffer)
-                                            stream_pause = False
-                                            continue
-                                        except Exception as exception:
-                                            logger.error(exception)
-                                            yield LLMStreamResponse(
-                                                error=True,
-                                                error_log="Parsing error : Invalid end tag detected",
-                                                parsed_outputs={
-                                                    active_key: buffer.split(
-                                                        start_token
-                                                    )[0]
-                                                },
-                                            )
-                                            stream_pause = False
-                                            buffer = ""
-                                    yield LLMStreamResponse(
-                                        error=True,
-                                        error_log="Parsing error : Invalid end tag detected",
-                                        parsed_outputs={active_key: buffer},
-                                    )
-                                    stream_pause = False
-                                    buffer = ""
                                 break
                             else:
                                 # no start token, no stream_pause (not inside of tag)
