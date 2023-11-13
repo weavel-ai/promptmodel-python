@@ -160,8 +160,8 @@ async def test_run_model_function_call(
     system_prompt_with_format = """
 You are a helpful assistant.
 
-This is your output format. Keep the string between < type=< >>, </ > as it is.
-<temperature type=<float>>
+This is your output format. Keep the string between "<" and ">" as it is.
+<temperature type=float>
 (value here)
 </temperature>
     """
