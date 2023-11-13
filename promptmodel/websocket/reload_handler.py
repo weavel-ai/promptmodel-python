@@ -11,6 +11,7 @@ from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
 from promptmodel import DevApp, DevClient
 from promptmodel.database.crud import (
+    list_prompt_model_versions,
     list_prompt_models,
     update_used_in_code_prompt_model_by_name,
     create_prompt_models,
@@ -257,6 +258,16 @@ def update_prompt_model_version_changelog(
     local_db_prompt_model_list: List[Dict],
     local_code_prompt_model_name_list: List[str],
 ) -> List[Dict[str, Any]]:
+    local_db_prompt_model_version_list: List[Dict] = []
+    for uuid in local_db_prompt_model_list:
+        local_db_prompt_model_version_list += list_prompt_model_versions(uuid["uuid"])
+    uuid_list = list(
+        filter(
+            lambda uuid: uuid
+            not in [str(x["uuid"]) for x in local_db_prompt_model_version_list],
+            uuid_list,
+        )
+    )
     if action == ChangeLogAction.ADD.value:
         # find prompt_model_version in project_status['prompt_model_versions'] where uuid in uuid_list
         prompt_model_version_list_to_update = [
