@@ -39,7 +39,7 @@ class RegisteringMeta(type):
     def find_client_instance():
         import sys
 
-        # Get the current frame
+        # Get the current frame (frame where PromptModel is called)
         frame = sys._getframe(2)
         # Get global variables in the current frame
         global_vars = frame.f_globals
