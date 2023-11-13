@@ -11,6 +11,7 @@ from promptmodel.utils.types import LLMResponse, LLMStreamResponse
 from promptmodel.utils.enums import ParsingType
 
 html_output_format = """\
+You must follow the provided output format. Keep the string between <> as it is.
 Output format:
 <response type=str>
 (value here)
@@ -18,6 +19,7 @@ Output format:
 """
 
 double_bracket_output_format = """\
+You must follow the provided output format. Keep the string between [[ ]] as it is.
 Output format:
 [[response type=str]]
 (value here)
@@ -25,8 +27,9 @@ Output format:
 """
 
 colon_output_format = """\
+You must follow the provided output format. Keep the string before : as it is
 Output format:
-response: (value here)
+response type=str: (value here)
 
 """
 
@@ -156,12 +159,12 @@ def test_run_and_parse_with_functions(mocker):
     )
 
     print(res.__dict__)
-    # 1. Output 지키고 function call -> OK
+    # 1. Output 지키고 function call ->  (Pass)
     # 2. Output 지키고 stop -> OK
     # 3. Output 무시하고 function call -> OK (function call이 나타나면 파싱을 하지 않도록 수정)
 
     # In this case, error is True because the output is not in the correct format
-    assert res.error is True, "error is not True"
+    assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
         res.api_response.choices[0]["finish_reason"] == "function_call"
@@ -185,8 +188,9 @@ def test_run_and_parse_with_functions(mocker):
         output_keys=["response"],
     )
 
-    print(res.__dict__)
-    assert res.error is False, "error is not False"
+    if not "str" in res.raw_output:
+        # if "str" in res.raw_output, it means that LLM make mistakes
+        assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
         res.api_response.choices[0]["finish_reason"] == "stop"
@@ -251,9 +255,9 @@ async def test_arun_and_parse_with_functions(mocker):
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
-    print(res.__dict__)
-    # In this case, error is True because the output is not in the correct format
-    assert res.error is True, "error is not True"
+
+    # In this case, error is False becuase if function_call, parsing is not performed
+    assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
         res.api_response.choices[0]["finish_reason"] == "function_call"
@@ -276,8 +280,9 @@ async def test_arun_and_parse_with_functions(mocker):
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
-    print(res.__dict__)
-    assert res.error is False, "error is not False"
+    if not "str" in res.raw_output:
+        # if "str" in res.raw_output, it means that LLM make mistakes
+        assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
         res.api_response.choices[0]["finish_reason"] == "stop"

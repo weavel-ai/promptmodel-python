@@ -593,6 +593,31 @@ async def test_run_and_parsing(mocker):
     }, f"parsed output error : {res.parsed_outputs}"
     assert res.error == True, f"error mismatch : {res.error}"
 
+    # error case, raise in __parse_output_pattern__
+    mock_completion = mocker.patch(
+        "promptmodel.llms.llm.completion", return_value=mock_response
+    )
+    with mocker.patch(
+        "promptmodel.llms.llm.LLM.__parse_output_pattern__",
+        side_effect=Exception("test"),
+    ):
+        res: LLMResponse = llm.run_and_parse(
+            messages=[
+                {"role": "user", "content": "What is the weather like in Boston?"}
+            ],
+            parsing_type=ParsingType.SQUARE_BRACKET.value,
+            functions=[],
+            output_keys=["key"],
+            model="gpt-3.5-turbo",
+        )
+        mock_completion.assert_called_once()
+        mock_completion.reset_mock()
+        # should have api response
+        assert (
+            res.api_response is not None
+        ), f"api response mismatch : {res.api_response}"
+        assert res.error == True, f"error mismatch : {res.error}"
+
     # success case with function call
     mock_response.choices[0]["message"]["function_call"] = {
         "name": "get_current_weather",
@@ -607,18 +632,15 @@ async def test_run_and_parsing(mocker):
     )
     mock_completion.assert_called_once()
     mock_completion.reset_mock()
-    assert res.parsed_outputs == {
-        "key": "ab"
-    }, f"parsed output error : {res.parsed_outputs}"
+    assert (
+        res.parsed_outputs == {}
+    ), f"If function call, do not parse but : {res.parsed_outputs}"
     assert res.function_call == {
         "name": "get_current_weather",
         "arguments": '{\n  "location": "Boston, MA"\n}',
     }, f"function call mismatch : {res.function_call}"
 
-    # error case
-    mock_completion = mocker.patch(
-        "promptmodel.llms.llm.completion", returun_value=mock_response
-    )
+    # success case because function_call, did not parse
     mocker.patch(
         "promptmodel.llms.llm.LLM.__parse_output_pattern__",
         side_effect=Exception("test"),
@@ -633,8 +655,9 @@ async def test_run_and_parsing(mocker):
     mock_completion.assert_called_once()
     mock_completion.reset_mock()
     assert res.api_response is not None, f"api response mismatch : {res.api_response}"
-    assert res.error == True, f"error mismatch : {res.error}"
+    assert res.error == False, f"error mismatch : {res.error}"
 
+    # error case, raise error in completion
     mock_completion = mocker.patch(
         "promptmodel.llms.llm.completion",
         side_effect=Exception("test"),

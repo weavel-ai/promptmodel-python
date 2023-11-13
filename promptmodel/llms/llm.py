@@ -261,7 +261,6 @@ class LLM:
                 if "function_call" in response.choices[0]["message"]
                 else None
             )
-
             if not call_func:
                 # function call does not appear in output
 
@@ -406,7 +405,7 @@ class LLM:
 
             parsed_outputs = {}
             error_occurs = False
-            error_log = ""
+            error_log = None
 
             if len(functions) > 0:
                 # if function exists, cannot parsing in stream time
@@ -416,16 +415,19 @@ class LLM:
                     "function_call": None,
                     "api_response": None,
                 }
+                response_with_api_res = None
                 for result in self.__llm_stream_response_generator__(
                     messages, response, start_time, functions
                 ):
-                    yield result
                     if result.raw_output:
                         streamed_outputs["content"] += result.raw_output
                     if result.function_call:
                         streamed_outputs["function_call"] = result.function_call
                     if result.api_response:
                         streamed_outputs["api_response"] = result.api_response
+                        response_with_api_res = result
+                    else:
+                        yield result
 
                     if result.error and not error_occurs:
                         error_occurs = True
@@ -437,27 +439,32 @@ class LLM:
                     parse_result: ParseResult = self.__parse_output_pattern__(
                         streamed_outputs["content"], parsing_type
                     )
+
+                    error_occurs = parse_result.error or error_occurs
+                    error_log = parse_result.error_log if not error_log else error_log
+
                     if (
-                        (
-                            output_keys is not None
-                            and set(parsed_outputs.keys()) != set(output_keys)
-                        )
-                        or parse_result.error
-                        or not error_occurs
-                    ):
+                        output_keys is not None
+                        and set(parse_result.parsed_outputs.keys()) != set(output_keys)
+                    ) or error_occurs:
                         error_occurs = True
                         error_log = (
                             "Output keys do not match with parsed output keys"
-                            if not parse_result.error_log
-                            else parse_result.error_log
+                            if not error_log
+                            else error_log
                         )
-                        yield LLMStreamResponse(error=True, error_log=error_log)
-                    else:
                         yield LLMStreamResponse(
                             api_response=streamed_outputs["api_response"],
-                            parsed_outputs=parsed_outputs,
+                            error=True,
+                            error_log=error_log,
                         )
-
+                    else:
+                        response_with_api_res.parsed_outputs = (
+                            parse_result.parsed_outputs
+                        )
+                        yield response_with_api_res
+                else:
+                    yield response_with_api_res
             else:
                 if parsing_type is None:
                     for result in self.__llm_stream_response_generator__(
@@ -534,7 +541,8 @@ class LLM:
             )
 
             parsed_outputs = {}
-            error_occurs = False
+            error_occurs = False  # error in stream time
+            error_log = None
             if len(functions) > 0:
                 # if function exists, cannot parsing in stream time
                 # just stream raw output and parse after stream
@@ -543,16 +551,19 @@ class LLM:
                     "function_call": None,
                     "api_response": None,
                 }
+                response_with_api_res = None
                 async for result in self.__llm_stream_response_agenerator__(
                     messages, response, start_time, functions
                 ):
-                    yield result
                     if result.raw_output:
                         streamed_outputs["content"] += result.raw_output
                     if result.function_call:
                         streamed_outputs["function_call"] = result.function_call
                     if result.api_response:
                         streamed_outputs["api_response"] = result.api_response
+                        response_with_api_res = result
+                    else:
+                        yield result
 
                     if result.error and not error_occurs:
                         error_occurs = True
@@ -564,26 +575,31 @@ class LLM:
                     parse_result: ParseResult = self.__parse_output_pattern__(
                         streamed_outputs["content"], parsing_type
                     )
+
+                    error_occurs = parse_result.error or error_occurs
+                    error_log = parse_result.error_log if not error_log else error_log
                     if (
-                        (
-                            output_keys is not None
-                            and set(parsed_outputs.keys()) != set(output_keys)
-                        )
-                        or parse_result.error
-                        or not error_occurs
-                    ):
+                        output_keys is not None
+                        and set(parse_result.parsed_outputs.keys()) != set(output_keys)
+                    ) or error_occurs:
                         error_occurs = True
                         error_log = (
                             "Output keys do not match with parsed output keys"
-                            if not parse_result.error_log
-                            else parse_result.error_log
+                            if not error_log
+                            else error_log
                         )
-                        yield LLMStreamResponse(error=True, error_log=error_log)
-                    else:
                         yield LLMStreamResponse(
                             api_response=streamed_outputs["api_response"],
-                            parsed_outputs=parsed_outputs,
+                            error=True,
+                            error_log=error_log,
                         )
+                    else:
+                        response_with_api_res.parsed_outputs = (
+                            parse_result.parsed_outputs
+                        )
+                        yield response_with_api_res
+                else:
+                    yield response_with_api_res
             else:
                 if parsing_type is None:
                     async for result in self.__llm_stream_response_agenerator__(
