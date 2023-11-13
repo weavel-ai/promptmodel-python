@@ -8,145 +8,281 @@ from .constants import function_shemas
 from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse
+from promptmodel.utils.enums import ParsingType
+
+html_output_format = """\
+Output format:
+<response type=str>
+(value here)
+</response>
+"""
+
+double_bracket_output_format = """\
+Output format:
+[[response type=str]]
+(value here)
+[[/response]]
+"""
+
+colon_output_format = """\
+Output format:
+response: (value here)
+
+"""
 
 
 def test_run_with_functions(mocker):
-    pass
+    messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
+    llm = LLM()
+    res: LLMResponse = llm.run(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+    )
+
+    assert res.error is None, "error is not None"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "function_call"
+    ), "finish_reason is not function_call"
+
+    assert res.function_call is not None, "function_call is None"
+
+    messages = [{"role": "user", "content": "Hello, How are you?"}]
+
+    res: LLMResponse = llm.run(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+    )
+
+    assert res.error is None, "error is not None"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "stop"
+    ), "finish_reason is not stop"
+
+    assert res.function_call is None, "function_call is not None"
+    assert res.raw_output is not None, "raw_output is None"
 
 
 @pytest.mark.asyncio
 async def test_arun_with_functions(mocker):
-    pass
+    messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
+    llm = LLM()
+    res: LLMResponse = await llm.arun(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+    )
+
+    assert res.error is None, "error is not None"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "function_call"
+    ), "finish_reason is not function_call"
+
+    assert res.function_call is not None, "function_call is None"
+
+    messages = [{"role": "user", "content": "Hello, How are you?"}]
+
+    res: LLMResponse = await llm.arun(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+    )
+
+    assert res.error is None, "error is not None"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "stop"
+    ), "finish_reason is not stop"
+
+    assert res.function_call is None, "function_call is not None"
+    assert res.raw_output is not None, "raw_output is None"
 
 
 def test_run_and_parse_with_functions(mocker):
-    pass
+    # With parsing_type = None
+    messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
+    llm = LLM()
+    res: LLMResponse = llm.run_and_parse(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+        parsing_type=None,
+    )
+    assert res.error is False, "error is not False"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "function_call"
+    ), "finish_reason is not function_call"
+
+    assert res.function_call is not None, "function_call is None"
+
+    messages = [{"role": "user", "content": "Hello, How are you?"}]
+
+    res: LLMResponse = llm.run_and_parse(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+        parsing_type=None,
+    )
+
+    assert res.error is False, "error is not False"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "stop"
+    ), "finish_reason is not stop"
+
+    assert res.function_call is None, "function_call is not None"
+    assert res.raw_output is not None, "raw_output is None"
+
+    # with parsing_type = "HTML"
+
+    messages = [
+        {
+            "role": "user",
+            "content": "What is the weather like in Boston? \n" + html_output_format,
+        }
+    ]
+    llm = LLM()
+    res: LLMResponse = llm.run_and_parse(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+        parsing_type=ParsingType.HTML.value,
+        output_keys=["response"],
+    )
+
+    print(res.__dict__)
+    # 1. Output 지키고 function call -> OK
+    # 2. Output 지키고 stop -> OK
+    # 3. Output 무시하고 function call -> OK (function call이 나타나면 파싱을 하지 않도록 수정)
+
+    # In this case, error is True because the output is not in the correct format
+    assert res.error is True, "error is not True"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "function_call"
+    ), "finish_reason is not function_call"
+
+    assert res.function_call is not None, "function_call is None"
+    assert res.parsed_outputs == {}, "parsed_outputs is not empty"
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, How are you?\n" + html_output_format,
+        }
+    ]
+
+    res: LLMResponse = llm.run_and_parse(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+        parsing_type=ParsingType.HTML.value,
+        output_keys=["response"],
+    )
+
+    print(res.__dict__)
+    assert res.error is False, "error is not False"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "stop"
+    ), "finish_reason is not stop"
+
+    assert res.function_call is None, "function_call is not None"
+    assert res.raw_output is not None, "raw_output is None"
+    assert res.parsed_outputs != {}, "parsed_outputs is empty dict"
 
 
 @pytest.mark.asyncio
 async def test_arun_and_parse_with_functions(mocker):
-    pass
-
-
-def test_stream_with_functions(mocker):
+    # With parsing_type = None
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
-    stream_res: Generator[LLMStreamResponse, None, None] = llm.stream(
+    res: LLMResponse = await llm.arun_and_parse(
         messages=messages,
         functions=function_shemas,
         model="gpt-3.5-turbo-0613",
+        parsing_type=None,
     )
 
-    error_count = 0
-    api_responses: List[ModelResponse] = []
-    final_response: Optional[LLMStreamResponse] = None
-    for res in stream_res:
-        if res.error:
-            error_count += 1
-            print("ERROR")
-            print(res.error)
-            print(res.error_log)
-        if res.api_response:
-            api_responses.append(res.api_response)
-            final_response = res
-
-    assert error_count == 0, "error_count is not 0"
-    assert len(api_responses) == 1, "api_count is not 1"
-
+    assert res.error is False, "error is not False"
+    assert res.api_response is not None, "api_response is None"
     assert (
-        api_responses[0].choices[0]["message"]["content"] is None
-    ), "content is not None"
-    assert api_responses[0]["response_ms"] is not None, "response_ms is None"
-    assert api_responses[0]["usage"] is not None, "usage is None"
-    assert api_responses[0]["usage"]["prompt_tokens"] == 74, "prompt_tokens is not 74"
+        res.api_response.choices[0]["finish_reason"] == "function_call"
+    ), "finish_reason is not function_call"
 
-    # test logging
-    llm_proxy = LLMProxy("test")
+    assert res.function_call is not None, "function_call is None"
 
-    mock_execute = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_execute.return_value = mock_response
-    mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
+    messages = [{"role": "user", "content": "Hello, How are you?"}]
 
-    llm_proxy._sync_log_to_cloud(
-        version_uuid="test",
-        inputs={},
-        api_response=api_responses[0],
-        parsed_outputs={},
-        metadata={},
-    )
-
-    mock_execute.assert_called_once()
-    _, kwargs = mock_execute.call_args
-
-    assert (
-        kwargs["json"]["api_response"] == api_responses[0].to_dict_recursive()
-    ), "api_response is not equal"
-
-
-@pytest.mark.asyncio
-async def test_astream_with_functions(mocker):
-    messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
-    llm = LLM()
-    stream_res: Generator[LLMStreamResponse, None, None] = llm.astream(
+    res: LLMResponse = await llm.arun_and_parse(
         messages=messages,
         functions=function_shemas,
         model="gpt-3.5-turbo-0613",
+        parsing_type=None,
     )
 
-    error_count = 0
-    api_responses: List[ModelResponse] = []
-    final_response: Optional[LLMStreamResponse] = None
-    async for res in stream_res:
-        if res.error:
-            error_count += 1
-            print("ERROR")
-            print(res.error)
-            print(res.error_log)
-        if res.api_response:
-            api_responses.append(res.api_response)
-            final_response = res
-
-    assert error_count == 0, "error_count is not 0"
-    assert len(api_responses) == 1, "api_count is not 1"
-
+    assert res.error is False, "error is not False"
+    assert res.api_response is not None, "api_response is None"
     assert (
-        api_responses[0].choices[0]["message"]["content"] is None
-    ), "content is not None"
-    assert api_responses[0]["response_ms"] is not None, "response_ms is None"
-    assert api_responses[0]["usage"] is not None, "usage is None"
-    assert api_responses[0]["usage"]["prompt_tokens"] == 74, "prompt_tokens is not 74"
+        res.api_response.choices[0]["finish_reason"] == "stop"
+    ), "finish_reason is not stop"
 
-    # test logging
-    llm_proxy = LLMProxy("test")
+    assert res.function_call is None, "function_call is not None"
+    assert res.raw_output is not None, "raw_output is None"
 
-    mock_execute = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_execute.return_value = mock_response
-    mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
+    # with parsing_type = "HTML"
 
-    await llm_proxy._async_log_to_cloud(
-        version_uuid="test",
-        inputs={},
-        api_response=api_responses[0],
-        parsed_outputs={},
-        metadata={},
+    messages = [
+        {
+            "role": "user",
+            "content": "What is the weather like in Boston? \n" + html_output_format,
+        }
+    ]
+    llm = LLM()
+    res: LLMResponse = await llm.arun_and_parse(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+        parsing_type=ParsingType.HTML.value,
+        output_keys=["response"],
     )
-
-    mock_execute.assert_called_once()
-    _, kwargs = mock_execute.call_args
-
+    print(res.__dict__)
+    # In this case, error is True because the output is not in the correct format
+    assert res.error is True, "error is not True"
+    assert res.api_response is not None, "api_response is None"
     assert (
-        kwargs["json"]["api_response"] == api_responses[0].to_dict_recursive()
-    ), "api_response is not equal"
+        res.api_response.choices[0]["finish_reason"] == "function_call"
+    ), "finish_reason is not function_call"
 
+    assert res.function_call is not None, "function_call is None"
+    assert res.parsed_outputs == {}, "parsed_outputs is not empty"
 
-def test_stream_and_parse_with_functions(mocker):
-    pass
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, How are you?\n" + html_output_format,
+        }
+    ]
 
+    res: LLMResponse = await llm.arun_and_parse(
+        messages=messages,
+        functions=function_shemas,
+        model="gpt-3.5-turbo-0613",
+        parsing_type=ParsingType.HTML.value,
+        output_keys=["response"],
+    )
+    print(res.__dict__)
+    assert res.error is False, "error is not False"
+    assert res.api_response is not None, "api_response is None"
+    assert (
+        res.api_response.choices[0]["finish_reason"] == "stop"
+    ), "finish_reason is not stop"
 
-@pytest.mark.asyncio
-async def test_astream_and_parse_with_functions(mocker):
-    pass
+    assert res.function_call is None, "function_call is not None"
+    assert res.raw_output is not None, "raw_output is None"
+    assert res.parsed_outputs != {}, "parsed_outputs is empty"

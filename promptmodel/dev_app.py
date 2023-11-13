@@ -61,7 +61,9 @@ class DevApp:
     def __init__(self):
         self.prompt_models: List[PromptModelInterface] = []
         self.samples: List[Dict[str, Any]] = []
-        self.functions: Dict[str, Dict[str, Union[FunctionSchema, Callable]]] = {}
+        self.functions: Dict[
+            str, Dict[str, Union[FunctionSchema, Optional[Callable]]]
+        ] = {}
 
         if not DevApp._nest_asyncio_applied:
             DevApp._nest_asyncio_applied = True
