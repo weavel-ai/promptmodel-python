@@ -10,8 +10,7 @@ from typing import (
     Generator,
     List,
     Optional,
-    Tuple,
-    Union,
+    Coroutine,
 )
 
 import promptmodel.utils.logger as logger
@@ -40,7 +39,7 @@ class RegisteringMeta(type):
     def find_client_instance():
         import sys
 
-        # Get the current frame
+        # Get the current frame (frame where PromptModel is called)
         frame = sys._getframe(2)
         # Get global variables in the current frame
         global_vars = frame.f_globals
@@ -130,7 +129,7 @@ class PromptModel(metaclass=RegisteringMeta):
         self,
         inputs: Optional[Dict[str, Any]] = {},
         function_list: Optional[List[Dict[str, Any]]] = None,
-    ) -> AsyncGenerator[LLMStreamResponse, None]:
+    ) -> Coroutine[AsyncGenerator[LLMStreamResponse, None]]:
         """Async Run PromptModel with stream=True. It does not raise error.
 
         Args:
@@ -142,8 +141,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        async for item in self.llm_proxy.astream(inputs, function_list):
-            yield item
+        return (item async for item in self.llm_proxy.astream(inputs, function_list))
 
     def run_and_parse(
         self,
@@ -204,7 +202,7 @@ class PromptModel(metaclass=RegisteringMeta):
         self,
         inputs: Dict[str, Any] = {},
         function_list: Optional[List[Dict[str, Any]]] = None,
-    ) -> AsyncGenerator[LLMStreamResponse, None]:
+    ) -> Coroutine[AsyncGenerator[LLMStreamResponse, None]]:
         """Async Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
         Args:
@@ -216,29 +214,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
         """
-        async for item in self.llm_proxy.astream_and_parse(inputs, function_list):
-            yield item
-
-    # def run_and_parse_function_call(
-    #     self,
-    #     inputs: Dict[str, Any] = {},
-    #     function_list: List[Callable[..., Any]] = [],
-    # ) -> Generator[str, None, None]:
-    #     return self.llm_proxy.run_and_parse_function_call(inputs, function_list)
-
-    # async def arun_and_parse_function_call(
-    #     self,
-    #     inputs: Dict[str, Any] = {},
-    #     function_list: List[Callable[..., Any]] = [],
-    # ) -> Generator[str, None, None]:
-    #     return await self.llm_proxy.arun_and_parse_function_call(inputs, function_list)
-
-    # async def astream_and_parse_function_call(
-    #     self,
-    #     inputs: Dict[str, Any] = {},
-    #     function_list: List[Callable[..., Any]] = [],
-    # ) -> AsyncGenerator[str, None]:
-    #     async for item in self.llm_proxy.astream_and_parse_function_call(
-    #         inputs, function_list
-    #     ):
-    #         yield item
+        return (
+            item
+            async for item in self.llm_proxy.astream_and_parse(inputs, function_list)
+        )

@@ -6,7 +6,7 @@ from promptmodel.dev_app import DevApp
 
 
 async def echo_coroutine(*args, **kwargs):
-    print(args, kwargs)
+    # print(args, kwargs)
     return args, kwargs
 
 

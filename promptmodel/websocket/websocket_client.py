@@ -453,6 +453,7 @@ class DevWebsocketClient:
                                 function_call["name"], function_call_args
                             )
                             function_call_log["response"] = function_response
+                            # Send function call response for check LLM response validity
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
@@ -483,66 +484,70 @@ class DevWebsocketClient:
                             response.update(data)
                             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                             return
-                        # call LLM once more
-                        messages_for_run += [
-                            {
-                                "role": "assistant",
-                                "function_call": function_call,
-                            },
-                            {
-                                "role": "function",
-                                "name": function_call["name"],
-                                "content": str(function_response),
-                            },
-                        ]
-                        res_after_function_call: AsyncGenerator[
-                            LLMStreamResponse, None
-                        ] = prompt_model_dev.dev_chat(
-                            messages_for_run, parsing_type, model
-                        )
+                        # # call LLM once more
+                        # messages_for_run += [
+                        #     {
+                        #         "role": "assistant",
+                        #         "function_call": function_call,
+                        #     },
+                        #     {
+                        #         "role": "function",
+                        #         "name": function_call["name"],
+                        #         "content": str(function_response),
+                        #     },
+                        # ]
 
-                        output = {"raw_output": "", "parsed_outputs": {}}
-                        async for item in res_after_function_call:
-                            if item.raw_output is not None:
-                                output["raw_output"] += item.raw_output
-                                data = {
-                                    "type": ServerTask.UPDATE_RESULT_RUN.value,
-                                    "status": "running",
-                                    "raw_output": item.raw_output,
-                                }
-                            if item.parsed_outputs:
-                                if (
-                                    list(item.parsed_outputs.keys())[0]
-                                    not in output["parsed_outputs"]
-                                ):
-                                    output["parsed_outputs"][
-                                        list(item.parsed_outputs.keys())[0]
-                                    ] = list(item.parsed_outputs.values())[0]
-                                else:
-                                    output["parsed_outputs"][
-                                        list(item.parsed_outputs.keys())[0]
-                                    ] += list(item.parsed_outputs.values())[0]
-                                data = {
-                                    "type": ServerTask.UPDATE_RESULT_RUN.value,
-                                    "status": "running",
-                                    "parsed_outputs": item.parsed_outputs,
-                                }
+                        # res_after_function_call: AsyncGenerator[
+                        #     LLMStreamResponse, None
+                        # ] = prompt_model_dev.dev_chat(
+                        #     messages_for_run, parsing_type, model
+                        # )
 
-                            if item.error and parsing_success is True:
-                                parsing_success = not item.error
-                                error_log = item.error_log
+                        # output = {"raw_output": "", "parsed_outputs": {}}
+                        # async for item in res_after_function_call:
+                        #     if item.raw_output is not None:
+                        #         output["raw_output"] += item.raw_output
+                        #         data = {
+                        #             "type": ServerTask.UPDATE_RESULT_RUN.value,
+                        #             "status": "running",
+                        #             "raw_output": item.raw_output,
+                        #         }
+                        #     if item.parsed_outputs:
+                        #         if (
+                        #             list(item.parsed_outputs.keys())[0]
+                        #             not in output["parsed_outputs"]
+                        #         ):
+                        #             output["parsed_outputs"][
+                        #                 list(item.parsed_outputs.keys())[0]
+                        #             ] = list(item.parsed_outputs.values())[0]
+                        #         else:
+                        #             output["parsed_outputs"][
+                        #                 list(item.parsed_outputs.keys())[0]
+                        #             ] += list(item.parsed_outputs.values())[0]
+                        #         data = {
+                        #             "type": ServerTask.UPDATE_RESULT_RUN.value,
+                        #             "status": "running",
+                        #             "parsed_outputs": item.parsed_outputs,
+                        #         }
 
-                            data.update(response)
-                            # logger.debug(f"Sent response: {data}")
-                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                        #     if item.error and parsing_success is True:
+                        #         parsing_success = not item.error
+                        #         error_log = item.error_log
+
+                        #     data.update(response)
+                        #     # logger.debug(f"Sent response: {data}")
+                        #     await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
                     if (
                         message["output_keys"] is not None
                         and message["parsing_type"] is not None
                         and set(output["parsed_outputs"].keys())
-                        != set(message["output_keys"])
-                        or (parsing_success is False)
-                    ):
+                        != set(
+                            message["output_keys"]
+                        )  # parsed output keys != output keys
+                    ) or (
+                        parsing_success is False
+                    ):  # error occurs in streaming time
                         error_log = error_log if error_log else "Key matching failed."
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,

@@ -34,14 +34,16 @@ class LLMProxy(LLM):
             # Call the generator with the arguments
             stream_response: Generator[LLMStreamResponse, None, None] = gen(**call_args)
 
-            raw_response = None
+            api_response = None
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
             error_occurs = False
             error_log = None
             for item in stream_response:
-                if item.api_response:
-                    raw_response = item.api_response
+                if (
+                    item.api_response and "delta" not in item.api_response["choices"][0]
+                ):  # only get the last api_response, not delta response
+                    api_response = item.api_response
                 if item.parsed_outputs:
                     dict_cache = update_dict(dict_cache, item.parsed_outputs)
                 if item.raw_output:
@@ -49,22 +51,28 @@ class LLMProxy(LLM):
                 if item.error and not error_occurs:
                     error_occurs = True
                     error_log = item.error_log
+
+                if error_occurs:
+                    # delete all promptmodel data in item
+                    item.raw_output = None
+                    item.parsed_outputs = None
+                    item.function_call = None
                 yield item
 
             # add string_cache in model_response
-            if raw_response:
-                if "message" not in raw_response.choices[0]:
-                    raw_response.choices[0]["message"] = {}
-                if "content" not in raw_response.choices[0]["message"]:
-                    raw_response.choices[0]["message"]["content"] = string_cache
-                    raw_response.choices[0]["message"]["role"] = "assistant"
+            if api_response:
+                if "message" not in api_response.choices[0]:
+                    api_response.choices[0]["message"] = {}
+                if "content" not in api_response.choices[0]["message"]:
+                    api_response.choices[0]["message"]["content"] = string_cache
+                    api_response.choices[0]["message"]["role"] = "assistant"
 
             metadata = {
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
             self._sync_log_to_cloud(
-                version_details["uuid"], inputs, raw_response, dict_cache, metadata
+                version_details["uuid"], inputs, api_response, dict_cache, metadata
             )
 
         return wrapper
@@ -81,15 +89,17 @@ class LLMProxy(LLM):
                 **call_args
             )
 
-            raw_response = None
+            api_response = None
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
             error_occurs = False
             error_log = None
-            raw_response: Optional[ModelResponse] = None
+            api_response: Optional[ModelResponse] = None
             async for item in stream_response:
-                if item.api_response:
-                    raw_response = item.api_response
+                if (
+                    item.api_response and "delta" not in item.api_response["choices"][0]
+                ):  # only get the last api_response, not delta response
+                    api_response = item.api_response
                 if item.parsed_outputs:
                     dict_cache = update_dict(dict_cache, item.parsed_outputs)
                 if item.raw_output:
@@ -100,19 +110,19 @@ class LLMProxy(LLM):
                 yield item
 
             # add string_cache in model_response
-            if raw_response:
-                if "message" not in raw_response.choices[0]:
-                    raw_response.choices[0]["message"] = {}
-                if "content" not in raw_response.choices[0]["message"]:
-                    raw_response.choices[0]["message"]["content"] = string_cache
-                    raw_response.choices[0]["message"]["role"] = "assistant"
+            if api_response:
+                if "message" not in api_response.choices[0]:
+                    api_response.choices[0]["message"] = {}
+                if "content" not in api_response.choices[0]["message"]:
+                    api_response.choices[0]["message"]["content"] = string_cache
+                    api_response.choices[0]["message"]["role"] = "assistant"
 
             metadata = {
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
             await self._async_log_to_cloud(
-                version_details["uuid"], inputs, raw_response, dict_cache, metadata
+                version_details["uuid"], inputs, api_response, dict_cache, metadata
             )
 
             # raise Exception("error_log")
@@ -150,6 +160,11 @@ class LLMProxy(LLM):
                     {},
                     metadata,
                 )
+            if error_occurs:
+                # delete all promptmodel data in llm_response
+                llm_response.raw_output = None
+                llm_response.parsed_outputs = None
+                llm_response.function_call = None
             return llm_response
 
         return wrapper
@@ -188,6 +203,12 @@ class LLMProxy(LLM):
                     {},
                     metadata,
                 )
+
+            if error_occurs:
+                # delete all promptmodel data in llm_response
+                llm_response.raw_output = None
+                llm_response.parsed_outputs = None
+                llm_response.function_call = None
             return llm_response
 
         return async_wrapper
