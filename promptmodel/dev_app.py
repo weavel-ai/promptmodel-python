@@ -89,7 +89,9 @@ class DevApp:
             }
 
     def _call_register_function(self, name: str, arguments: Dict[str, str]):
-        function_to_call: Callable = self.functions[name]["function"]
+        function_to_call: Optional[Callable] = self.functions[name]["function"]
+        if not function_to_call:
+            return
         try:
             function_response = function_to_call(**arguments)
             return function_response
