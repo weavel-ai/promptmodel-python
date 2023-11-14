@@ -29,7 +29,7 @@ def test_stream(mocker):
             print("ERROR")
             print(res.error)
             print(res.error_log)
-        if res.api_response:
+        if res.api_response and "delta" not in res.api_response.choices[0]:
             api_responses.append(res.api_response)
 
     assert error_count == 0, "error_count is not 0"
@@ -86,7 +86,7 @@ async def test_astream(mocker):
             print("ERROR")
             print(res.error)
             print(res.error_log)
-        if res.api_response:
+        if res.api_response and "delta" not in res.api_response.choices[0]:
             api_responses.append(res.api_response)
 
     assert error_count == 0, "error_count is not 0"

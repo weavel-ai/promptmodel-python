@@ -171,7 +171,7 @@ def test_run_and_parse_with_functions(mocker):
     ), "finish_reason is not function_call"
 
     assert res.function_call is not None, "function_call is None"
-    assert res.parsed_outputs == {}, "parsed_outputs is not empty"
+    assert res.parsed_outputs is None, "parsed_outputs is not empty"
 
     messages = [
         {
@@ -264,7 +264,7 @@ async def test_arun_and_parse_with_functions(mocker):
     ), "finish_reason is not function_call"
 
     assert res.function_call is not None, "function_call is None"
-    assert res.parsed_outputs == {}, "parsed_outputs is not empty"
+    assert res.parsed_outputs is None, "parsed_outputs is not empty"
 
     messages = [
         {

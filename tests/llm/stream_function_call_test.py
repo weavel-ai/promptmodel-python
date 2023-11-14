@@ -52,13 +52,15 @@ def test_stream_with_functions(mocker):
             print("ERROR")
             print(res.error)
             print(res.error_log)
-        if res.api_response:
+        if res.api_response and "delta" not in res.api_response.choices[0]:
             api_responses.append(res.api_response)
             final_response = res
 
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
-    assert final_response.function_call is not None, "function_call is None"
+    assert (
+        "function_call" in final_response.api_response.choices[0]["message"]
+    ), "function_call is None"
 
     assert (
         api_responses[0].choices[0]["message"]["content"] is None
@@ -111,13 +113,15 @@ async def test_astream_with_functions(mocker):
             print("ERROR")
             print(res.error)
             print(res.error_log)
-        if res.api_response:
+        if res.api_response and "delta" not in res.api_response.choices[0]:
             api_responses.append(res.api_response)
             final_response = res
 
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
-    assert final_response.function_call is not None, "function_call is None"
+    assert (
+        "function_call" in final_response.api_response.choices[0]["message"]
+    ), "function_call is None"
 
     assert (
         api_responses[0].choices[0]["message"]["content"] is None
@@ -170,18 +174,19 @@ def test_stream_and_parse_with_functions(mocker):
             print("ERROR")
             print(res.error)
             print(res.error_log)
-        if res.api_response:
+        if res.api_response and "delta" not in res.api_response.choices[0]:
             api_responses.append(res.api_response)
             final_response = res
 
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
-    assert final_response.function_call is not None, "function_call is None"
+    assert (
+        "function_call" in final_response.api_response.choices[0]["message"]
+    ), "function_call is None"
 
     assert (
         api_responses[0].choices[0]["message"]["content"] is None
     ), "content is not None"
-    assert final_response.function_call is not None, "function_call is None"
 
     # Not call function, parsing case
     messages = [
@@ -207,7 +212,7 @@ def test_stream_and_parse_with_functions(mocker):
             error_count += 1
             error_log = res.error_log
             print("ERROR")
-        if res.api_response:
+        if res.api_response and "delta" not in res.api_response.choices[0]:
             api_responses.append(res.api_response)
             final_response = res
 
@@ -217,13 +222,15 @@ def test_stream_and_parse_with_functions(mocker):
             error_count == 0
         ), f"error_count is not 0, {error_log}, {api_responses[0].to_dict_recursive()}"
     assert len(api_responses) == 1, "api_count is not 1"
-    assert final_response.function_call is None, "function_call is not None"
-    assert final_response.parsed_outputs != {}, "parsed_outputs is empty dict"
+    assert (
+        "function_call" not in final_response.api_response.choices[0]["message"]
+    ), "function_call is not None"
+
+    assert final_response.parsed_outputs is not None, "parsed_outputs is None"
 
     assert (
         api_responses[0].choices[0]["message"]["content"] is not None
     ), "content is None"
-    assert final_response.function_call is None, "function_call is not None"
 
 
 @pytest.mark.asyncio
@@ -246,7 +253,7 @@ async def test_astream_and_parse_with_functions(mocker):
             # print("ERROR")
             # print(res.error)
             # print(res.error_log)
-        if res.api_response:
+        if res.api_response and "delta" not in res.api_response.choices[0]:
             api_responses.append(res.api_response)
             final_response = res
 
@@ -256,7 +263,9 @@ async def test_astream_and_parse_with_functions(mocker):
     assert (
         api_responses[0].choices[0]["message"]["content"] is None
     ), "content is not None"
-    assert final_response.function_call is not None, "function_call is None"
+    assert (
+        "function_call" in final_response.api_response.choices[0]["message"]
+    ), "function_call is None"
 
     # Not call function, parsing case
     messages = [
@@ -282,7 +291,7 @@ async def test_astream_and_parse_with_functions(mocker):
             error_count += 1
             error_log = res.error_log
             print("ERROR")
-        if res.api_response:
+        if res.api_response and "delta" not in res.api_response.choices[0]:
             api_responses.append(res.api_response)
             final_response = res
 
@@ -292,10 +301,11 @@ async def test_astream_and_parse_with_functions(mocker):
             error_count == 0
         ), f"error_count is not 0, {error_log}, {api_responses[0].to_dict_recursive()}"
     assert len(api_responses) == 1, "api_count is not 1"
-    assert final_response.function_call is None, "function_call is not None"
+    assert (
+        "function_call" not in final_response.api_response.choices[0]["message"]
+    ), "function_call is not None"
     assert final_response.parsed_outputs != {}, "parsed_outputs is empty dict"
 
     assert (
         api_responses[0].choices[0]["message"]["content"] is not None
     ), "content is None"
-    assert final_response.function_call is None, "function_call is not None"

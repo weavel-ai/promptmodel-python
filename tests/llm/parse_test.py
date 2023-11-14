@@ -633,7 +633,7 @@ async def test_run_and_parsing(mocker):
     mock_completion.assert_called_once()
     mock_completion.reset_mock()
     assert (
-        res.parsed_outputs == {}
+        res.parsed_outputs is None
     ), f"If function call, do not parse but : {res.parsed_outputs}"
     assert res.function_call == {
         "name": "get_current_weather",
@@ -768,7 +768,7 @@ async def test_arun_and_parsing(mocker):
     mock_completion.assert_called_once()
     mock_completion.reset_mock()
     assert (
-        res.parsed_outputs == {}
+        res.parsed_outputs is None
     ), f"If function call, do not parse but : {res.parsed_outputs}"
     assert res.function_call == {
         "name": "get_current_weather",

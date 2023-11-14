@@ -362,7 +362,7 @@ class LLM:
             return LLMResponse(
                 api_response=response,
                 raw_output=raw_output,
-                parsed_outputs=parse_result.parsed_outputs if parse_result else {},
+                parsed_outputs=parse_result.parsed_outputs if parse_result else None,
                 function_call=call_func,
                 error=not parsed_success,
                 error_log=error_log,
