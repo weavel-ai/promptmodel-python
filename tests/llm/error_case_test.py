@@ -17,7 +17,6 @@ def test_parse_output_pattern_error_cases(mocker):
     assert res.parsed_outputs == {}
     assert res.error == False
     assert res.error_log is None
-    # res = llm.LLM__parse_output_pattern()
 
     res: ParseResult = llm.__parse_output_pattern__(
         parsing_type=ParsingType.COLON.value, raw_output=None

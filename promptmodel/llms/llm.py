@@ -284,7 +284,7 @@ class LLM:
             return LLMResponse(
                 api_response=response,
                 raw_output=raw_output,
-                parsed_outputs=parse_result.parsed_outputs if parse_result else {},
+                parsed_outputs=parse_result.parsed_outputs if parse_result else None,
                 function_call=call_func,
                 error=not parsed_success,
                 error_log=error_log,
@@ -422,7 +422,10 @@ class LLM:
                         streamed_outputs["content"] += result.raw_output
                     if result.function_call:
                         streamed_outputs["function_call"] = result.function_call
-                    if result.api_response:
+                    if (
+                        result.api_response
+                        and "delta" not in result.api_response["choices"][0]
+                    ):  # only get the last api_response, not delta response
                         streamed_outputs["api_response"] = result.api_response
                         response_with_api_res = result
                     else:
@@ -558,7 +561,10 @@ class LLM:
                         streamed_outputs["content"] += result.raw_output
                     if result.function_call:
                         streamed_outputs["function_call"] = result.function_call
-                    if result.api_response:
+                    if (
+                        result.api_response
+                        and "delta" not in result.api_response["choices"][0]
+                    ):
                         streamed_outputs["api_response"] = result.api_response
                         response_with_api_res = result
                     else:
@@ -710,16 +716,9 @@ class LLM:
         raw_output = ""
         function_call = {"name": "", "arguments": ""}
         try:
+            yield_api_response_with_fc = False
             for chunk in response:
-                if (
-                    "content" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["content"] is not None
-                ):
-                    raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(
-                        raw_output=chunk["choices"][0]["delta"]["content"]
-                    )
-
+                yield_api_response_with_fc = False
                 if (
                     "function_call" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["function_call"] is not None
@@ -728,6 +727,22 @@ class LLM:
                         "function_call"
                     ].items():
                         function_call[key] += value
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        function_call=chunk["choices"][0]["delta"]["function_call"],
+                    )
+                    yield_api_response_with_fc = True
+
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
+                    raw_output += chunk["choices"][0]["delta"]["content"]
+                    yield LLMStreamResponse(
+                        api_response=chunk if not yield_api_response_with_fc else None,
+                        raw_output=chunk["choices"][0]["delta"]["content"],
+                    )
 
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
@@ -742,10 +757,7 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
+                        )
                     )
         except Exception as e:
             logger.error(e)
@@ -773,24 +785,39 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
+            yield_api_response_with_fc = False
             for chunk in response:
+                yield_api_response_with_fc = False
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
+                        function_call[key] += value
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        function_call=chunk["choices"][0]["delta"]["function_call"],
+                    )
+                    yield_api_response_with_fc = True
+
                 if (
                     "content" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["content"] is not None
                 ):
                     stream_value: str = chunk["choices"][0]["delta"]["content"]
                     raw_output += stream_value
-                    yield LLMStreamResponse(raw_output=stream_value)
+                    yield LLMStreamResponse(
+                        api_response=chunk if not yield_api_response_with_fc else None,
+                        raw_output=stream_value,
+                    )
+
                     buffer += stream_value
                     while True:
                         if active_key is None:
                             keys = re.findall(start_tag, buffer, flags=re.DOTALL)
-                            # if len(keys) > 1:
-                            #     yield LLMStreamResponse(
-                            #         error=True,
-                            #         error_log="Parsing error : Nested key detected",
-                            #     )
-                            #     break
                             if len(keys) == 0:
                                 break  # no key
                             active_key, active_type = keys[
@@ -864,15 +891,6 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if (
-                    "function_call" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["function_call"] is not None
-                ):
-                    for key, value in chunk["choices"][0]["delta"][
-                        "function_call"
-                    ].items():
-                        function_call[key] += value
-
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
@@ -886,10 +904,7 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
+                        )
                     )
         except Exception as e:
             logger.error(e)
@@ -917,25 +932,40 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
+            yield_api_response_with_fc = False
             for chunk in response:
+                yield_api_response_with_fc = False
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
+                        function_call[key] += value
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        function_call=chunk["choices"][0]["delta"]["function_call"],
+                    )
+                    yield_api_response_with_fc = True
+
                 if (
                     "content" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["content"] is not None
                 ):
                     stream_value: str = chunk["choices"][0]["delta"]["content"]
                     raw_output += stream_value
-                    yield LLMStreamResponse(raw_output=stream_value)
+                    yield LLMStreamResponse(
+                        api_response=chunk if not yield_api_response_with_fc else None,
+                        raw_output=stream_value,
+                    )
+
                     buffer += stream_value
 
                     while True:
                         if active_key is None:
                             keys = re.findall(start_tag, buffer, flags=re.DOTALL)
-                            # if len(keys) > 1:
-                            #     yield LLMStreamResponse(
-                            #         error=True,
-                            #         error_log="Parsing error : Nested key detected",
-                            #     )
-                            #     break
                             if len(keys) == 0:
                                 break  # no key
                             active_key, active_type = keys[0]
@@ -1003,15 +1033,6 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if (
-                    "function_call" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["function_call"] is not None
-                ):
-                    for key, value in chunk["choices"][0]["delta"][
-                        "function_call"
-                    ].items():
-                        function_call[key] += value
-
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
@@ -1025,10 +1046,7 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
+                        )
                     )
         except Exception as e:
             logger.error(e)
@@ -1044,16 +1062,9 @@ class LLM:
         raw_output = ""
         function_call = {"name": "", "arguments": ""}
         try:
+            yield_api_response_with_fc = False
             async for chunk in response:
-                if (
-                    "content" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["content"] is not None
-                ):
-                    raw_output += chunk["choices"][0]["delta"]["content"]
-                    yield LLMStreamResponse(
-                        raw_output=chunk["choices"][0]["delta"]["content"]
-                    )
-
+                yield_api_response_with_fc = False
                 if (
                     "function_call" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["function_call"] is not None
@@ -1062,6 +1073,23 @@ class LLM:
                         "function_call"
                     ].items():
                         function_call[key] += value
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        function_call=chunk["choices"][0]["delta"]["function_call"],
+                    )
+                    yield_api_response_with_fc = True
+
+                if (
+                    "content" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["content"] is not None
+                ):
+                    stream_value: str = chunk["choices"][0]["delta"]["content"]
+                    raw_output += stream_value
+                    yield LLMStreamResponse(
+                        api_response=chunk if not yield_api_response_with_fc else None,
+                        raw_output=stream_value,
+                    )
 
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
@@ -1076,10 +1104,7 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
+                        )
                     )
         except Exception as e:
             logger.error(e)
@@ -1107,25 +1132,40 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
+            yield_api_response_with_fc = False
             async for chunk in response:
+                yield_api_response_with_fc = False
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
+                        function_call[key] += value
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        function_call=chunk["choices"][0]["delta"]["function_call"],
+                    )
+                    yield_api_response_with_fc = True
+
                 if (
                     "content" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["content"] is not None
                 ):
                     stream_value: str = chunk["choices"][0]["delta"]["content"]
                     raw_output += stream_value
-                    yield LLMStreamResponse(raw_output=stream_value)
+                    yield LLMStreamResponse(
+                        api_response=chunk if not yield_api_response_with_fc else None,
+                        raw_output=stream_value,
+                    )
+
                     buffer += stream_value
 
                     while True:
                         if active_key is None:
                             keys = re.findall(start_tag, buffer, flags=re.DOTALL)
-                            # if len(keys) > 1:
-                            #     yield LLMStreamResponse(
-                            #         error=True,
-                            #         error_log="Parsing error : Nested key detected",
-                            #     )
-                            #     break
                             if len(keys) == 0:
                                 break  # no key
 
@@ -1201,15 +1241,6 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if (
-                    "function_call" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["function_call"] is not None
-                ):
-                    for key, value in chunk["choices"][0]["delta"][
-                        "function_call"
-                    ].items():
-                        function_call[key] += value
-
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
@@ -1223,10 +1254,7 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
+                        )
                     )
         except Exception as e:
             logger.error(e)
@@ -1254,14 +1282,35 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
+            yield_api_response_with_fc = False
             async for chunk in response:
+                yield_api_response_with_fc = False
+                if (
+                    "function_call" in chunk["choices"][0]["delta"]
+                    and chunk["choices"][0]["delta"]["function_call"] is not None
+                ):
+                    for key, value in chunk["choices"][0]["delta"][
+                        "function_call"
+                    ].items():
+                        function_call[key] += value
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        function_call=chunk["choices"][0]["delta"]["function_call"],
+                    )
+                    yield_api_response_with_fc = True
+
                 if (
                     "content" in chunk["choices"][0]["delta"]
                     and chunk["choices"][0]["delta"]["content"] is not None
                 ):
                     stream_value: str = chunk["choices"][0]["delta"]["content"]
                     raw_output += stream_value
-                    yield LLMStreamResponse(raw_output=stream_value)
+                    yield LLMStreamResponse(
+                        api_response=chunk if not yield_api_response_with_fc else None,
+                        raw_output=stream_value,
+                    )
+
                     buffer += stream_value
 
                     while True:
@@ -1341,15 +1390,6 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if (
-                    "function_call" in chunk["choices"][0]["delta"]
-                    and chunk["choices"][0]["delta"]["function_call"] is not None
-                ):
-                    for key, value in chunk["choices"][0]["delta"][
-                        "function_call"
-                    ].items():
-                        function_call[key] += value
-
                 if chunk["choices"][0]["finish_reason"] != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
@@ -1363,10 +1403,7 @@ class LLM:
                             function_call=function_call
                             if chunk["choices"][0]["finish_reason"] == "function_call"
                             else None,
-                        ),
-                        function_call=function_call
-                        if chunk["choices"][0]["finish_reason"] == "function_call"
-                        else None,
+                        )
                     )
         except Exception as e:
             logger.error(e)
