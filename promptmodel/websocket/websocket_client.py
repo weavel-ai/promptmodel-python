@@ -253,11 +253,29 @@ class DevWebsocketClient:
                 # Validate Variable Matching
                 prompt_variables = []
                 for prompt in message["prompts"]:
-                    fstring_input_pattern = r"(?<!\\)(?<!{{)\{([^}]+)\}(?!\\)(?!}})"
-                    prompt_variables += re.findall(
-                        fstring_input_pattern, prompt["content"]
+                    prompt_content = prompt["content"]
+                    # Replace
+                    escaped_patterns = re.findall(r"\{\{.*?\}\}", prompt_content)
+                    for i, pattern in enumerate(escaped_patterns):
+                        prompt_content = prompt_content.replace(
+                            pattern, f"__ESCAPED{i}__"
+                        )
+
+                    # find f-string input variables
+                    fstring_input_pattern = r"(?<!\\)\{([^}]+)\}(?<!\\})"
+                    prompt_variables_in_prompt = re.findall(
+                        fstring_input_pattern, prompt_content
                     )
-                prompt_variables = list(set(prompt_variables))
+
+                    # Replace back
+                    for i, pattern in enumerate(escaped_patterns):
+                        prompt_content = prompt_content.replace(
+                            f"__ESCAPED{i}__", pattern
+                        )
+
+                    prompt_variables_in_prompt = list(set(prompt_variables_in_prompt))
+                    prompt_variables += prompt_variables_in_prompt
+
                 if len(prompt_variables) != 0:
                     if sample_input is None:
                         data = {
