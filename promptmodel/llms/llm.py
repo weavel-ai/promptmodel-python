@@ -196,10 +196,10 @@ class LLM:
                 functions=functions,
             )
 
-            for result in self.__llm_stream_response_generator__(
+            for chunk in self.__llm_stream_response_generator__(
                 messages, response, start_time, functions
             ):
-                yield result
+                yield chunk
         except Exception as e:
             yield LLMStreamResponse(error=True, error_log=str(e))
 
@@ -225,10 +225,10 @@ class LLM:
                 functions=functions,
             )
 
-            async for result in self.__llm_stream_response_agenerator__(
+            async for chunk in self.__llm_stream_response_agenerator__(
                 messages, response, start_time, functions
             ):
-                yield result
+                yield chunk
         except Exception as e:
             yield LLMStreamResponse(error=True, error_log=str(e))
 
@@ -415,25 +415,25 @@ class LLM:
                     "api_response": None,
                 }
                 response_with_api_res = None
-                for result in self.__llm_stream_response_generator__(
+                for chunk in self.__llm_stream_response_generator__(
                     messages, response, start_time, functions
                 ):
-                    if result.raw_output:
-                        streamed_outputs["content"] += result.raw_output
-                    if result.function_call:
-                        streamed_outputs["function_call"] = result.function_call
+                    if chunk.raw_output:
+                        streamed_outputs["content"] += chunk.raw_output
+                    if chunk.function_call:
+                        streamed_outputs["function_call"] = chunk.function_call
                     if (
-                        result.api_response
-                        and "delta" not in result.api_response["choices"][0]
+                        chunk.api_response
+                        and "delta" not in chunk.api_response["choices"][0]
                     ):  # only get the last api_response, not delta response
-                        streamed_outputs["api_response"] = result.api_response
-                        response_with_api_res = result
+                        streamed_outputs["api_response"] = chunk.api_response
+                        response_with_api_res = chunk
                     else:
-                        yield result
+                        yield chunk
 
-                    if result.error and not error_occurs:
+                    if chunk.error and not error_occurs:
                         error_occurs = True
-                        error_log = result.error_log
+                        error_log = chunk.error_log
 
                 if not streamed_outputs["function_call"]:
                     # if function call does not exist in output
@@ -469,39 +469,39 @@ class LLM:
                     yield response_with_api_res
             else:
                 if parsing_type is None:
-                    for result in self.__llm_stream_response_generator__(
+                    for chunk in self.__llm_stream_response_generator__(
                         messages, response, start_time, functions
                     ):
-                        yield result
+                        yield chunk
 
-                        if result.error and not error_occurs:
+                        if chunk.error and not error_occurs:
                             error_occurs = True
-                            error_log = result.error_log
+                            error_log = chunk.error_log
 
                 elif parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
-                    for result in self.__double_type_sp_generator__(
+                    for chunk in self.__double_type_sp_generator__(
                         messages, response, parsing_type, start_time, functions
                     ):
-                        yield result
-                        if result.parsed_outputs:
+                        yield chunk
+                        if chunk.parsed_outputs:
                             parsed_outputs = update_dict(
-                                parsed_outputs, result.parsed_outputs
+                                parsed_outputs, chunk.parsed_outputs
                             )
-                        if result.error and not error_occurs:
+                        if chunk.error and not error_occurs:
                             error_occurs = True
-                            error_log = result.error_log
+                            error_log = chunk.error_log
                 else:
-                    for result in self.__single_type_sp_generator__(
+                    for chunk in self.__single_type_sp_generator__(
                         messages, response, parsing_type, start_time
                     ):
-                        yield result
-                        if result.parsed_outputs:
+                        yield chunk
+                        if chunk.parsed_outputs:
                             parsed_outputs = update_dict(
-                                parsed_outputs, result.parsed_outputs
+                                parsed_outputs, chunk.parsed_outputs
                             )
-                        if result.error and not error_occurs:
+                        if chunk.error and not error_occurs:
                             error_occurs = True
-                            error_log = result.error_log
+                            error_log = chunk.error_log
 
                 if (
                     output_keys is not None
@@ -554,25 +554,25 @@ class LLM:
                     "api_response": None,
                 }
                 response_with_api_res = None
-                async for result in self.__llm_stream_response_agenerator__(
+                async for chunk in self.__llm_stream_response_agenerator__(
                     messages, response, start_time, functions
                 ):
-                    if result.raw_output:
-                        streamed_outputs["content"] += result.raw_output
-                    if result.function_call:
-                        streamed_outputs["function_call"] = result.function_call
+                    if chunk.raw_output:
+                        streamed_outputs["content"] += chunk.raw_output
+                    if chunk.function_call:
+                        streamed_outputs["function_call"] = chunk.function_call
                     if (
-                        result.api_response
-                        and "delta" not in result.api_response["choices"][0]
+                        chunk.api_response
+                        and "delta" not in chunk.api_response["choices"][0]
                     ):
-                        streamed_outputs["api_response"] = result.api_response
-                        response_with_api_res = result
+                        streamed_outputs["api_response"] = chunk.api_response
+                        response_with_api_res = chunk
                     else:
-                        yield result
+                        yield chunk
 
-                    if result.error and not error_occurs:
+                    if chunk.error and not error_occurs:
                         error_occurs = True
-                        error_log = result.error_log
+                        error_log = chunk.error_log
 
                 if not streamed_outputs["function_call"]:
                     # if function call does not exist in output
@@ -607,36 +607,36 @@ class LLM:
                     yield response_with_api_res
             else:
                 if parsing_type is None:
-                    async for result in self.__llm_stream_response_agenerator__(
+                    async for chunk in self.__llm_stream_response_agenerator__(
                         messages, response, start_time, functions
                     ):
-                        yield result
+                        yield chunk
 
-                        if result.error and not error_occurs:
+                        if chunk.error and not error_occurs:
                             error_occurs = True
-                            error_log = result.error_log
+                            error_log = chunk.error_log
 
                 elif parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
-                    async for result in self.__double_type_sp_agenerator__(
+                    async for chunk in self.__double_type_sp_agenerator__(
                         messages, response, parsing_type, start_time, functions
                     ):
-                        yield result
-                        if result.parsed_outputs:
+                        yield chunk
+                        if chunk.parsed_outputs:
                             parsed_outputs = update_dict(
-                                parsed_outputs, result.parsed_outputs
+                                parsed_outputs, chunk.parsed_outputs
                             )
-                        if result.error and not error_occurs:
+                        if chunk.error and not error_occurs:
                             error_occurs = True
                 else:
-                    async for result in self.__single_type_sp_agenerator__(
+                    async for chunk in self.__single_type_sp_agenerator__(
                         messages, response, parsing_type, start_time, functions
                     ):
-                        yield result
-                        if result.parsed_outputs:
+                        yield chunk
+                        if chunk.parsed_outputs:
                             parsed_outputs = update_dict(
-                                parsed_outputs, result.parsed_outputs
+                                parsed_outputs, chunk.parsed_outputs
                             )
-                        if result.error and not error_occurs:
+                        if chunk.error and not error_occurs:
                             error_occurs = True
 
                 if (
