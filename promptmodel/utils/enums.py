@@ -23,7 +23,7 @@ class ServerTask(str, Enum):
     UPDATE_RESULT_EVAL = "UPDATE_RESULT_EVAL"
 
 
-class PromptModelVersionStatus(Enum):
+class ModelVersionStatus(Enum):
     BROKEN = "broken"
     WORKING = "working"
     CANDIDATE = "candidate"

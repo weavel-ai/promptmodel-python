@@ -17,7 +17,8 @@ from peewee import (
 )
 
 from promptmodel.database.config import BaseModel
-from promptmodel.utils.enums import PromptModelVersionStatus, ParsingType
+from promptmodel.database.models_chat import *
+from promptmodel.utils.enums import ModelVersionStatus, ParsingType
 
 
 class JSONField(TextField):
@@ -52,7 +53,7 @@ class PromptModelVersion(BaseModel):
     status = CharField(
         constraints=[
             Check(
-                f"status IN ('{PromptModelVersionStatus.BROKEN.value}', '{PromptModelVersionStatus.WORKING.value}', '{PromptModelVersionStatus.CANDIDATE.value}')"
+                f"status IN ('{ModelVersionStatus.BROKEN.value}', '{ModelVersionStatus.WORKING.value}', '{ModelVersionStatus.CANDIDATE.value}')"
             )
         ]
     )

@@ -22,7 +22,7 @@ async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
     """fetch prompts.
 
     Args:
-        name (str): name of promtpmodel
+        name (str): name of PromptModel
 
     Returns:
         Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
@@ -205,8 +205,4 @@ def run_async_in_sync(coro: Coroutine):
         # loop.close()
         return result
 
-    if loop.is_running():
-        # nest_asyncio.apply already done
-        return loop.run_until_complete(coro)
-    else:
-        return loop.run_until_complete(coro)
+    return loop.run_until_complete(coro)

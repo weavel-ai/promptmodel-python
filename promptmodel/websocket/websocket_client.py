@@ -35,7 +35,7 @@ from promptmodel.database.models import PromptModelVersion, PromptModel
 from promptmodel.utils.enums import (
     ServerTask,
     LocalTask,
-    PromptModelVersionStatus,
+    ModelVersionStatus,
 )
 from promptmodel.utils.config_utils import upsert_config, read_config
 from promptmodel.utils.types import LLMStreamResponse
@@ -323,7 +323,7 @@ class DevWebsocketClient:
                         prompt_model_version: PromptModelVersion = (
                             create_prompt_model_version(
                                 prompt_model_uuid=prompt_model_uuid,
-                                status=PromptModelVersionStatus.BROKEN.value,
+                                status=ModelVersionStatus.BROKEN.value,
                                 from_uuid=message["from_uuid"],
                                 model=message["model"],
                                 parsing_type=message["parsing_type"],
@@ -490,7 +490,7 @@ class DevWebsocketClient:
                             }
                             update_prompt_model_version(
                                 prompt_model_version_uuid=prompt_model_version_uuid,
-                                status=PromptModelVersionStatus.BROKEN.value,
+                                status=ModelVersionStatus.BROKEN.value,
                             )
                             create_run_log(
                                 prompt_model_version_uuid=prompt_model_version_uuid,
@@ -574,7 +574,7 @@ class DevWebsocketClient:
                         }
                         update_prompt_model_version(
                             prompt_model_version_uuid=prompt_model_version_uuid,
-                            status=PromptModelVersionStatus.BROKEN.value,
+                            status=ModelVersionStatus.BROKEN.value,
                         )
                         create_run_log(
                             prompt_model_version_uuid=prompt_model_version_uuid,
@@ -593,7 +593,7 @@ class DevWebsocketClient:
                     }
                     update_prompt_model_version(
                         prompt_model_version_uuid=prompt_model_version_uuid,
-                        status=PromptModelVersionStatus.WORKING.value,
+                        status=ModelVersionStatus.WORKING.value,
                     )
 
                     create_run_log(

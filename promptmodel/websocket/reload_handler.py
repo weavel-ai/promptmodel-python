@@ -23,7 +23,7 @@ from promptmodel.database.crud import (
     update_prompt_model_uuid,
 )
 from promptmodel.utils.enums import (
-    PromptModelVersionStatus,
+    ModelVersionStatus,
     ChangeLogAction,
 )
 from promptmodel.websocket.websocket_client import DevWebsocketClient
@@ -284,7 +284,7 @@ def update_prompt_model_version_changelog(
         ]
 
         for prompt_model_version in prompt_model_version_list_to_update:
-            prompt_model_version["status"] = PromptModelVersionStatus.CANDIDATE.value
+            prompt_model_version["status"] = ModelVersionStatus.CANDIDATE.value
 
         create_prompt_model_versions(prompt_model_version_list_to_update)
         create_prompts(prompts_to_update)

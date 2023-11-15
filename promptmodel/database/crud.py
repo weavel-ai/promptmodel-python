@@ -12,10 +12,11 @@ from promptmodel.database.models import (
     DeployedPrompt,
 )
 from playhouse.shortcuts import model_to_dict
-from promptmodel.utils.enums import PromptModelVersionStatus, ParsingType
+from promptmodel.utils.enums import ModelVersionStatus, ParsingType
 from promptmodel.utils.random_utils import select_version
 from promptmodel.utils import logger
 from promptmodel.database.config import db
+from promptmodel.database.crud_chat import *
 
 
 # Insert
@@ -405,8 +406,7 @@ def find_ancestor_versions(target_prompt_model_uuid: Optional[str] = None):
 
     targets = list(
         filter(
-            lambda version: version["status"]
-            == PromptModelVersionStatus.CANDIDATE.value
+            lambda version: version["status"] == ModelVersionStatus.CANDIDATE.value
             and version["version"] is None,
             versions,
         )
@@ -437,7 +437,7 @@ def _find_ancestor(target: dict, versions: List[Dict]):
             ][0]
             if (
                 new_temp["version"] is not None
-                or new_temp["status"] == PromptModelVersionStatus.CANDIDATE.value
+                or new_temp["status"] == ModelVersionStatus.CANDIDATE.value
             ):
                 ancestor = new_temp
                 break

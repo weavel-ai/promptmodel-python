@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
+import nest_asyncio
 from typing import Generator, AsyncGenerator, Dict, List, Any, Optional
 from litellm import ModelResponse
 
@@ -9,6 +10,7 @@ from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.types import LLMResponse, LLMStreamResponse
 from promptmodel.utils.enums import ParsingType
+from promptmodel.utils.prompt_util import run_async_in_sync
 
 html_output_format = """\
 You must follow the provided output format. Keep the string between <> as it is.
@@ -78,12 +80,15 @@ def test_stream_with_functions(mocker):
     mock_execute.return_value = mock_response
     mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
 
-    llm_proxy._sync_log_to_cloud(
-        version_uuid="test",
-        inputs={},
-        api_response=api_responses[0],
-        parsed_outputs={},
-        metadata={},
+    nest_asyncio.apply()
+    run_async_in_sync(
+        llm_proxy._async_log_to_cloud(
+            version_uuid="test",
+            inputs={},
+            api_response=api_responses[0],
+            parsed_outputs={},
+            metadata={},
+        )
     )
 
     mock_execute.assert_called_once()

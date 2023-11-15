@@ -26,7 +26,7 @@ from promptmodel.cli.signal_handler import dev_terminate_signal_handler
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.crypto import generate_api_key, encrypt_message
-from promptmodel.utils.enums import PromptModelVersionStatus, ChangeLogAction
+from promptmodel.utils.enums import ModelVersionStatus, ChangeLogAction
 from promptmodel.websocket import DevWebsocketClient, CodeReloadHandler
 from promptmodel.database.orm import initialize_db
 from promptmodel.database.models import PromptModelVersion
@@ -124,7 +124,7 @@ def dev():
 
         # save prompt_model_versions
         for version in project_status["prompt_model_versions"]:
-            version["status"] = PromptModelVersionStatus.CANDIDATE.value
+            version["status"] = ModelVersionStatus.CANDIDATE.value
         create_prompt_model_versions(project_status["prompt_model_versions"])
         # save prompts
         create_prompts(project_status["prompts"])
@@ -454,7 +454,7 @@ def update_prompt_model_version_changelog(
         ]
 
         for prompt_model_version in version_list_to_update:
-            prompt_model_version["status"] = PromptModelVersionStatus.CANDIDATE.value
+            prompt_model_version["status"] = ModelVersionStatus.CANDIDATE.value
 
         create_prompt_model_versions(version_list_to_update)
         create_prompts(prompts_to_update)
