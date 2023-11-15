@@ -15,8 +15,11 @@ from typing import (
     Coroutine,
 )
 from uuid import uuid4
-from promptmodel.utils import logger
+from promptmodel import DevClient
+
 from promptmodel.llms.llm_proxy import LLMProxy
+from promptmodel.database.crud import create_chat_logs
+from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.prompt_util import (
     run_async_in_sync,
@@ -26,7 +29,6 @@ from promptmodel.utils.chat_util import (
     fetch_chat_log,
 )
 from promptmodel.utils.types import LLMStreamResponse, LLMResponse
-from promptmodel import DevClient
 
 
 class RegisteringMeta(type):
@@ -67,8 +69,7 @@ class ChatModel(metaclass=RegisteringMeta):
                 pass
             elif "dev_branch" in config and config["dev_branch"]["online"] == True:
                 # if dev online=True, save in Local DB
-                # TODO: make CRUD
-                pass
+                create_chat_logs(self.chat_uuid, instruction, version_details["uuid"])
             else:
                 run_async_in_sync(
                     self.llm_proxy._async_chat_log_to_cloud(
@@ -108,8 +109,7 @@ class ChatModel(metaclass=RegisteringMeta):
             pass
         elif "dev_branch" in config and config["dev_branch"]["online"] == True:
             # if dev online=True, add to Local DB
-            # TODO: make CRUD
-            pass
+            create_chat_logs(self.chat_uuid, new_messages, None)
         else:
             run_async_in_sync(
                 self.llm_proxy._async_chat_log_to_cloud(

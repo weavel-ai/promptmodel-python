@@ -78,7 +78,6 @@ class ChatLog(BaseModel):
     content = CharField(null=True, default=None)
     function_call = JSONField(null=True, default=None)
     run_from_deployment = BooleanField(default=False)
-    function_call = JSONField(null=True, default={})
 
 
 # class DeployedChatModel(BaseModel):

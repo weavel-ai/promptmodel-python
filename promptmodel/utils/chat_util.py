@@ -10,6 +10,7 @@ from litellm import token_counter
 from promptmodel.apis.base import AsyncAPIClient
 from promptmodel.database.crud import (
     get_latest_version_chat_model,
+    fetch_chat_log_with_uuid,
 )
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
@@ -79,8 +80,8 @@ async def fetch_chat_log(chat_uuid: str) -> List[Dict[str, Any]]:
     if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
         return []
     elif "dev_branch" in config and config["dev_branch"]["online"] == True:
-        # TODO: make CRUD
-        return []
+        chat_logs = fetch_chat_log_with_uuid(chat_uuid)
+        return chat_logs
     else:
         try:
             res_data = await AsyncAPIClient.execute(

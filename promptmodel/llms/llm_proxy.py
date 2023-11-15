@@ -344,6 +344,7 @@ class LLMProxy(LLM):
         version_detail: Dict[str, Any],
         kwargs,
     ):
+        # TODO: truncate messages to make length <= model's max length
         call_args = {
             "messages": messages,
             "model": version_detail["model"] if version_detail else None,
