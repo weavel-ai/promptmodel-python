@@ -14,6 +14,93 @@ from promptmodel.utils import logger
 from promptmodel.database.config import db
 
 
+def create_chat_models(chat_model_list: List):
+    """Create ChatModels with List of Dict"""
+    with db.atomic():
+        ChatModel.insert_many(chat_model_list).execute()
+    return
+
+
+def create_chat_model_versions(chat_model_version_list: List):
+    """Creat ChatModel versions with List of Dict"""
+    with db.atomic():
+        ChatModelVersion.insert_many(chat_model_version_list).execute()
+    return
+
+
+def list_chat_models() -> List[Dict]:
+    """List all ChatModels."""
+    response: List[ChatModel] = list(ChatModel.select())
+    return [model_to_dict(x, recurse=False) for x in response]
+
+
+def list_chat_model_versions(chat_model_uuid: str) -> List[Dict]:
+    """List all ChatModel versions for the given ChatModel."""
+    response: List[ChatModelVersion] = list(
+        ChatModelVersion.select()
+        .where(ChatModelVersion.chat_model_uuid == chat_model_uuid)
+        .order_by(ChatModelVersion.created_at)
+    )
+    return [model_to_dict(x, recurse=False) for x in response]
+
+
+def get_chat_model_uuid(chat_model_name: str) -> Dict:
+    """Get uuid of ChatModel by name"""
+    try:
+        response = ChatModel.get(ChatModel.name == chat_model_name)
+        return model_to_dict(response, recurse=False)
+    except:
+        return None
+
+
+def hide_chat_model_not_in_code(local_chat_model_list: List):
+    return (
+        ChatModel.update(used_in_code=False)
+        .where(ChatModel.name.not_in(local_chat_model_list))
+        .execute()
+    )
+
+
+def update_chat_model_uuid(local_uuid, new_uuid):
+    """Update ChatModel.uuid"""
+    if str(local_uuid) == str(new_uuid):
+        return
+    else:
+        with db.atomic():
+            local_chat_model: ChatModel = ChatModel.get(ChatModel.uuid == local_uuid)
+            ChatModel.create(
+                uuid=new_uuid,
+                name=local_chat_model.name,
+                project_uuid=local_chat_model.project_uuid,
+                created_at=local_chat_model.created_at,
+                used_in_code=local_chat_model.used_in_code,
+                is_deployed=True,
+            )
+            ChatModelVersion.update(prompt_model_uuid=new_uuid).where(
+                ChatModelVersion.chat_model_uuid == local_uuid
+            ).execute()
+            ChatModel.delete().where(ChatModel.uuid == local_uuid).execute()
+        return
+
+
+def update_used_in_code_chat_model_by_name(chatmodel_name: str, used_in_code: bool):
+    """Update the name of the given ChatModel."""
+    return (
+        ChatModel.update(used_in_code=used_in_code)
+        .where(ChatModel.name == chatmodel_name)
+        .execute()
+    )
+
+
+def rename_chat_model(chat_model_uuid: str, new_name: str):
+    """Update the name of the given ChatModel."""
+    return (
+        ChatModel.update(name=new_name)
+        .where(ChatModel.uuid == chat_model_uuid)
+        .execute()
+    )
+
+
 def create_session(
     session_uuid: str,
     chat_model_version_uuid: Optional[str] = None,

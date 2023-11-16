@@ -29,17 +29,23 @@ from promptmodel.utils.crypto import generate_api_key, encrypt_message
 from promptmodel.utils.enums import ModelVersionStatus, ChangeLogAction
 from promptmodel.websocket import DevWebsocketClient, CodeReloadHandler
 from promptmodel.database.orm import initialize_db
-from promptmodel.database.models import PromptModelVersion
+from promptmodel.database.models import PromptModelVersion, ChatModelVersion
 from promptmodel.database.crud import (
     create_prompt_models,
+    create_chat_models,
     create_prompt_model_versions,
+    create_chat_model_versions,
     create_prompts,
     create_run_logs,
     list_prompt_models,
+    list_chat_models,
     hide_prompt_model_not_in_code,
+    hide_chat_model_not_in_code,
     update_samples,
     update_prompt_model_uuid,
+    update_chat_model_uuid,
     rename_prompt_model,
+    rename_chat_model,
 )
 
 
@@ -109,8 +115,8 @@ def dev():
             {"project_version": project_status["project_version"]}, section="dev_branch"
         )
 
-        local_prompt_models = devapp_instance.prompt_models
-        local_prompt_model_names = [x.name for x in local_prompt_models]
+        local_prompt_model_names = devapp_instance._get_prompt_model_name_list()
+        local_chat_model_names = devapp_instance._get_chat_model_name_list()
 
         # save prompt_models
         for prompt_model in project_status["prompt_models"]:
@@ -142,6 +148,30 @@ def dev():
             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local
         ]
         create_prompt_models(only_in_local_prompt_models)
+
+        # save chat_models
+        for chat_model in project_status["chat_models"]:
+            chat_model["is_deployed"] = True
+            if chat_model["name"] in local_chat_model_names:
+                chat_model["used_in_code"] = True
+            else:
+                chat_model["used_in_code"] = False
+
+        create_chat_models(project_status["chat_models"])
+        # save chat_model_versions
+        for version in project_status["chat_model_versions"]:
+            version["status"] = ModelVersionStatus.CANDIDATE.value
+        create_chat_model_versions(project_status["chat_model_versions"])
+
+        # create_chat_models from code in local DB
+        project_chat_model_names = [x["name"] for x in project_status["chat_models"]]
+        only_in_local_names = list(
+            set(local_chat_model_names) - set(project_chat_model_names)
+        )
+        only_in_local_chat_models = [
+            {"name": x, "project_uuid": project["uuid"]} for x in only_in_local_names
+        ]
+        create_chat_models(only_in_local_chat_models)
 
     else:
         org = config["dev_branch"]["org"]
@@ -177,18 +207,26 @@ def dev():
         local_code_prompt_model_name_list = (
             devapp_instance._get_prompt_model_name_list()
         )
+        local_code_chat_model_name_list = devapp_instance._get_chat_model_name_list()
+
         res = update_by_changelog(
-            changelogs, project_status, local_code_prompt_model_name_list
+            changelogs,
+            project_status,
+            local_code_prompt_model_name_list,
+            local_code_chat_model_name_list,
         )
+
         if res is False:
             print("Update Dev Stopped.")
             upsert_config({"online": False}, section="dev_branch")
             return
 
-        # local_code_prompt_model_name_list 에 없는 prompt_model 의 used_in_code=False 설정
+        # Make prompt_model.used_in_code=False which is not in local code
         hide_prompt_model_not_in_code(local_code_prompt_model_name_list)
+        # Make chat_model.used_in_code=False which is not in local code
+        hide_chat_model_not_in_code(local_code_chat_model_name_list)
 
-        # 새로 생긴 prompt_model DB에 생성
+        # Save new prompt_model in code to local DB
         local_db_prompt_model_names = [x["name"] for x in list_prompt_models()]
         only_in_local = list(
             set(local_code_prompt_model_name_list) - set(local_db_prompt_model_names)
@@ -197,6 +235,16 @@ def dev():
             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local
         ]
         create_prompt_models(only_in_local_prompt_models)
+
+        # Save new chat_model in code to local DB
+        local_db_chat_model_names = [x["name"] for x in list_chat_models()]
+        only_in_local = list(
+            set(local_code_chat_model_name_list) - set(local_db_chat_model_names)
+        )
+        only_in_local_chat_models = [
+            {"name": x, "project_uuid": project["uuid"]} for x in only_in_local
+        ]
+        create_chat_models(only_in_local_chat_models)
 
     dev_url = f"{WEB_CLIENT_URL}/org/{org['slug']}/projects/{project['uuid']}/dev/{branch_name}"
 
@@ -213,7 +261,7 @@ def dev():
     reloader_thread.start()
 
     print(
-        f"\nOpening [violet]PromptModel[/violet] prompt engineering environment with the following configuration:\n"
+        f"\nOpening [violet]Promptmodel[/violet] prompt engineering environment with the following configuration:\n"
     )
     print(f"📌 Organization: [blue]{org['name']}[/blue]")
     print(f"📌 Project: [blue]{project['name']}[/blue]")
@@ -260,9 +308,11 @@ def update_by_changelog(
     changelogs: List[Dict],
     project_status: dict,
     local_code_prompt_model_name_list: List[str],
+    local_code_chat_model_name_list: List[str],
 ):
     """Update Local DB by changelog"""
     local_db_prompt_model_list: list = list_prompt_models()  # {"name", "uuid"}
+    local_db_chat_model_list: list = list_chat_models()  # {"name", "uuid"}
 
     for changelog in changelogs:
         level: int = changelog["level"]
@@ -272,26 +322,50 @@ def update_by_changelog(
                 subject = log["subject"]
                 action: str = log["action"]
                 if subject == "prompt_model":
-                    local_db_prompt_model_list = update_prompt_model_changelog(
-                        action=action,
-                        project_status=project_status,
-                        uuid_list=log["identifiers"],
-                        local_db_prompt_model_list=local_db_prompt_model_list,
-                        local_code_prompt_model_name_list=local_code_prompt_model_name_list,
-                    )
-                elif subject == "prompt_model_version":
                     (
                         is_success,
                         local_db_prompt_model_list,
-                    ) = update_prompt_model_version_changelog(
+                    ) = update_prompt_model_changelog(
                         action=action,
                         project_status=project_status,
                         uuid_list=log["identifiers"],
                         local_db_prompt_model_list=local_db_prompt_model_list,
                         local_code_prompt_model_name_list=local_code_prompt_model_name_list,
                     )
+
                     if not is_success:
                         return False
+
+                elif subject == "prompt_model_version":
+                    local_db_prompt_model_list = update_prompt_model_version_changelog(
+                        action=action,
+                        project_status=project_status,
+                        uuid_list=log["identifiers"],
+                        local_db_prompt_model_list=local_db_prompt_model_list,
+                        local_code_prompt_model_name_list=local_code_prompt_model_name_list,
+                    )
+
+                elif subject == "chat_model":
+                    is_success, local_db_chat_model_list = update_chat_model_changelog(
+                        action=action,
+                        project_status=project_status,
+                        uuid_list=log["identifiers"],
+                        local_db_chat_model_list=local_db_chat_model_list,
+                        local_code_chat_model_name_list=local_code_chat_model_name_list,
+                    )
+
+                    if not is_success:
+                        return False
+
+                elif subject == "chat_model_version":
+                    local_db_chat_model_list = update_chat_model_version_changelog(
+                        action=action,
+                        project_status=project_status,
+                        uuid_list=log["identifiers"],
+                        local_db_chat_model_list=local_db_chat_model_list,
+                        local_code_chat_model_name_list=local_code_chat_model_name_list,
+                    )
+
                 else:
                     pass
             previous_version_levels = changelog["previous_version"].split(".")
@@ -313,6 +387,15 @@ def update_by_changelog(
                         uuid_list=log["identifiers"],
                         local_db_prompt_model_list=local_db_prompt_model_list,
                         local_code_prompt_model_name_list=local_code_prompt_model_name_list,
+                    )
+
+                elif subject == "chat_model_version":
+                    local_db_chat_model_list = update_chat_model_version_changelog(
+                        action=action,
+                        project_status=project_status,
+                        uuid_list=log["identifiers"],
+                        local_db_chat_model_list=local_db_chat_model_list,
+                        local_code_chat_model_name_list=local_code_chat_model_name_list,
                     )
                 else:
                     pass
@@ -461,5 +544,117 @@ def update_prompt_model_version_changelog(
         create_run_logs(run_logs_to_update)
 
         return local_db_prompt_model_list
+    else:
+        pass
+
+
+def update_chat_model_changelog(
+    action: ChangeLogAction,
+    project_status: dict,
+    uuid_list: List[str],
+    local_db_chat_model_list: List[Dict],
+    local_code_chat_model_name_list: List[str],
+):
+    if action == ChangeLogAction.ADD.value:
+        chat_model_list = [
+            x for x in project_status["chat_models"] if x["uuid"] in uuid_list
+        ]
+        for chat_model in chat_model_list:
+            local_db_chat_model_name_list = [
+                x["name"] for x in local_db_chat_model_list
+            ]
+
+            if chat_model["name"] not in local_db_chat_model_name_list:
+                # IF chat_model not in Local DB
+                if chat_model["name"] in local_code_chat_model_name_list:
+                    # IF chat_model in Local Code
+                    chat_model["used_in_code"] = True
+                    chat_model["is_deployed"] = True
+                    create_chat_models([chat_model])
+                else:
+                    chat_model["used_in_code"] = False
+                    chat_model["is_deployed"] = True
+                    create_chat_models([chat_model])
+            else:
+                local_db_chat_model = [
+                    x
+                    for x in local_db_chat_model_list
+                    if x["name"] == chat_model["name"]
+                ][0]
+                if local_db_chat_model["is_deployed"] is False:
+                    print(
+                        "Creation of chatmodel with identical name was detected in local & deployment."
+                    )
+                    check_same = inquirer.confirm(
+                        message="Are they same chatmodel? [y/n]", default=False
+                    ).execute()
+                    # check_same = input()
+                    # if check_same == "y":
+                    #     check_same = True
+                    # else:
+                    #     check_same = False
+
+                    if not check_same:
+                        # rename & change name in Local DB
+                        print(
+                            f"Please rename local chatmodel {chat_model['name']} to continue"
+                        )
+                        validate_new_chatmodel_name = (
+                            lambda name: name not in local_code_chat_model_name_list
+                            and name not in local_db_chat_model_name_list
+                        )
+                        new_model_name = inquirer.text(
+                            message="Enter the new chatmodel name:",
+                            validate=lambda x: validate_new_chatmodel_name(x),
+                            invalid_message="chatmodel name already exists.",
+                        ).execute()
+                        # new_model_name = input()
+                        rename_chat_model(local_db_chat_model["uuid"], new_model_name)
+
+                        print("We changed the name of chatmodel in local DB.")
+                        print(
+                            f"Please change the name of chatmodel '{chat_model['name']}' in your project code and restart."
+                        )
+                        # dev 꺼버리고, 수정하고 다시 키라고 명령.
+                        return False, local_db_chat_model_list
+                    update_chat_model_uuid(
+                        local_db_chat_model["uuid"], chat_model["uuid"]
+                    )
+                    local_db_chat_model_list: list = list_chat_models()
+    else:
+        # TODO: add code DELETE, CHANGE, FIX later
+        pass
+    return True, local_db_chat_model_list
+
+
+def update_chat_model_version_changelog(
+    action: ChangeLogAction,
+    project_status: dict,
+    uuid_list: List[str],
+    local_db_chat_model_list: List[Dict],
+    local_code_chat_model_name_list: List[str],
+) -> List[Dict[str, Any]]:
+    if action == ChangeLogAction.ADD.value:
+        # find chat_model_version in project_status['chat_model_versions'] where uuid in uuid_list
+        chat_model_version_list_in_changelog = [
+            x for x in project_status["chat_model_versions"] if x["uuid"] in uuid_list
+        ]
+
+        # check if chat_model_version['uuid'] is in local_db_chat_model_list
+        local_db_version_uuid_list = [
+            str(x.uuid) for x in list(ChatModelVersion.select())
+        ]
+        version_list_to_update = [
+            x
+            for x in chat_model_version_list_in_changelog
+            if x["uuid"] not in local_db_version_uuid_list
+        ]
+
+        for chat_model_version in version_list_to_update:
+            chat_model_version["status"] = ModelVersionStatus.CANDIDATE.value
+
+        create_chat_model_versions(version_list_to_update)
+
+        return local_db_chat_model_list
     else:
         pass
