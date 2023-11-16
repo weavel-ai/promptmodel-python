@@ -174,9 +174,9 @@ def dev():
                 "levels": [1, 2],
             },
         ).json()
-        local_code_prompt_model_name_list = [
-            x.name for x in devapp_instance.prompt_models
-        ]
+        local_code_prompt_model_name_list = (
+            devapp_instance._get_prompt_model_name_list()
+        )
         res = update_by_changelog(
             changelogs, project_status, local_code_prompt_model_name_list
         )

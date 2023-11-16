@@ -12,11 +12,17 @@ class PromptModelInterface:
     name: str
 
 
+@dataclass
+class ChatModelInterface:
+    name: str
+
+
 class DevClient:
     """DevClient main class"""
 
     def __init__(self):
         self.prompt_models: List[PromptModelInterface] = []
+        self.chat_models: List[ChatModelInterface] = []
 
     def register(self, func):
         instructions = list(dis.get_instructions(func))
@@ -25,9 +31,8 @@ class DevClient:
         ):  # We check up to len-1 because we access idx+1 inside loop
             instruction = instructions[idx]
             # print(instruction)
-            if (
-                instruction.opname in ["LOAD_ATTR", "LOAD_METHOD", "LOAD_GLOBAL"]
-                and instruction.argval == "PromptModel"
+            if instruction.opname in ["LOAD_ATTR", "LOAD_METHOD", "LOAD_GLOBAL"] and (
+                instruction.argval == "PromptModel" or instruction.argval == "ChatModel"
             ):
                 next_instruction = instructions[idx + 1]
 
@@ -35,9 +40,14 @@ class DevClient:
                 if next_instruction.opname == "LOAD_CONST" and isinstance(
                     next_instruction.argval, str
                 ):
-                    self.prompt_models.append(
-                        PromptModelInterface(name=next_instruction.argval)
-                    )
+                    if instruction.argval == "PromptModel":
+                        self.prompt_models.append(
+                            PromptModelInterface(name=next_instruction.argval)
+                        )
+                    elif instruction.argval == "ChatModel":
+                        self.chat_models.append(
+                            ChatModelInterface(name=next_instruction.argval)
+                        )
 
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
@@ -51,6 +61,13 @@ class DevClient:
 
         self.prompt_models.append(PromptModelInterface(name=name))
 
+    def register_chat_model(self, name):
+        for chat_model in self.chat_models:
+            if chat_model.name == name:
+                return
+
+        self.prompt_models.append(ChatModelInterface(name=name))
+
     def _get_prompt_model_name_list(self) -> List[str]:
         return [prompt_model.name for prompt_model in self.prompt_models]
 
@@ -60,6 +77,7 @@ class DevApp:
 
     def __init__(self):
         self.prompt_models: List[PromptModelInterface] = []
+        self.chat_models: List[ChatModelInterface] = []
         self.samples: List[Dict[str, Any]] = []
         self.functions: Dict[
             str, Dict[str, Union[FunctionSchema, Optional[Callable]]]
@@ -71,6 +89,7 @@ class DevApp:
 
     def include_client(self, client: DevClient):
         self.prompt_models.extend(client.prompt_models)
+        self.chat_models.extend(client.chat_models)
 
     def register_function(
         self, schema: Union[Dict[str, Any], FunctionSchema], function: Callable
@@ -116,3 +135,6 @@ class DevApp:
 
     def _get_prompt_model_name_list(self) -> List[str]:
         return [prompt_model.name for prompt_model in self.prompt_models]
+
+    def _get_chat_model_name_list(self) -> List[str]:
+        return [chat_model.name for chat_model in self.chat_models]

@@ -18,7 +18,7 @@ from uuid import uuid4
 from promptmodel import DevClient
 
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.database.crud import create_chat_logs
+from promptmodel.database.crud import create_chat_logs, create_session
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.prompt_util import (
@@ -56,11 +56,11 @@ class RegisteringMeta(type):
 
 
 class ChatModel(metaclass=RegisteringMeta):
-    def __init__(self, name, rate_limit_manager=None, chat_uuid: str = None):
+    def __init__(self, name, rate_limit_manager=None, session_uuid: str = None):
         self.name = name
         self.llm_proxy = LLMProxy(name, rate_limit_manager)
-        if chat_uuid is None:
-            self.chat_uuid = uuid4()
+        if session_uuid is None:
+            self.session_uuid = uuid4()
             instruction, version_details = run_async_in_sync(
                 fetch_chat_model(self.name)
             )
@@ -69,18 +69,24 @@ class ChatModel(metaclass=RegisteringMeta):
                 pass
             elif "dev_branch" in config and config["dev_branch"]["online"] == True:
                 # if dev online=True, save in Local DB
-                create_chat_logs(self.chat_uuid, instruction, version_details["uuid"])
+
+                session_uuid = create_session(
+                    self.session_uuid, version_details["uuid"]
+                )
+                if session_uuid is None:
+                    raise Exception("Failed to create session")
+                create_chat_logs(self.session_uuid, instruction)
             else:
                 run_async_in_sync(
                     self.llm_proxy._async_chat_log_to_cloud(
-                        self.chat_uuid,
-                        version_details["uuid"],
+                        self.session_uuid,
                         instruction,
-                        {},
+                        version_details["uuid"],
+                        [{}],
                     )
                 )
         else:
-            self.chat_uuid = chat_uuid
+            self.session_uuid = session_uuid
 
     def get_prompts(self) -> List[Dict[str, str]]:
         """Get prompt for the promptmodel.
@@ -93,7 +99,7 @@ class ChatModel(metaclass=RegisteringMeta):
             List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
         """
         instruction, detail = run_async_in_sync(
-            fetch_chat_model(self.name, self.chat_uuid)
+            fetch_chat_model(self.name, self.session_uuid)
         )
         return instruction
 
@@ -109,19 +115,19 @@ class ChatModel(metaclass=RegisteringMeta):
             pass
         elif "dev_branch" in config and config["dev_branch"]["online"] == True:
             # if dev online=True, add to Local DB
-            create_chat_logs(self.chat_uuid, new_messages, None)
+            create_chat_logs(self.session_uuid, new_messages, None)
         else:
             run_async_in_sync(
                 self.llm_proxy._async_chat_log_to_cloud(
-                    self.chat_uuid,
+                    self.session_uuid,
                     new_messages,
                     None,
-                    {},
+                    [{} for _ in range(len(new_messages))],
                 )
             )
 
     def get_messages(self) -> List[Dict[str, Any]]:
-        message_logs = run_async_in_sync(fetch_chat_log(self.chat_uuid))
+        message_logs = run_async_in_sync(fetch_chat_log(self.session_uuid))
         return message_logs
 
     def run(
@@ -141,11 +147,11 @@ class ChatModel(metaclass=RegisteringMeta):
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
         # if stream:
-        #     for item in self.llm_proxy.chat_stream(self.chat_uuid, function_list):
+        #     for item in self.llm_proxy.chat_stream(self.session_uuid, function_list):
         #         yield item
         # else:
-        #     return self.llm_proxy.chat_run(self.chat_uuid, function_list)
-        return self.llm_proxy.chat_run(self.chat_uuid, function_list)
+        #     return self.llm_proxy.chat_run(self.session_uuid, function_list)
+        return self.llm_proxy.chat_run(self.session_uuid, function_list)
 
     async def arun(
         self,
@@ -164,7 +170,7 @@ class ChatModel(metaclass=RegisteringMeta):
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
         # if stream:
-        #     return Coroutine(self.llm_proxy.chat_astream(self.chat_uuid, function_list))
+        #     return Coroutine(self.llm_proxy.chat_astream(self.session_uuid, function_list))
         # else:
-        #     return await self.llm_proxy.chat_arun(self.chat_uuid, function_list)
-        return await self.llm_proxy.chat_arun(self.chat_uuid, function_list)
+        #     return await self.llm_proxy.chat_arun(self.session_uuid, function_list)
+        return await self.llm_proxy.chat_arun(self.session_uuid, function_list)

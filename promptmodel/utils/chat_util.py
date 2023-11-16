@@ -19,7 +19,7 @@ from promptmodel.promptmodel_init import CacheManager, update_deployed_db
 
 
 async def fetch_chat_model(
-    name: str, chat_uuid: Optional[str] = None
+    name: str, session_uuid: Optional[str] = None
 ) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
     """fetch instruction and version detail
 
@@ -35,7 +35,7 @@ async def fetch_chat_model(
         return [], {}
     elif "dev_branch" in config and config["dev_branch"]["online"] == True:
         # get prompt from local DB
-        instruction, version_detail = get_latest_version_chat_model(name, chat_uuid)
+        instruction, version_detail = get_latest_version_chat_model(name, session_uuid)
         if version_detail is None:
             return [], {}
         return instruction, version_detail
@@ -44,7 +44,7 @@ async def fetch_chat_model(
             res_data = await AsyncAPIClient.execute(
                 method="GET",
                 path="/fetch_published_chat_model_version",
-                params={"chat_model_name": name, "chat_uuid": chat_uuid},
+                params={"chat_model_name": name, "session_uuid": session_uuid},
                 use_cli_key=False,
             )
             res_data = res_data.json()
@@ -67,11 +67,11 @@ async def fetch_chat_model(
         return instruction, version_detail
 
 
-async def fetch_chat_log(chat_uuid: str) -> List[Dict[str, Any]]:
-    """fetch conversation log for chat_uuid and version detail
+async def fetch_chat_log(session_uuid: str) -> List[Dict[str, Any]]:
+    """fetch conversation log for session_uuid and version detail
 
     Args:
-        chat_uuid (str): chat_uuid
+        session_uuid (str): session_uuid
 
     Returns:
         List[Dict[str, Any]] : list of conversation log
@@ -80,14 +80,14 @@ async def fetch_chat_log(chat_uuid: str) -> List[Dict[str, Any]]:
     if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
         return []
     elif "dev_branch" in config and config["dev_branch"]["online"] == True:
-        chat_logs = fetch_chat_log_with_uuid(chat_uuid)
+        chat_logs = fetch_chat_log_with_uuid(session_uuid)
         return chat_logs
     else:
         try:
             res_data = await AsyncAPIClient.execute(
                 method="GET",
                 path="/fetch_chat_logs",
-                params={"chat_uuid": chat_uuid},
+                params={"session_uuid": session_uuid},
                 use_cli_key=False,
             )
             res_data = res_data.json()

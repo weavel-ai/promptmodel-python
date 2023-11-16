@@ -230,10 +230,10 @@ class LLMProxy(LLM):
         return async_wrapper
 
     def _wrap_chat(self, method: Callable[..., Any]) -> Callable[..., Any]:
-        def wrapper(chat_uuid: str, **kwargs):
-            message_logs = run_async_in_sync(fetch_chat_log(chat_uuid))
+        def wrapper(session_uuid: str, **kwargs):
+            message_logs = run_async_in_sync(fetch_chat_log(session_uuid))
             instruction, version_details = run_async_in_sync(
-                fetch_chat_model(self._name, chat_uuid)
+                fetch_chat_model(self._name, session_uuid)
             )
 
             if len(message_logs) == 0 or message_logs[0]["role"] != "system":
@@ -251,13 +251,17 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
+            if llm_response.api_response:
+                metadata["api_response"] = llm_response.api_response.to_dict_recursive()
+                metadata["token_usage"] = llm_response.api_response["token_usage"]
+                metadata["latency"] = llm_response.api_response["response_ms"]
 
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
-                    chat_uuid,
+                    session_uuid,
                     [llm_response.api_response["choices"][0]["message"]],
                     version_details["uuid"],
-                    metadata,
+                    [metadata],
                 )
             )
 
@@ -272,9 +276,11 @@ class LLMProxy(LLM):
         return wrapper
 
     def _wrap_async_chat(self, method: Callable[..., Any]) -> Callable[..., Any]:
-        async def async_wrapper(chat_uuid: str, **kwargs):
-            message_logs = await fetch_chat_log(chat_uuid)
-            instruction, version_details = await fetch_chat_model(self._name, chat_uuid)
+        async def async_wrapper(session_uuid: str, **kwargs):
+            message_logs = await fetch_chat_log(session_uuid)
+            instruction, version_details = await fetch_chat_model(
+                self._name, session_uuid
+            )
 
             if len(message_logs) == 0 or message_logs[0]["role"] != "system":
                 message_logs = instruction + message_logs
@@ -291,12 +297,16 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
+            if llm_response.api_response:
+                metadata["api_response"] = llm_response.api_response.to_dict_recursive()
+                metadata["token_usage"] = llm_response.api_response["token_usage"]
+                metadata["latency"] = llm_response.api_response["response_ms"]
 
             await self._async_chat_log_to_cloud(
-                chat_uuid,
+                session_uuid,
                 [llm_response.api_response["choices"][0]["message"]],
                 version_details["uuid"],
-                metadata,
+                [metadata],
             )
 
             if error_occurs:
@@ -394,17 +404,17 @@ class LLMProxy(LLM):
 
     async def _async_chat_log_to_cloud(
         self,
-        chat_uuid: str,
+        session_uuid: str,
         messages: List[Dict[str, Any]],
         version_uuid: Optional[str] = None,
-        metadata: Optional[Dict] = None,
+        metadata: Optional[List[Dict]] = None,
     ):
         # Perform the logging asynchronously
         res = await AsyncAPIClient.execute(
             method="POST",
             path="/log_deployment_chat",
             params={
-                "chat_uuid": chat_uuid,
+                "session_uuid": session_uuid,
                 "version_uuid": version_uuid,
             },
             json={
@@ -469,32 +479,32 @@ class LLMProxy(LLM):
 
     def chat_run(
         self,
-        chat_uuid: str,
+        session_uuid: str,
         function_list: Optional[List[Any]] = None,
     ) -> LLMResponse:
         kwargs = {"function_list": function_list} if function_list else {}
-        return self._wrap_chat(super().run)(chat_uuid, **kwargs)
+        return self._wrap_chat(super().run)(session_uuid, **kwargs)
 
     def chat_arun(
         self,
-        chat_uuid: str,
+        session_uuid: str,
         function_list: Optional[List[Any]] = None,
     ) -> LLMResponse:
         kwargs = {"function_list": function_list} if function_list else {}
-        return self._wrap_async_chat(super().arun)(chat_uuid, **kwargs)
+        return self._wrap_async_chat(super().arun)(session_uuid, **kwargs)
 
     # def chat_stream(
     #     self,
-    #     chat_uuid: str,
+    #     session_uuid: str,
     #     function_list: Optional[List[Any]] = None,
     # ) -> LLMResponse:
     #     kwargs = {"function_list": function_list} if function_list else {}
-    #     return self._wrap_chat_gen(super().stream)(chat_uuid, **kwargs)
+    #     return self._wrap_chat_gen(super().stream)(session_uuid, **kwargs)
 
     # def chat_astream(
     #     self,
-    #     chat_uuid: str,
+    #     session_uuid: str,
     #     function_list: Optional[List[Any]] = None,
     # ) -> LLMResponse:
     #     kwargs = {"function_list": function_list} if function_list else {}
-    #     return self._wrap_async_chat_gen(super().astream)(chat_uuid, **kwargs)
+    #     return self._wrap_async_chat_gen(super().astream)(session_uuid, **kwargs)

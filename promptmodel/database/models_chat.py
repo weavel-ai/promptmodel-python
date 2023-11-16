@@ -64,20 +64,33 @@ class ChatModelVersion(BaseModel):
     functions = JSONField(default=[])
 
 
-class ChatLog(BaseModel):
-    id = AutoField()
+class ChatLogSession(BaseModel):
+    uuid = UUIDField(unique=True, default=uuid4)
     created_at = DateTimeField(default=datetime.datetime.now)
-    chat_uuid = UUIDField(unique=False)
     version_uuid = ForeignKeyField(
         ChatModelVersion,
         field=ChatModelVersion.uuid,
-        backref="run_logs",
+        backref="chat_log_session",
+        on_delete="CASCADE",
+    )
+    run_from_deployment = BooleanField(default=False)
+
+
+class ChatLog(BaseModel):
+    id = AutoField()
+    created_at = DateTimeField(default=datetime.datetime.now)
+    session_uuid = ForeignKeyField(
+        ChatLogSession,
+        field=ChatLogSession.uuid,
+        backref="chat_logs",
         on_delete="CASCADE",
     )
     role = CharField(null=True, default=None)
     content = CharField(null=True, default=None)
-    function_call = JSONField(null=True, default=None)
-    run_from_deployment = BooleanField(default=False)
+    tool_calls = JSONField(null=True, default=None)
+    latency = FloatField(null=True, default=None)
+    cost = FloatField(null=True, default=None)
+    metadata = JSONField(null=True, default=None)
 
 
 # class DeployedChatModel(BaseModel):
