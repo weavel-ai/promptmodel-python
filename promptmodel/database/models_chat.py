@@ -88,8 +88,9 @@ class ChatLog(BaseModel):
     role = CharField(null=True, default=None)
     content = CharField(null=True, default=None)
     tool_calls = JSONField(null=True, default=None)
-    latency = FloatField(null=True, default=None)
-    cost = FloatField(null=True, default=None)
+    token_usage = JSONField(null=True, default=None)
+    latency = FloatField(null=True, default=0)
+    cost = FloatField(null=True, default=0)
     metadata = JSONField(null=True, default=None)
 
 

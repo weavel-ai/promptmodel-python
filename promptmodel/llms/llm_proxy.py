@@ -254,7 +254,7 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             if llm_response.api_response:
-                metadata["api_response"] = llm_response.api_response.to_dict_recursive()
+                metadata["api_response"] = llm_response.api_response.__dict__
                 metadata["token_usage"] = llm_response.api_response["token_usage"]
                 metadata["latency"] = llm_response.api_response["response_ms"]
 
@@ -300,7 +300,7 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             if llm_response.api_response:
-                metadata["api_response"] = llm_response.api_response.to_dict_recursive()
+                metadata["api_response"] = llm_response.api_response.__dict__
                 metadata["token_usage"] = llm_response.api_response["token_usage"]
                 metadata["latency"] = llm_response.api_response["response_ms"]
 

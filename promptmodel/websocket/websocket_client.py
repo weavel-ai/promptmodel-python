@@ -30,8 +30,24 @@ from promptmodel.database.crud import (
     find_ancestor_version,
     find_ancestor_versions,
     update_candidate_prompt_model_version,
+    create_chat_model_version,
+    create_chat_log,
+    list_chat_models,
+    list_chat_model_versions,
+    list_sessions,
+    list_chat_logs,
+    get_chat_model_uuid,
+    update_chat_model_version,
+    update_candidate_chat_model_version,
+    find_ancestor_chat_model_version,
+    find_ancestor_chat_model_versions,
 )
-from promptmodel.database.models import PromptModelVersion, PromptModel
+from promptmodel.database.models import (
+    PromptModelVersion,
+    PromptModel,
+    ChatModelVersion,
+    ChatModel,
+)
 from promptmodel.utils.enums import (
     ServerTask,
     LocalTask,
@@ -613,6 +629,105 @@ class DevWebsocketClient:
                     response.update(data)
                     await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                     return
+
+            # ChatModel LocalTasks
+            elif message["type"] == LocalTask.CHANGE_CHAT_MODEL_VERSION_STATUS:
+                chat_model_version_uuid = message["chat_model_version_uuid"]
+                new_status = message["status"]
+                res_from_local_db = update_chat_model_version(
+                    chat_model_version_uuid=chat_model_version_uuid,
+                    status=new_status,
+                )
+                data = {
+                    "chat_model_version_uuid": chat_model_version_uuid,
+                    "status": new_status,
+                }
+
+            elif message["type"] == LocalTask.GET_CHAT_LOG_SESSIONS:
+                chat_model_version_uuid = message["chat_model_version_uuid"]
+                res_from_local_db = list_sessions(chat_model_version_uuid)
+                data = {"sessions": res_from_local_db}
+
+            elif message["type"] == LocalTask.GET_CHAT_LOGS:
+                session_uuid = message["session_uuid"]
+                res_from_local_db = list_chat_logs(session_uuid)
+                data = {"chat_logs": res_from_local_db}
+
+            elif message["type"] == LocalTask.GET_CHAT_MODEL_VERSION_TO_SAVE:
+                chat_model_version_uuid = message["chat_model_version_uuid"]
+                # change from_uuid to candidate ancestor
+                chat_model_version = find_ancestor_chat_model_version(
+                    chat_model_version_uuid
+                )
+                # delete status, is_published
+                del chat_model_version["status"]
+                del chat_model_version["is_published"]
+                config = read_config()
+                chat_model_version["dev_branch_uuid"] = config["dev_branch"]["uuid"]
+
+                chat_model = ChatModel.get(
+                    ChatModel.uuid == chat_model_version.chat_model_uuid
+                ).__data__
+                
+                is_deployed = chat_model["is_deployed"]
+                if not is_deployed:
+                    data = {
+                        "chat_model": {
+                            "uuid": chat_model["uuid"],
+                            "name": chat_model["name"],
+                            "project_uuid": chat_model["project_uuid"],
+                        },
+                        "version": chat_model_version,
+                    }
+                else:
+                    data = {
+                        "chat_model": None,
+                        "version": chat_model_version,
+                    }
+
+            elif message["type"] == LocalTask.GET_CHAT_MODEL_VERSIONS_TO_SAVE:
+                target_chat_model_uuid = (
+                    message["chat_model_uuid"] if "chat_model_uuid" in message else None
+                )
+
+                chat_model_versions = find_ancestor_chat_model_versions(
+                    target_chat_model_uuid
+                )
+
+                config = read_config()
+                for chat_model_version in chat_model_versions:
+                    chat_model_version["dev_branch_uuid"] = config["dev_branch"]["uuid"]
+                    del chat_model_version["id"]
+                    del chat_model_version["status"]
+                    del chat_model_version["is_published"]
+
+                chat_model_uuids = [
+                    version["chat_model_uuid"] for version in chat_model_versions
+                ]
+                chat_models = list(
+                    ChatModel.select().where(ChatModel.uuid.in_(chat_model_uuids))
+                )
+                chat_models = [model_to_dict(chat_model) for chat_model in chat_models]
+                # find chat_model which is not deployed
+                chat_models_only_in_local = []
+                for chat_model in chat_models:
+                    if chat_model["is_deployed"] is False:
+                        del chat_model["is_deployed"]
+                        del chat_model["used_in_code"]
+                        del chat_model["id"]
+
+                        chat_models_only_in_local.append(chat_model)
+                data = {
+                    "chat_models": chat_models_only_in_local,
+                    "versions": chat_model_versions,
+                }
+
+            elif message["type"] == LocalTask.UPDATE_CANDIDATE_CHAT_MODEL_VERSION_ID:
+                new_candidates = message["new_candidates"]
+                update_candidate_chat_model_version(new_candidates)
+                
+            elif message["type"] == LocalTask.RUN_CHAT_MODEL:
+                pass
 
             if data:
                 response.update(data)

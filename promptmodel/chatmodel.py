@@ -75,7 +75,7 @@ class ChatModel(metaclass=RegisteringMeta):
                 )
                 if session_uuid is None:
                     raise Exception("Failed to create session")
-                create_chat_logs(self.session_uuid, instruction)
+                create_chat_logs(self.session_uuid, instruction, [{}])
             else:
                 run_async_in_sync(
                     self.llm_proxy._async_chat_log_to_cloud(
@@ -115,7 +115,9 @@ class ChatModel(metaclass=RegisteringMeta):
             pass
         elif "dev_branch" in config and config["dev_branch"]["online"] == True:
             # if dev online=True, add to Local DB
-            create_chat_logs(self.session_uuid, new_messages, None)
+            create_chat_logs(
+                self.session_uuid, new_messages, [{} for _ in range(len(new_messages))]
+            )
         else:
             run_async_in_sync(
                 self.llm_proxy._async_chat_log_to_cloud(
