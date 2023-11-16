@@ -2,15 +2,17 @@ import os
 import sys
 import yaml
 import asyncio
+from uuid import UUID
 from datetime import datetime
 from threading import Thread
 from typing import Any, Dict, Tuple, List, Union, Optional, Coroutine
+from playhouse.shortcuts import model_to_dict
 from litellm import token_counter
 
 from promptmodel.apis.base import AsyncAPIClient
+from promptmodel.database.models import ChatLog, ChatLogSession
 from promptmodel.database.crud import (
     get_latest_version_chat_model,
-    fetch_chat_log_with_uuid,
 )
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
@@ -80,7 +82,23 @@ async def fetch_chat_log(session_uuid: str) -> List[Dict[str, Any]]:
     if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
         return []
     elif "dev_branch" in config and config["dev_branch"]["online"] == True:
-        chat_logs = fetch_chat_log_with_uuid(session_uuid)
+        try:
+            chat_log_rows: List[ChatLog] = (
+                ChatLog.select()
+                .where(ChatLog.session_uuid == UUID(session_uuid))
+                .order_by(ChatLog.created_at.asc())
+                .get()
+            )
+            chat_logs = [
+                {
+                    "role": message.role,
+                    "content": message.content,
+                    "tool_calls": message.tool_calls,
+                }
+                for message in chat_log_rows
+            ]
+        except:
+            chat_logs = []
         return chat_logs
     else:
         try:
