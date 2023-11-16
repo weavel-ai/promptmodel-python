@@ -118,26 +118,32 @@ def set_inputs_to_prompts(inputs: Dict[str, Any], prompts: List[Dict[str, str]])
 def num_tokens_for_messages(
     messages: List[Dict[str, str]], model: str = "gpt-3.5-turbo-0613"
 ) -> int:
-    tokens_per_message = 0
-    tokens_per_name = 0
-    if model.startswith("gpt-3.5-turbo"):
-        tokens_per_message = 4
-        tokens_per_name = -1
+    # tokens_per_message = 0
+    # tokens_per_name = 0
+    # if model.startswith("gpt-3.5-turbo"):
+    #     tokens_per_message = 4
+    #     tokens_per_name = -1
 
-    if model.startswith("gpt-4"):
-        tokens_per_message = 3
-        tokens_per_name = 1
+    # if model.startswith("gpt-4"):
+    #     tokens_per_message = 3
+    #     tokens_per_name = 1
 
-    if model.endswith("-0613") or model == "gpt-3.5-turbo-16k":
-        tokens_per_message = 3
-        tokens_per_name = 1
-    sum = 0
+    # if model.endswith("-0613") or model == "gpt-3.5-turbo-16k":
+    #     tokens_per_message = 3
+    #     tokens_per_name = 1
+    # sum = 0
     sum = token_counter(model=model, messages=messages)
-    for message in messages:
-        sum += tokens_per_message
-        if "name" in message:
-            sum += tokens_per_name
+    # for message in messages:
+    #     sum += tokens_per_message
+    #     if "name" in message:
+    #         sum += tokens_per_name
     return sum
+
+
+def num_tokens_for_messages_for_each(
+    messages: List[Dict[str, str]], model: str = "gpt-3.5-turbo-0613"
+) -> List[int]:
+    return [token_counter(model=model, messages=[message]) for message in messages]
 
 
 def num_tokens_from_functions_input(

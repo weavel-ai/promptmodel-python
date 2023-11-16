@@ -29,7 +29,7 @@ setup(
         "cryptography",
         "pyyaml",
         "InquirerPy",
-        "litellm==0.13.2",
+        "litellm",
         "python-dotenv",
         "websockets",
         "termcolor",

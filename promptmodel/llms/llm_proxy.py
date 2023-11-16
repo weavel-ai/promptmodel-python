@@ -14,12 +14,14 @@ from typing import (
 from threading import Thread
 from concurrent.futures import Future
 from rich import print
-from litellm.utils import ModelResponse
+from litellm.utils import ModelResponse, get_max_tokens, token_counter
 from promptmodel.llms.llm import LLM
 from promptmodel.utils import logger
 from promptmodel.utils.prompt_util import (
     fetch_prompts,
     run_async_in_sync,
+    num_tokens_for_messages_for_each,
+    num_tokens_from_functions_input,
 )
 from promptmodel.utils.chat_util import (
     fetch_chat_model,
@@ -354,14 +356,37 @@ class LLMProxy(LLM):
         version_detail: Dict[str, Any],
         kwargs,
     ):
-        # TODO: truncate messages to make length <= model's max length
-        call_args = {
-            "messages": messages,
-            "model": version_detail["model"] if version_detail else None,
-        }
-
+        call_args = {}
+        token_per_tools = 0
         if "function_list" in kwargs:
             call_args["functions"] = kwargs["function_list"]
+            token_per_tools = num_tokens_from_functions_input(
+                functions=kwargs["function_list"],
+                model=version_detail["model"] if version_detail else "gpt-3.5-turbo",
+            )
+        # truncate messages to make length <= model's max length
+        model_max_tokens = get_max_tokens(
+            model=version_detail["model"] if version_detail else "gpt-3.5-turbo"
+        )
+        token_per_messages = num_tokens_for_messages_for_each(
+            messages, version_detail["model"]
+        )
+        token_limit_exceeded = (
+            sum(token_per_messages) + token_per_tools
+        ) - model_max_tokens
+        if token_limit_exceeded > 0:
+            while token_limit_exceeded > 0:
+                # erase the second oldest message (first one is system prompt, so it should not be erased)
+                if len(messages) == 1:
+                    # if there is only one message, Error cannot be solved. Just call LLM and get error response
+                    break
+                token_limit_exceeded -= token_per_messages[1]
+                del messages[1]
+                del token_per_messages[1]
+
+        call_args["messages"] = messages
+        call_args["model"] = (version_detail["model"] if version_detail else None,)
+
         return call_args
 
     async def _async_log_to_cloud(
