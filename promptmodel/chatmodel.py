@@ -28,7 +28,7 @@ from promptmodel.utils.chat_util import (
     fetch_chat_model,
     fetch_chat_log,
 )
-from promptmodel.utils.types import LLMStreamResponse, LLMResponse
+from promptmodel.types.response import LLMStreamResponse, LLMResponse
 
 
 class RegisteringMeta(type):

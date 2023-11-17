@@ -24,13 +24,13 @@ from promptmodel.database.crud import (
     find_ancestor_chat_model_versions,
 )
 from promptmodel.database.models import *
-from promptmodel.utils.enums import (
+from promptmodel.types.enums import (
     ServerTask,
     LocalTask,
     ModelVersionStatus,
 )
 from promptmodel.utils.config_utils import upsert_config, read_config
-from promptmodel.utils.types import LLMStreamResponse
+from promptmodel.types.response import LLMStreamResponse
 from promptmodel.constants import ENDPOINT_URL
 
 load_dotenv()

@@ -16,7 +16,7 @@ from typing import (
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
-from promptmodel.utils.types import LLMStreamResponse, LLMResponse
+from promptmodel.types.response import LLMStreamResponse, LLMResponse
 from promptmodel import DevClient
 
 

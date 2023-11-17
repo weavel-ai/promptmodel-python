@@ -17,7 +17,7 @@ from promptmodel.database.crud import (
     update_prompt_model_uuid,
     update_chat_model_uuid,
 )
-from promptmodel.utils.enums import (
+from promptmodel.types.enums import (
     ModelVersionStatus,
     ChangeLogAction,
 )

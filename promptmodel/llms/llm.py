@@ -13,9 +13,9 @@ from dotenv import load_dotenv
 from litellm import completion, acompletion
 from litellm import ModelResponse
 
-from promptmodel.utils.types import LLMResponse, LLMStreamResponse
+from promptmodel.types.response import LLMResponse, LLMStreamResponse
 from promptmodel.utils import logger
-from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
+from promptmodel.types.enums import ParsingType, ParsingPattern, get_pattern_by_type
 from promptmodel.utils.output_utils import convert_str_to_type, update_dict
 from promptmodel.utils.prompt_util import (
     num_tokens_for_messages,

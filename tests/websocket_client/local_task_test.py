@@ -4,7 +4,7 @@ import asyncio
 
 from websockets.exceptions import ConnectionClosedOK
 from promptmodel.websocket.websocket_client import DevWebsocketClient
-from promptmodel.utils.enums import LocalTask
+from promptmodel.types.enums import LocalTask
 
 
 @pytest.mark.asyncio

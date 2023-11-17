@@ -17,7 +17,7 @@ from peewee import (
 )
 
 from promptmodel.database.config import BaseModel
-from promptmodel.utils.enums import ModelVersionStatus, ParsingType
+from promptmodel.types.enums import ModelVersionStatus, ParsingType
 
 
 class JSONField(TextField):

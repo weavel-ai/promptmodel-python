@@ -7,9 +7,9 @@ from uuid import uuid4
 from dataclasses import dataclass
 from websockets.exceptions import ConnectionClosedOK
 from promptmodel.websocket.websocket_client import DevWebsocketClient
-from promptmodel.utils.enums import LocalTask, ParsingType
+from promptmodel.types.enums import LocalTask, ParsingType
 from promptmodel.database.models import PromptModelVersion
-from promptmodel.utils.types import FunctionSchema
+from promptmodel.types.response import FunctionSchema
 
 
 @dataclass

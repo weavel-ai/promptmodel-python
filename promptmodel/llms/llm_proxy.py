@@ -29,7 +29,7 @@ from promptmodel.utils.chat_util import (
 )
 from promptmodel.utils.output_utils import update_dict
 from promptmodel.apis.base import APIClient, AsyncAPIClient
-from promptmodel.utils.types import LLMResponse, LLMStreamResponse
+from promptmodel.types.response import LLMResponse, LLMStreamResponse
 
 
 class LLMProxy(LLM):

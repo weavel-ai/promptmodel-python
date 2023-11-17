@@ -4,7 +4,7 @@ import nest_asyncio
 from dataclasses import dataclass
 from typing import Callable, Dict, Any, List, Optional, Union
 
-from promptmodel.utils.types import FunctionSchema
+from promptmodel.types.response import FunctionSchema
 
 
 @dataclass

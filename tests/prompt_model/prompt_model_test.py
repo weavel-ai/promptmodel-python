@@ -6,8 +6,8 @@ from litellm import ModelResponse
 
 from promptmodel.llms.llm import LLM, ParseResult
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.types import LLMResponse, LLMStreamResponse
-from promptmodel.utils.enums import ParsingType
+from promptmodel.types.response import LLMResponse, LLMStreamResponse
+from promptmodel.types.enums import ParsingType
 from promptmodel import PromptModel, DevClient
 from promptmodel.dev_app import PromptModelInterface
 from promptmodel.promptmodel import RegisteringMeta

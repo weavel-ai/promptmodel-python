@@ -7,8 +7,8 @@ from litellm import ModelResponse
 from ..constants import function_shemas
 from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.types import LLMResponse, LLMStreamResponse
-from promptmodel.utils.enums import ParsingType
+from promptmodel.types.response import LLMResponse, LLMStreamResponse
+from promptmodel.types.enums import ParsingType
 
 html_output_format = """\
 You must follow the provided output format. Keep the string between <> as it is.

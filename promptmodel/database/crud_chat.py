@@ -9,7 +9,7 @@ from promptmodel.database.models import (
     ChatLog,
 )
 from playhouse.shortcuts import model_to_dict
-from promptmodel.utils.enums import ModelVersionStatus, ParsingType
+from promptmodel.types.enums import ModelVersionStatus, ParsingType
 from promptmodel.utils.random_utils import select_version
 from promptmodel.utils import logger
 from promptmodel.database.config import db

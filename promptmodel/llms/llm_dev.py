@@ -9,10 +9,10 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import acompletion
 
-from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
+from promptmodel.types.enums import ParsingType, ParsingPattern, get_pattern_by_type
 from promptmodel.utils import logger
 from promptmodel.utils.output_utils import convert_str_to_type
-from promptmodel.utils.types import LLMStreamResponse
+from promptmodel.types.response import LLMStreamResponse
 
 load_dotenv()
 

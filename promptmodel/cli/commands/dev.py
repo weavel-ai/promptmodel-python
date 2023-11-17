@@ -28,7 +28,7 @@ from promptmodel.cli.signal_handler import dev_terminate_signal_handler
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.crypto import generate_api_key, encrypt_message
-from promptmodel.utils.enums import ModelVersionStatus, ChangeLogAction
+from promptmodel.types.enums import ModelVersionStatus, ChangeLogAction
 from promptmodel.websocket import DevWebsocketClient, CodeReloadHandler
 from promptmodel.database.orm import initialize_db
 from promptmodel.database.models import *
