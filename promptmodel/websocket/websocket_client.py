@@ -261,7 +261,6 @@ class DevWebsocketClient:
                         sample_input_dict = model_to_dict(sample_input_row)
                     except:
                         sample_input_dict = None
-
                     if sample_input_dict is None or "contents" not in sample_input_dict:
                         logger.error(f"There is no sample input {sample_name}.")
                         return
@@ -643,7 +642,6 @@ class DevWebsocketClient:
                         .where(PromptModelVersion.uuid == prompt_model_version_uuid)
                         .execute()
                     )
-
                     RunLog.create(
                         version_uuid=prompt_model_version_uuid,
                         inputs=sample_input,

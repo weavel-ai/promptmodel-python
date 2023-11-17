@@ -54,22 +54,24 @@ def test_stream_with_functions(mocker):
             print("ERROR")
             print(res.error)
             print(res.error_log)
-        if res.api_response and "delta" not in res.api_response.choices[0]:
+        if (
+            res.api_response
+            and getattr(res.api_response.choices[0], "delta", None) is None
+        ):
             api_responses.append(res.api_response)
             final_response = res
 
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        "function_call" in final_response.api_response.choices[0]["message"]
+        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        is not None
     ), "function_call is None"
 
-    assert (
-        api_responses[0].choices[0]["message"]["content"] is None
-    ), "content is not None"
-    assert api_responses[0]["response_ms"] is not None, "response_ms is None"
-    assert api_responses[0]["usage"] is not None, "usage is None"
-    assert api_responses[0]["usage"]["prompt_tokens"] == 74, "prompt_tokens is not 74"
+    assert api_responses[0].choices[0].message.content is None, "content is not None"
+    assert api_responses[0]._response_ms is not None, "response_ms is None"
+    assert api_responses[0].usage is not None, "usage is None"
+    assert api_responses[0].usage.prompt_tokens == 74, "prompt_tokens is not 74"
 
     # test logging
     llm_proxy = LLMProxy("test")
@@ -95,7 +97,7 @@ def test_stream_with_functions(mocker):
     _, kwargs = mock_execute.call_args
 
     assert (
-        kwargs["json"]["api_response"] == api_responses[0].to_dict_recursive()
+        kwargs["json"]["api_response"] == api_responses[0].model_dump()
     ), "api_response is not equal"
 
 
@@ -103,7 +105,7 @@ def test_stream_with_functions(mocker):
 async def test_astream_with_functions(mocker):
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
-    stream_res: Generator[LLMStreamResponse, None, None] = llm.astream(
+    stream_res: AsyncGenerator[LLMStreamResponse, None] = llm.astream(
         messages=messages,
         functions=function_shemas,
         model="gpt-3.5-turbo-0613",
@@ -118,22 +120,24 @@ async def test_astream_with_functions(mocker):
             print("ERROR")
             print(res.error)
             print(res.error_log)
-        if res.api_response and "delta" not in res.api_response.choices[0]:
+        if (
+            res.api_response
+            and getattr(res.api_response.choices[0], "delta", None) is None
+        ):
             api_responses.append(res.api_response)
             final_response = res
 
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        "function_call" in final_response.api_response.choices[0]["message"]
+        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        is not None
     ), "function_call is None"
 
-    assert (
-        api_responses[0].choices[0]["message"]["content"] is None
-    ), "content is not None"
-    assert api_responses[0]["response_ms"] is not None, "response_ms is None"
-    assert api_responses[0]["usage"] is not None, "usage is None"
-    assert api_responses[0]["usage"]["prompt_tokens"] == 74, "prompt_tokens is not 74"
+    assert api_responses[0].choices[0].message.content is None, "content is not None"
+    assert api_responses[0]._response_ms is not None, "response_ms is None"
+    assert api_responses[0].usage is not None, "usage is None"
+    assert api_responses[0].usage.prompt_tokens == 74, "prompt_tokens is not 74"
 
     # test logging
     llm_proxy = LLMProxy("test")
@@ -156,7 +160,7 @@ async def test_astream_with_functions(mocker):
     _, kwargs = mock_execute.call_args
 
     assert (
-        kwargs["json"]["api_response"] == api_responses[0].to_dict_recursive()
+        kwargs["json"]["api_response"] == api_responses[0].model_dump()
     ), "api_response is not equal"
 
 
@@ -179,19 +183,21 @@ def test_stream_and_parse_with_functions(mocker):
             print("ERROR")
             print(res.error)
             print(res.error_log)
-        if res.api_response and "delta" not in res.api_response.choices[0]:
+        if (
+            res.api_response
+            and getattr(res.api_response.choices[0], "delta", None) is None
+        ):
             api_responses.append(res.api_response)
             final_response = res
 
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        "function_call" in final_response.api_response.choices[0]["message"]
+        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        is not None
     ), "function_call is None"
 
-    assert (
-        api_responses[0].choices[0]["message"]["content"] is None
-    ), "content is not None"
+    assert api_responses[0].choices[0].message.content is None, "content is not None"
 
     # Not call function, parsing case
     messages = [
@@ -217,25 +223,27 @@ def test_stream_and_parse_with_functions(mocker):
             error_count += 1
             error_log = res.error_log
             print("ERROR")
-        if res.api_response and "delta" not in res.api_response.choices[0]:
+        if (
+            res.api_response
+            and getattr(res.api_response.choices[0], "delta", None) is None
+        ):
             api_responses.append(res.api_response)
             final_response = res
 
-    if not "str" in api_responses[0].choices[0]["message"]["content"]:
+    if not "str" in api_responses[0].choices[0].message.content:
         # if "str" in content, just LLM make mistake in generation.
         assert (
             error_count == 0
-        ), f"error_count is not 0, {error_log}, {api_responses[0].to_dict_recursive()}"
+        ), f"error_count is not 0, {error_log}, {api_responses[0].model_dump()}"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        "function_call" not in final_response.api_response.choices[0]["message"]
+        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        is None
     ), "function_call is not None"
 
     assert final_response.parsed_outputs is not None, "parsed_outputs is None"
 
-    assert (
-        api_responses[0].choices[0]["message"]["content"] is not None
-    ), "content is None"
+    assert api_responses[0].choices[0].message.content is not None, "content is None"
 
 
 @pytest.mark.asyncio
@@ -258,18 +266,20 @@ async def test_astream_and_parse_with_functions(mocker):
             # print("ERROR")
             # print(res.error)
             # print(res.error_log)
-        if res.api_response and "delta" not in res.api_response.choices[0]:
+        if (
+            res.api_response
+            and getattr(res.api_response.choices[0], "delta", None) is None
+        ):
             api_responses.append(res.api_response)
             final_response = res
 
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
 
+    assert api_responses[0].choices[0].message.content is None, "content is not None"
     assert (
-        api_responses[0].choices[0]["message"]["content"] is None
-    ), "content is not None"
-    assert (
-        "function_call" in final_response.api_response.choices[0]["message"]
+        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        is not None
     ), "function_call is None"
 
     # Not call function, parsing case
@@ -279,7 +289,7 @@ async def test_astream_and_parse_with_functions(mocker):
             "content": "Hello, How are you?\n" + html_output_format,
         }
     ]
-    stream_res: Generator[LLMStreamResponse, None, None] = llm.astream_and_parse(
+    stream_res: AsyncGenerator[LLMStreamResponse, None] = llm.astream_and_parse(
         messages=messages,
         functions=function_shemas,
         model="gpt-3.5-turbo-0613",
@@ -296,21 +306,23 @@ async def test_astream_and_parse_with_functions(mocker):
             error_count += 1
             error_log = res.error_log
             print("ERROR")
-        if res.api_response and "delta" not in res.api_response.choices[0]:
+        if (
+            res.api_response
+            and getattr(res.api_response.choices[0], "delta", None) is None
+        ):
             api_responses.append(res.api_response)
             final_response = res
 
-    if not "str" in api_responses[0].choices[0]["message"]["content"]:
+    if not "str" in api_responses[0].choices[0].message.content:
         # if "str" in content, just LLM make mistake in generation.
         assert (
             error_count == 0
-        ), f"error_count is not 0, {error_log}, {api_responses[0].to_dict_recursive()}"
+        ), f"error_count is not 0, {error_log}, {api_responses[0].model_dump()}"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        "function_call" not in final_response.api_response.choices[0]["message"]
+        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        is None
     ), "function_call is not None"
     assert final_response.parsed_outputs != {}, "parsed_outputs is empty dict"
 
-    assert (
-        api_responses[0].choices[0]["message"]["content"] is not None
-    ), "content is None"
+    assert api_responses[0].choices[0].message.content is not None, "content is None"

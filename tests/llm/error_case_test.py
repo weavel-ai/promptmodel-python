@@ -7,7 +7,17 @@ from litellm import ModelResponse
 from ..constants import function_shemas
 from promptmodel.llms.llm import LLM, ParseResult
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.types.response import LLMResponse, LLMStreamResponse
+from promptmodel.types.response import (
+    LLMResponse,
+    LLMStreamResponse,
+    Message,
+    Delta,
+    Choices,
+    Usage,
+    FunctionCall,
+    ChoiceDeltaFunctionCall,
+    StreamingChoices,
+)
 from promptmodel.types.enums import ParsingType
 
 
@@ -103,34 +113,46 @@ async def test_astream_error_cases(mocker):
 
 def string_to_generator(input_string: str):
     def generator_format(response: str):
-        return {"choices": [{"delta": {"content": response}, "finish_reason": None}]}
+        model_response = ModelResponse(stream=True)
+        model_response.choices[0] = StreamingChoices(
+            **{
+                "delta": Delta(**{"content": response}),
+                "finish_reason": None,
+            }
+        )
+        return model_response
 
     def generator():
         for char in input_string:
             yield generator_format(char)
-        yield {
-            "id": "test",
-            "created": "Test",
-            "model": "gpt-3.5-turbo",
-            "choices": [{"delta": {"content": None}, "finish_reason": "stop"}],
-        }
+        model_response = ModelResponse(stream=True)
+        model_response.choices[0] = StreamingChoices(
+            **{"delta": Delta(**{"content": None}), "finish_reason": "stop"}
+        )
+        yield model_response
 
     return generator()
 
 
 async def string_to_agenerator(input_string: str):
     def generator_format(response: str):
-        return {"choices": [{"delta": {"content": response}, "finish_reason": None}]}
+        model_response = ModelResponse(stream=True)
+        model_response.choices[0] = StreamingChoices(
+            **{
+                "delta": Delta(**{"content": response}),
+                "finish_reason": None,
+            }
+        )
+        return model_response
 
     async def agenerator():
         for char in input_string:
             yield generator_format(char)
-        yield {
-            "id": "test",
-            "created": "Test",
-            "model": "gpt-3.5-turbo",
-            "choices": [{"delta": {"content": None}, "finish_reason": "stop"}],
-        }
+        model_response = ModelResponse(stream=True)
+        model_response.choices[0] = StreamingChoices(
+            **{"delta": Delta(**{"content": None}), "finish_reason": "stop"}
+        )
+        yield model_response
 
     return agenerator()
 

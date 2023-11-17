@@ -29,7 +29,13 @@ from promptmodel.utils.chat_util import (
 )
 from promptmodel.utils.output_utils import update_dict
 from promptmodel.apis.base import APIClient, AsyncAPIClient
-from promptmodel.types.response import LLMResponse, LLMStreamResponse
+from promptmodel.types.response import (
+    LLMResponse,
+    LLMStreamResponse,
+    Message,
+    Usage,
+    FunctionCall,
+)
 
 
 class LLMProxy(LLM):
@@ -53,7 +59,7 @@ class LLMProxy(LLM):
             error_log = None
             for item in stream_response:
                 if (
-                    item.api_response and "delta" not in item.api_response["choices"][0]
+                    item.api_response and "delta" not in item.api_response.choices[0]
                 ):  # only get the last api_response, not delta response
                     api_response = item.api_response
                 if item.parsed_outputs:
@@ -70,14 +76,6 @@ class LLMProxy(LLM):
                     item.parsed_outputs = None
                     item.function_call = None
                 yield item
-
-            # add string_cache in model_response
-            if api_response:
-                if "message" not in api_response.choices[0]:
-                    api_response.choices[0]["message"] = {}
-                if "content" not in api_response.choices[0]["message"]:
-                    api_response.choices[0]["message"]["content"] = string_cache
-                    api_response.choices[0]["message"]["role"] = "assistant"
 
             metadata = {
                 "error_occurs": error_occurs,
@@ -111,7 +109,7 @@ class LLMProxy(LLM):
             api_response: Optional[ModelResponse] = None
             async for item in stream_response:
                 if (
-                    item.api_response and "delta" not in item.api_response["choices"][0]
+                    item.api_response and "delta" not in item.api_response.choices[0]
                 ):  # only get the last api_response, not delta response
                     api_response = item.api_response
                 if item.parsed_outputs:
@@ -123,13 +121,13 @@ class LLMProxy(LLM):
                     error_log = item.error_log
                 yield item
 
-            # add string_cache in model_response
-            if api_response:
-                if "message" not in api_response.choices[0]:
-                    api_response.choices[0]["message"] = {}
-                if "content" not in api_response.choices[0]["message"]:
-                    api_response.choices[0]["message"]["content"] = string_cache
-                    api_response.choices[0]["message"]["role"] = "assistant"
+            # # add string_cache in model_response
+            # if api_response:
+            #     if "message" not in api_response.choices[0]:
+            #         api_response.choices[0]["message"] = {}
+            #     if "content" not in api_response.choices[0]["message"]:
+            #         api_response.choices[0]["message"]["content"] = string_cache
+            #         api_response.choices[0]["message"]["role"] = "assistant"
 
             metadata = {
                 "error_occurs": error_occurs,
@@ -256,12 +254,12 @@ class LLMProxy(LLM):
             if llm_response.api_response:
                 metadata["api_response"] = llm_response.api_response.__dict__
                 metadata["token_usage"] = llm_response.api_response["token_usage"]
-                metadata["latency"] = llm_response.api_response["response_ms"]
+                metadata["latency"] = llm_response.api_response._response_ms
 
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
                     session_uuid,
-                    [llm_response.api_response["choices"][0]["message"]],
+                    [llm_response.api_response.choices[0]["message"]],
                     version_details["uuid"],
                     [metadata],
                 )
@@ -302,11 +300,11 @@ class LLMProxy(LLM):
             if llm_response.api_response:
                 metadata["api_response"] = llm_response.api_response.__dict__
                 metadata["token_usage"] = llm_response.api_response["token_usage"]
-                metadata["latency"] = llm_response.api_response["response_ms"]
+                metadata["latency"] = llm_response.api_response._response_ms
 
             await self._async_chat_log_to_cloud(
                 session_uuid,
-                [llm_response.api_response["choices"][0]["message"]],
+                [llm_response.api_response.choices[0]["message"]],
                 version_details["uuid"],
                 [metadata],
             )
@@ -399,14 +397,8 @@ class LLMProxy(LLM):
     ):
         # Perform the logging asynchronously
         if api_response:
-            api_response_dict = api_response.to_dict_recursive()
-            api_response_dict.update(
-                {
-                    "response_ms": api_response["response_ms"]
-                    if "response_ms" in api_response
-                    else api_response.response_ms
-                }
-            )
+            api_response_dict = api_response.model_dump()
+            api_response_dict.update({"response_ms": api_response._response_ms})
         else:
             api_response_dict = None
         res = await AsyncAPIClient.execute(

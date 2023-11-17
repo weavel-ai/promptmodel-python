@@ -10,48 +10,107 @@ from typing import (
     Union,
 )
 from pydantic import BaseModel
-from litellm import ModelResponse as LiteLLMModelResponse
+from litellm import ModelResponse
+from openai._models import BaseModel as OpenAIObject
 
 
-class ModelResponse(LiteLLMModelResponse):
-    def __init__(self, **params):
-        super(ModelResponse, self).__init__(**params)
+class Usage(OpenAIObject):
+    def __init__(
+        self, prompt_tokens=None, completion_tokens=None, total_tokens=None, **params
+    ):
+        super(Usage, self).__init__(**params)
+        if prompt_tokens:
+            self.prompt_tokens = prompt_tokens
+        if completion_tokens:
+            self.completion_tokens = completion_tokens
+        if total_tokens:
+            self.total_tokens = total_tokens
 
 
-class LLMResponse:
+class Message(OpenAIObject):
     def __init__(
         self,
-        api_response: Optional[ModelResponse] = None,
-        raw_output: Optional[str] = None,
-        parsed_outputs: Optional[Dict[str, str]] = None,
-        error: Optional[bool] = None,
-        error_log: Optional[str] = None,
-        function_call: Optional[Dict[str, Any]] = None,
+        content="default",
+        role="assistant",
+        logprobs=None,
+        function_call=None,
+        **params
     ):
-        self.api_response = api_response
-        self.raw_output = raw_output
-        self.parsed_outputs = parsed_outputs
-        self.error = error
-        self.error_log = error_log
-        self.function_call = function_call
+        super(Message, self).__init__(**params)
+        self.content = content
+        self.role = role
+        self._logprobs = logprobs
+        if function_call:
+            self.function_call = FunctionCall(**function_call)
 
 
-class LLMStreamResponse:
+class Delta(OpenAIObject):
+    def __init__(self, content=None, role=None, function_call=None, **params):
+        super(Delta, self).__init__(**params)
+        if content is not None:
+            self.content = content
+        if role:
+            self.role = role
+        if function_call:
+            self.function_call = FunctionCall(**function_call)
+
+
+class Choices(OpenAIObject):
+    def __init__(self, finish_reason=None, index=0, message=None, **params):
+        super(Choices, self).__init__(**params)
+        if finish_reason:
+            self.finish_reason = finish_reason
+        else:
+            self.finish_reason = "stop"
+        self.index = index
+        if message is None:
+            self.message = Message(content=None)
+        else:
+            self.message = message
+
+
+class StreamingChoices(OpenAIObject):
     def __init__(
-        self,
-        api_response: Optional[ModelResponse] = None,
-        raw_output: Optional[str] = None,
-        parsed_outputs: Optional[Dict[str, str]] = None,
-        error: Optional[bool] = None,
-        error_log: Optional[str] = None,
-        function_call: Optional[Dict[str, Any]] = None,
+        self, finish_reason=None, index=0, delta: Optional[Delta] = None, **params
     ):
-        self.api_response = api_response
-        self.raw_output = raw_output
-        self.parsed_outputs = parsed_outputs
-        self.error = error
-        self.error_log = error_log
-        self.function_call = function_call
+        super(StreamingChoices, self).__init__(**params)
+        if finish_reason:
+            self.finish_reason = finish_reason
+        else:
+            self.finish_reason = None
+        self.index = index
+        if delta:
+            self.delta = delta
+        else:
+            self.delta = Delta()
+
+
+class FunctionCall(OpenAIObject):
+    arguments: str
+    name: str
+
+
+class ChoiceDeltaFunctionCall(OpenAIObject):
+    arguments: str
+    name: str
+
+
+class LLMResponse(OpenAIObject):
+    api_response: Optional[ModelResponse] = None
+    raw_output: Optional[str] = None
+    parsed_outputs: Optional[Dict[str, str]] = None
+    error: Optional[bool] = None
+    error_log: Optional[str] = None
+    function_call: Optional[Dict[str, Any]] = None
+
+
+class LLMStreamResponse(OpenAIObject):
+    api_response: Optional[ModelResponse] = None
+    raw_output: Optional[str] = None
+    parsed_outputs: Optional[Dict[str, str]] = None
+    error: Optional[bool] = None
+    error_log: Optional[str] = None
+    function_call: Optional[Dict[str, Any]] = None
 
 
 class FunctionSchema(BaseModel):
