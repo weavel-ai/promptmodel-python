@@ -58,8 +58,8 @@ class ParseResult:
 
 
 class LLM:
-    def __init__(self, rate_limit_manager=None):
-        self._rate_limit_manager = rate_limit_manager
+    def __init__(self):
+        pass
 
     @classmethod
     def __parse_output_pattern__(
@@ -108,6 +108,7 @@ class LLM:
         messages: List[Dict[str, str]],
         functions: List[Any] = [],
         model: Optional[str] = DEFAULT_MODEL,
+        api_key: Optional[str] = None,
         *args,
         **kwargs,
     ) -> LLMResponse:
@@ -121,6 +122,7 @@ class LLM:
                     for message in self.__validate_openai_messages(messages)
                 ],
                 functions=functions,
+                api_key=api_key,
             )
 
             content: Optional[str] = getattr(
@@ -147,6 +149,7 @@ class LLM:
         messages: List[Dict[str, str]],
         functions: List[Any] = [],
         model: Optional[str] = DEFAULT_MODEL,
+        api_key: Optional[str] = None,
         *args,
         **kwargs,
     ) -> LLMResponse:
@@ -160,6 +163,7 @@ class LLM:
                     for message in self.__validate_openai_messages(messages)
                 ],
                 functions=functions,
+                api_key=api_key,
             )
             content: Optional[str] = getattr(
                 response.choices[0].message, "content", None
@@ -185,6 +189,7 @@ class LLM:
         messages: List[Dict[str, str]],  # input
         functions: List[Any] = [],
         model: Optional[str] = DEFAULT_MODEL,
+        api_key: Optional[str] = None,
         *args,
         **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
@@ -201,6 +206,7 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
+                api_key=api_key,
             )
 
             for chunk in self.__llm_stream_response_generator__(
@@ -215,6 +221,7 @@ class LLM:
         messages: List[Dict[str, str]],
         functions: List[Any] = [],
         model: Optional[str] = DEFAULT_MODEL,
+        api_key: Optional[str] = None,
         *args,
         **kwargs,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
@@ -230,6 +237,7 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
+                api_key=api_key,
             )
 
             async for chunk in self.__llm_stream_response_agenerator__(
@@ -246,6 +254,7 @@ class LLM:
         functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
         """Parse and return output from openai chat completion."""
         response = None
@@ -260,6 +269,7 @@ class LLM:
                     for message in self.__validate_openai_messages(messages)
                 ],
                 functions=functions,
+                api_key=api_key,
             )
             raw_output = getattr(response.choices[0].message, "content", None)
 
@@ -308,6 +318,7 @@ class LLM:
         functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
         """Generate openai chat completion asynchronously, and parse the output.
         Example prompt is as follows:
@@ -337,6 +348,7 @@ class LLM:
                     for message in self.__validate_openai_messages(messages)
                 ],
                 functions=functions,
+                api_key=api_key,
             )
             raw_output = getattr(response.choices[0].message, "content", None)
 
@@ -385,6 +397,7 @@ class LLM:
         functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
+        api_key: Optional[str] = None,
         **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
@@ -405,6 +418,7 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
+                api_key=api_key,
             )
 
             parsed_outputs = {}
@@ -527,6 +541,7 @@ class LLM:
         functions: List[Any] = [],
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
+        api_key: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
         response = None
@@ -546,6 +561,7 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
+                api_key=api_key,
             )
 
             parsed_outputs = {}

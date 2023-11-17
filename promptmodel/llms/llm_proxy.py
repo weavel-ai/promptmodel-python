@@ -39,8 +39,8 @@ from promptmodel.types.response import (
 
 
 class LLMProxy(LLM):
-    def __init__(self, name: str, rate_limit_manager=None):
-        super().__init__(rate_limit_manager)
+    def __init__(self, name: str):
+        super().__init__()
         self._name = name
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
@@ -346,6 +346,9 @@ class LLMProxy(LLM):
 
         if "function_list" in kwargs:
             call_args["functions"] = kwargs["function_list"]
+
+        if "api_key" in kwargs:
+            call_args["api_key"] = kwargs["api_key"]
         return call_args
 
     def _prepare_call_args_for_chat(
@@ -383,7 +386,10 @@ class LLMProxy(LLM):
                 del token_per_messages[1]
 
         call_args["messages"] = messages
-        call_args["model"] = (version_detail["model"] if version_detail else None,)
+        call_args["model"] = version_detail["model"] if version_detail else None
+
+        if "api_key" in kwargs:
+            call_args["api_key"] = kwargs["api_key"]
 
         return call_args
 
@@ -444,70 +450,101 @@ class LLMProxy(LLM):
             print(f"[red]Failed to log to cloud: {res.json()}[/red]")
         return res
 
+    def make_kwargs(self, **kwargs):
+        res = {}
+        for key, value in kwargs.items():
+            if value is not None:
+                res[key] = value
+        return res
+
     def run(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_method(super().run)(inputs, **kwargs)
 
     def arun(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_async_method(super().arun)(inputs, **kwargs)
 
     def stream(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_gen(super().stream)(inputs, **kwargs)
 
     def astream(
         self,
         inputs: Optional[Dict[str, Any]] = {},
         function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_async_gen(super().astream)(inputs, **kwargs)
 
     def run_and_parse(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_method(super().run_and_parse)(inputs, **kwargs)
 
     def arun_and_parse(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_async_method(super().arun_and_parse)(inputs, **kwargs)
 
     def stream_and_parse(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_gen(super().stream_and_parse)(inputs, **kwargs)
 
     def astream_and_parse(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_async_gen(super().astream_and_parse)(inputs, **kwargs)
 
     def chat_run(
         self,
         session_uuid: str,
         function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_chat(super().run)(session_uuid, **kwargs)
 
     def chat_arun(
         self,
         session_uuid: str,
         function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_async_chat(super().arun)(session_uuid, **kwargs)
 
     # def chat_stream(

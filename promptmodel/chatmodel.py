@@ -56,9 +56,10 @@ class RegisteringMeta(type):
 
 
 class ChatModel(metaclass=RegisteringMeta):
-    def __init__(self, name, rate_limit_manager=None, session_uuid: str = None):
+    def __init__(self, name, session_uuid: str = None, api_key: Optional[str] = None):
         self.name = name
-        self.llm_proxy = LLMProxy(name, rate_limit_manager)
+        self.api_key = api_key
+        self.llm_proxy = LLMProxy(name)
         if session_uuid is None:
             self.session_uuid = uuid4()
             instruction, version_details = run_async_in_sync(
@@ -181,7 +182,7 @@ class ChatModel(metaclass=RegisteringMeta):
         #         yield item
         # else:
         #     return self.llm_proxy.chat_run(self.session_uuid, function_list)
-        return self.llm_proxy.chat_run(self.session_uuid, function_list)
+        return self.llm_proxy.chat_run(self.session_uuid, function_list, self.api_key)
 
     async def arun(
         self,
@@ -203,4 +204,6 @@ class ChatModel(metaclass=RegisteringMeta):
         #     return Coroutine(self.llm_proxy.chat_astream(self.session_uuid, function_list))
         # else:
         #     return await self.llm_proxy.chat_arun(self.session_uuid, function_list)
-        return await self.llm_proxy.chat_arun(self.session_uuid, function_list)
+        return await self.llm_proxy.chat_arun(
+            self.session_uuid, function_list, self.api_key
+        )
