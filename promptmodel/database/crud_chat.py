@@ -10,7 +10,7 @@ from promptmodel.database.models import (
 )
 from playhouse.shortcuts import model_to_dict
 from promptmodel.types.enums import ModelVersionStatus, ParsingType
-from promptmodel.utils.random_utils import select_version
+from promptmodel.utils.random_utils import select_version_by_ratio
 from promptmodel.utils import logger
 from promptmodel.database.config import db
 

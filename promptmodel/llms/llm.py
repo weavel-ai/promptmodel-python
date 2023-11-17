@@ -24,7 +24,7 @@ from promptmodel.types.response import (
 from promptmodel.utils import logger
 from promptmodel.types.enums import ParsingType, ParsingPattern, get_pattern_by_type
 from promptmodel.utils.output_utils import convert_str_to_type, update_dict
-from promptmodel.utils.prompt_util import (
+from promptmodel.utils.token_counting import (
     num_tokens_for_messages,
     num_tokens_from_function_call_output,
     num_tokens_from_functions_input,

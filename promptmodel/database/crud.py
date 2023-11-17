@@ -13,7 +13,7 @@ from promptmodel.database.models import (
 )
 from playhouse.shortcuts import model_to_dict
 from promptmodel.types.enums import ModelVersionStatus, ParsingType
-from promptmodel.utils.random_utils import select_version
+from promptmodel.utils.random_utils import select_version_by_ratio
 from promptmodel.utils import logger
 from promptmodel.database.config import db
 from promptmodel.database.crud_chat import *
@@ -89,7 +89,9 @@ def get_deployed_prompts(prompt_model_name: str) -> Tuple[List[DeployedPrompt], 
                 .order_by(DeployedPrompt.step.asc())
             )
         # select version by ratio
-        selected_version = select_version([version.__data__ for version in versions])
+        selected_version = select_version_by_ratio(
+            [version.__data__ for version in versions]
+        )
         selected_prompts = list(
             filter(
                 lambda prompt: str(prompt.version_uuid.uuid)

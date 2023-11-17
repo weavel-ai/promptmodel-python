@@ -14,97 +14,8 @@ from promptmodel.database.crud import (
 )
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
-from promptmodel.utils.random_utils import select_version
+from promptmodel.utils.random_utils import select_version_by_ratio
 from promptmodel.promptmodel_init import CacheManager, update_deployed_db
-
-
-async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
-    """fetch prompts.
-
-    Args:
-        name (str): name of PromptModel
-
-    Returns:
-        Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
-    """
-    # Check dev_branch activate
-    config = read_config()
-    if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
-        return [], {}
-    elif "dev_branch" in config and config["dev_branch"]["online"] == True:
-        # get prompt from local DB
-        prompt_rows, version_detail = get_latest_version_prompts(name)
-        if prompt_rows is None:
-            return [], {}
-        return [
-            {"role": prompt.role, "content": prompt.content} for prompt in prompt_rows
-        ], version_detail
-    else:
-        if (
-            "project" in config
-            and "use_cache" in config["project"]
-            and config["project"]["use_cache"] == True
-        ):
-            cache_manager = CacheManager()
-            # call update_local API in background task
-            cache_update_thread = Thread(
-                target=cache_manager.cache_update_background_task, args=(config,)
-            )
-            cache_update_thread.daemon = True
-            cache_update_thread.start()
-
-            # get prompt from local DB by ratio
-            prompt_rows, version_detail = get_deployed_prompts(name)
-            if prompt_rows is None:
-                return [], {}
-
-            return [
-                {"role": prompt.role, "content": prompt.content}
-                for prompt in prompt_rows
-            ], version_detail
-
-        else:
-            try:
-                prompts_data = await AsyncAPIClient.execute(
-                    method="GET",
-                    path="/fetch_published_prompt_model_version",
-                    params={"prompt_model_name": name},
-                    use_cli_key=False,
-                )
-                prompts_data = prompts_data.json()
-            except Exception as e:
-                raise e
-            prompt_model_versions = prompts_data["prompt_model_versions"]
-            prompts = prompts_data["prompts"]
-            for version in prompt_model_versions:
-                if version["is_published"] is True:
-                    version["ratio"] = 1.0
-            selected_version = select_version(prompt_model_versions)
-
-            prompt_rows = list(
-                filter(
-                    lambda prompt: str(prompt["version_uuid"])
-                    == str(selected_version["uuid"]),
-                    prompts,
-                )
-            )
-            # sort prompt_rows by step
-            prompt_rows = sorted(prompt_rows, key=lambda prompt: prompt["step"])
-
-            version_detail = {
-                "model": selected_version["model"],
-                "uuid": selected_version["uuid"],
-                "parsing_type": selected_version["parsing_type"],
-                "output_keys": selected_version["output_keys"],
-            }
-
-            if prompt_rows is None:
-                return [], {}
-
-            return [
-                {"role": prompt["role"], "content": prompt["content"]}
-                for prompt in prompt_rows
-            ], version_detail
 
 
 def set_inputs_to_prompts(inputs: Dict[str, Any], prompts: List[Dict[str, str]]):
@@ -196,19 +107,3 @@ def num_tokens_from_function_call_output(
     if "arguments" in function_call_output:
         num_tokens += token_counter(model=model, text=function_call_output["arguments"])
     return num_tokens
-
-
-import asyncio
-
-
-def run_async_in_sync(coro: Coroutine):
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:  # No running loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(coro)
-        # loop.close()
-        return result
-
-    return loop.run_until_complete(coro)

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from promptmodel.llms.llm_proxy import LLMProxy, fetch_prompts
+from promptmodel.llms.llm_proxy import LLMProxy
 
 
 async def echo_coroutine(*args, **kwargs):

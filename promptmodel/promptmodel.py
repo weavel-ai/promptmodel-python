@@ -15,7 +15,7 @@ from typing import (
 
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
+from promptmodel.utils.async_util import run_async_in_sync
 from promptmodel.types.response import LLMStreamResponse, LLMResponse
 from promptmodel import DevClient
 
@@ -68,7 +68,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         # add name to the list of prompt_models
 
-        prompts, _ = run_async_in_sync(fetch_prompts(self.name))
+        prompts, _ = run_async_in_sync(self.llm_proxy.fetch_prompts(self.name))
         return prompts
 
     def run(

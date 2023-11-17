@@ -1,7 +1,7 @@
 import random
 
 
-def select_version(versions):
+def select_version_by_ratio(versions):
     epsilon = 1e-10
     ratios = [version["ratio"] for version in versions]
 

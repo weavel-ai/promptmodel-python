@@ -21,13 +21,7 @@ from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.database.models import ChatLog, ChatLogSession
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
-from promptmodel.utils.prompt_util import (
-    run_async_in_sync,
-)
-from promptmodel.utils.chat_util import (
-    fetch_chat_model,
-    fetch_chat_log,
-)
+from promptmodel.utils.async_util import run_async_in_sync
 from promptmodel.types.response import LLMStreamResponse, LLMResponse
 
 
@@ -63,7 +57,7 @@ class ChatModel(metaclass=RegisteringMeta):
         if session_uuid is None:
             self.session_uuid = uuid4()
             instruction, version_details = run_async_in_sync(
-                fetch_chat_model(self.name)
+                self.llm_proxy.fetch_chat_model(self.name)
             )
             config = read_config()
             if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
@@ -116,7 +110,7 @@ class ChatModel(metaclass=RegisteringMeta):
             List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
         """
         instruction, detail = run_async_in_sync(
-            fetch_chat_model(self.name, self.session_uuid)
+            self.llm_proxy.fetch_chat_model(self.name, self.session_uuid)
         )
         return instruction
 
@@ -158,7 +152,9 @@ class ChatModel(metaclass=RegisteringMeta):
             )
 
     def get_messages(self) -> List[Dict[str, Any]]:
-        message_logs = run_async_in_sync(fetch_chat_log(self.session_uuid))
+        message_logs = run_async_in_sync(
+            self.llm_proxy.fetch_chat_log(self.session_uuid)
+        )
         return message_logs
 
     def run(

@@ -11,21 +11,26 @@ from typing import (
     Union,
     Coroutine,
 )
+from uuid import UUID
 from threading import Thread
 from concurrent.futures import Future
 from rich import print
 from litellm.utils import ModelResponse, get_max_tokens, token_counter
 from promptmodel.llms.llm import LLM
+from promptmodel.database.models import *
+from promptmodel.database.crud import (
+    get_latest_version_prompts,
+    get_deployed_prompts,
+    get_latest_version_chat_model,
+)
+from promptmodel.promptmodel_init import CacheManager
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.utils.random_utils import select_version_by_ratio
 from promptmodel.utils import logger
-from promptmodel.utils.prompt_util import (
-    fetch_prompts,
-    run_async_in_sync,
+from promptmodel.utils.async_util import run_async_in_sync
+from promptmodel.utils.token_counting import (
     num_tokens_for_messages_for_each,
     num_tokens_from_functions_input,
-)
-from promptmodel.utils.chat_util import (
-    fetch_chat_model,
-    fetch_chat_log,
 )
 from promptmodel.utils.output_utils import update_dict
 from promptmodel.apis.base import APIClient, AsyncAPIClient
@@ -45,7 +50,7 @@ class LLMProxy(LLM):
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = run_async_in_sync(fetch_prompts(self._name))
+            prompts, version_details = run_async_in_sync(self.fetch_prompts(self._name))
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -91,7 +96,7 @@ class LLMProxy(LLM):
 
     def _wrap_async_gen(self, async_gen: Callable[..., Any]) -> Callable[..., Any]:
         async def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = await fetch_prompts(self._name)
+            prompts, version_details = await self.fetch_prompts(self._name)
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -143,7 +148,7 @@ class LLMProxy(LLM):
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = run_async_in_sync(fetch_prompts(self._name))
+            prompts, version_details = run_async_in_sync(self.fetch_prompts(self._name))
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -187,7 +192,7 @@ class LLMProxy(LLM):
 
     def _wrap_async_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         async def async_wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = await fetch_prompts(
+            prompts, version_details = await self.fetch_prompts(
                 self._name
             )  # messages, model, uuid = self._fetch_prompts()
             call_args = self._prepare_call_args(
@@ -231,9 +236,9 @@ class LLMProxy(LLM):
 
     def _wrap_chat(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(session_uuid: str, **kwargs):
-            message_logs = run_async_in_sync(fetch_chat_log(session_uuid))
+            message_logs = run_async_in_sync(self.fetch_chat_log(session_uuid))
             instruction, version_details = run_async_in_sync(
-                fetch_chat_model(self._name, session_uuid)
+                self.fetch_chat_model(self._name, session_uuid)
             )
 
             if len(message_logs) == 0 or message_logs[0]["role"] != "system":
@@ -277,8 +282,8 @@ class LLMProxy(LLM):
 
     def _wrap_async_chat(self, method: Callable[..., Any]) -> Callable[..., Any]:
         async def async_wrapper(session_uuid: str, **kwargs):
-            message_logs = await fetch_chat_log(session_uuid)
-            instruction, version_details = await fetch_chat_model(
+            message_logs = await self.fetch_chat_log(session_uuid)
+            instruction, version_details = await self.fetch_chat_model(
                 self._name, session_uuid
             )
 
@@ -562,3 +567,199 @@ class LLMProxy(LLM):
     # ) -> LLMResponse:
     #     kwargs = {"function_list": function_list} if function_list else {}
     #     return self._wrap_async_chat_gen(super().astream)(session_uuid, **kwargs)
+
+    @staticmethod
+    async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
+        """fetch prompts.
+
+        Args:
+            name (str): name of PromptModel
+
+        Returns:
+            Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
+        """
+        # Check dev_branch activate
+        config = read_config()
+        if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+            return [], {}
+        elif "dev_branch" in config and config["dev_branch"]["online"] == True:
+            # get prompt from local DB
+            prompt_rows, version_detail = get_latest_version_prompts(name)
+            if prompt_rows is None:
+                return [], {}
+            return [
+                {"role": prompt.role, "content": prompt.content}
+                for prompt in prompt_rows
+            ], version_detail
+        else:
+            if (
+                "project" in config
+                and "use_cache" in config["project"]
+                and config["project"]["use_cache"] == True
+            ):
+                cache_manager = CacheManager()
+                # call update_local API in background task
+                cache_update_thread = Thread(
+                    target=cache_manager.cache_update_background_task, args=(config,)
+                )
+                cache_update_thread.daemon = True
+                cache_update_thread.start()
+
+                # get prompt from local DB by ratio
+                prompt_rows, version_detail = get_deployed_prompts(name)
+                if prompt_rows is None:
+                    return [], {}
+
+                return [
+                    {"role": prompt.role, "content": prompt.content}
+                    for prompt in prompt_rows
+                ], version_detail
+
+            else:
+                try:
+                    prompts_data = await AsyncAPIClient.execute(
+                        method="GET",
+                        path="/fetch_published_prompt_model_version",
+                        params={"prompt_model_name": name},
+                        use_cli_key=False,
+                    )
+                    prompts_data = prompts_data.json()
+                except Exception as e:
+                    raise e
+                prompt_model_versions = prompts_data["prompt_model_versions"]
+                prompts = prompts_data["prompts"]
+                for version in prompt_model_versions:
+                    if version["is_published"] is True:
+                        version["ratio"] = 1.0
+                selected_version = select_version_by_ratio(prompt_model_versions)
+
+                prompt_rows = list(
+                    filter(
+                        lambda prompt: str(prompt["version_uuid"])
+                        == str(selected_version["uuid"]),
+                        prompts,
+                    )
+                )
+                # sort prompt_rows by step
+                prompt_rows = sorted(prompt_rows, key=lambda prompt: prompt["step"])
+
+                version_detail = {
+                    "model": selected_version["model"],
+                    "uuid": selected_version["uuid"],
+                    "parsing_type": selected_version["parsing_type"],
+                    "output_keys": selected_version["output_keys"],
+                }
+
+                if prompt_rows is None:
+                    return [], {}
+
+                return [
+                    {"role": prompt["role"], "content": prompt["content"]}
+                    for prompt in prompt_rows
+                ], version_detail
+
+    @staticmethod
+    async def fetch_chat_model(
+        name: str, session_uuid: Optional[str] = None
+    ) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
+        """fetch instruction and version detail
+
+        Args:
+            name (str): name of ChatModel
+
+        Returns:
+            Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
+        """
+        # Check dev_branch activate
+        config = read_config()
+        if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+            return [], {}
+        elif "dev_branch" in config and config["dev_branch"]["online"] == True:
+            # get prompt from local DB
+            instruction, version_detail = get_latest_version_chat_model(
+                name, session_uuid
+            )
+            if version_detail is None:
+                return [], {}
+            return instruction, version_detail
+        else:
+            try:
+                res_data = await AsyncAPIClient.execute(
+                    method="GET",
+                    path="/fetch_published_chat_model_version",
+                    params={"chat_model_name": name, "session_uuid": session_uuid},
+                    use_cli_key=False,
+                )
+                res_data = res_data.json()
+            except Exception as e:
+                raise e
+            chat_model_versions = res_data["chat_model_versions"]
+
+            for version in chat_model_versions:
+                if version["is_published"] is True:
+                    version["ratio"] = 1.0
+            selected_version = select_version_by_ratio(chat_model_versions)
+
+            instruction = [selected_version["system_prompt"]]
+
+            version_detail = {
+                "model": selected_version["model"],
+                "uuid": selected_version["uuid"],
+            }
+
+            return instruction, version_detail
+
+    @staticmethod
+    async def fetch_chat_log(session_uuid: str) -> List[Dict[str, Any]]:
+        """fetch conversation log for session_uuid and version detail
+
+        Args:
+            session_uuid (str): session_uuid
+
+        Returns:
+            List[Dict[str, Any]] : list of conversation log
+        """
+        config = read_config()
+        if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+            return []
+        elif "dev_branch" in config and config["dev_branch"]["online"] == True:
+            try:
+                chat_log_rows: List[ChatLog] = (
+                    ChatLog.select()
+                    .where(ChatLog.session_uuid == UUID(session_uuid))
+                    .order_by(ChatLog.created_at.asc())
+                    .get()
+                )
+                chat_logs = [
+                    {
+                        "role": message.role,
+                        "content": message.content,
+                        "tool_calls": message.tool_calls,
+                    }
+                    for message in chat_log_rows
+                ]
+            except:
+                chat_logs = []
+            return chat_logs
+        else:
+            try:
+                res_data = await AsyncAPIClient.execute(
+                    method="GET",
+                    path="/fetch_chat_logs",
+                    params={"session_uuid": session_uuid},
+                    use_cli_key=False,
+                )
+                res_data = res_data.json()
+            except Exception as e:
+                raise e
+
+            # filter out unnecessary data
+            res_data = [
+                {
+                    "role": message["role"],
+                    "content": message["content"],
+                    "function_call": message["function_call"],
+                }
+                for message in res_data["chat_logs"]
+            ]
+            return res_data
