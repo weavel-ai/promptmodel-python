@@ -322,6 +322,110 @@ class LLMProxy(LLM):
 
         return async_wrapper
 
+    def _wrap_chat_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
+        def wrapper(session_uuid: str, **kwargs):
+            message_logs = run_async_in_sync(LLMProxy.fetch_chat_log(session_uuid))
+            instruction, version_details = run_async_in_sync(
+                LLMProxy.fetch_chat_model(self._name, session_uuid)
+            )
+
+            if len(message_logs) == 0 or message_logs[0]["role"] != "system":
+                message_logs = instruction + message_logs
+
+            call_args = self._prepare_call_args_for_chat(
+                message_logs, version_details, kwargs
+            )
+            # Call the generator with the arguments
+            stream_response: Generator[LLMStreamResponse, None, None] = gen(**call_args)
+
+            api_response = None
+            error_occurs = False
+            error_log = None
+            for item in stream_response:
+                if (
+                    item.api_response and "delta" not in item.api_response.choices[0]
+                ):  # only get the last api_response, not delta response
+                    api_response = item.api_response
+
+                if item.error and not error_occurs:
+                    error_occurs = True
+                    error_log = item.error_log
+
+                if error_occurs:
+                    # delete all promptmodel data in item
+                    item.raw_output = None
+                    item.parsed_outputs = None
+                    item.function_call = None
+
+                yield item
+
+            metadata = {
+                "error_occurs": error_occurs,
+                "error_log": error_log,
+            }
+            run_async_in_sync(
+                self._async_chat_log_to_cloud(
+                    session_uuid,
+                    [api_response.choices[0]["message"]],
+                    version_details["uuid"],
+                    [metadata],
+                )
+            )
+
+        return wrapper
+
+    def _wrap_async_chat_gen(self, async_gen: Callable[..., Any]) -> Callable[..., Any]:
+        async def wrapper(session_uuid: str, **kwargs):
+            message_logs = await LLMProxy.fetch_chat_log(session_uuid)
+            instruction, version_details = await LLMProxy.fetch_chat_model(
+                self._name, session_uuid
+            )
+
+            if len(message_logs) == 0 or message_logs[0]["role"] != "system":
+                message_logs = instruction + message_logs
+
+            call_args = self._prepare_call_args_for_chat(
+                message_logs, version_details, kwargs
+            )
+            # Call the generator with the arguments
+            stream_response: AsyncGenerator[LLMStreamResponse, None] = async_gen(
+                **call_args
+            )
+
+            api_response = None
+            error_occurs = False
+            error_log = None
+            async for item in stream_response:
+                if (
+                    item.api_response and "delta" not in item.api_response.choices[0]
+                ):  # only get the last api_response, not delta response
+                    api_response = item.api_response
+
+                if item.error and not error_occurs:
+                    error_occurs = True
+                    error_log = item.error_log
+
+                if error_occurs:
+                    # delete all promptmodel data in item
+                    item.raw_output = None
+                    item.parsed_outputs = None
+                    item.function_call = None
+
+                yield item
+
+            metadata = {
+                "error_occurs": error_occurs,
+                "error_log": error_log,
+            }
+            await self._async_chat_log_to_cloud(
+                session_uuid,
+                [api_response.choices[0]["message"]],
+                version_details["uuid"],
+                [metadata],
+            )
+
+        return wrapper
+
     def _prepare_call_args(
         self,
         prompts: List[Dict[str, str]],
@@ -550,21 +654,23 @@ class LLMProxy(LLM):
         kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
         return self._wrap_async_chat(super().arun)(session_uuid, **kwargs)
 
-    # def chat_stream(
-    #     self,
-    #     session_uuid: str,
-    #     function_list: Optional[List[Any]] = None,
-    # ) -> LLMResponse:
-    #     kwargs = {"function_list": function_list} if function_list else {}
-    #     return self._wrap_chat_gen(super().stream)(session_uuid, **kwargs)
+    def chat_stream(
+        self,
+        session_uuid: str,
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
+    ) -> LLMResponse:
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        return self._wrap_chat_gen(super().stream)(session_uuid, **kwargs)
 
-    # def chat_astream(
-    #     self,
-    #     session_uuid: str,
-    #     function_list: Optional[List[Any]] = None,
-    # ) -> LLMResponse:
-    #     kwargs = {"function_list": function_list} if function_list else {}
-    #     return self._wrap_async_chat_gen(super().astream)(session_uuid, **kwargs)
+    def chat_astream(
+        self,
+        session_uuid: str,
+        function_list: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
+    ) -> LLMResponse:
+        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        return self._wrap_async_chat_gen(super().astream)(session_uuid, **kwargs)
 
     @staticmethod
     async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:

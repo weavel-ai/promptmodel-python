@@ -1,12 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-)
+from typing import Any, Dict, List, Optional, Coroutine
 from uuid import uuid4
 from promptmodel import DevClient
 
@@ -164,12 +159,12 @@ class ChatModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        # if stream:
-        #     for item in self.llm_proxy.chat_stream(self.session_uuid, function_list):
-        #         yield item
-        # else:
-        #     return self.llm_proxy.chat_run(self.session_uuid, function_list)
-        return self.llm_proxy.chat_run(self.session_uuid, function_list, self.api_key)
+        if stream:
+            for item in self.llm_proxy.chat_stream(self.session_uuid, function_list):
+                yield item
+        else:
+            return self.llm_proxy.chat_run(self.session_uuid, function_list)
+        # return self.llm_proxy.chat_run(self.session_uuid, function_list, self.api_key)
 
     async def arun(
         self,
@@ -187,10 +182,17 @@ class ChatModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        # if stream:
-        #     return Coroutine(self.llm_proxy.chat_astream(self.session_uuid, function_list))
-        # else:
-        #     return await self.llm_proxy.chat_arun(self.session_uuid, function_list)
-        return await self.llm_proxy.chat_arun(
-            self.session_uuid, function_list, self.api_key
-        )
+        if stream:
+
+            async def async_gen():
+                async for item in self.llm_proxy.chat_astream(
+                    self.session_uuid, function_list
+                ):
+                    yield item
+
+            return async_gen()
+        else:
+            return await self.llm_proxy.chat_arun(self.session_uuid, function_list)
+        # return await self.llm_proxy.chat_arun(
+        #     self.session_uuid, function_list, self.api_key
+        # )
