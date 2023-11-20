@@ -1,4 +1,3 @@
-from enum import Enum
 import datetime
 import json
 
@@ -18,7 +17,7 @@ from peewee import (
 
 from promptmodel.database.config import BaseModel
 from promptmodel.database.models_chat import *
-from promptmodel.utils.enums import ModelVersionStatus, ParsingType
+from promptmodel.types.enums import ModelVersionStatus, ParsingType
 
 
 class JSONField(TextField):

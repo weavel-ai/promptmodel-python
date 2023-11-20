@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from InquirerPy import inquirer
 from rich import print
-from ..apis.base import APIClient
+from promptmodel.apis.base import APIClient
 
 
 def get_org(config: Dict[str, Any]) -> Dict[str, Any]:

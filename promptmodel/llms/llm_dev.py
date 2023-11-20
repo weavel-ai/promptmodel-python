@@ -1,18 +1,14 @@
 """LLM for Development TestRun"""
 import re
-import os
-import json
-import openai
-
-from typing import Any, AsyncGenerator, List, Dict, Optional, Union, Generator
+from typing import Any, AsyncGenerator, List, Dict, Optional
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import acompletion
 
-from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
+from promptmodel.types.enums import ParsingType, get_pattern_by_type
 from promptmodel.utils import logger
 from promptmodel.utils.output_utils import convert_str_to_type
-from promptmodel.utils.types import LLMStreamResponse
+from promptmodel.types.response import LLMStreamResponse, ModelResponse
 
 load_dotenv()
 
@@ -47,7 +43,7 @@ class LLMDev:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
-        response = await acompletion(
+        response: AsyncGenerator[ModelResponse, None] = await acompletion(
             model=_model,
             messages=[
                 message.model_dump(exclude_none=True)
@@ -59,22 +55,19 @@ class LLMDev:
         function_call = {"name": "", "arguments": ""}
         finish_reason_function_call = False
         async for chunk in response:
-            if (
-                "content" in chunk["choices"][0]["delta"]
-                and chunk["choices"][0]["delta"]["content"] is not None
-            ):
-                stream_value = chunk["choices"][0]["delta"]["content"]
+            if getattr(chunk.choices[0].delta, "content", None) is not None:
+                stream_value = chunk.choices[0].delta.content
                 raw_output += stream_value  # append raw output
                 yield LLMStreamResponse(raw_output=stream_value)  # return raw output
 
-            if (
-                "function_call" in chunk["choices"][0]["delta"]
-                and chunk["choices"][0]["delta"]["function_call"] is not None
-            ):
-                for key, value in chunk["choices"][0]["delta"]["function_call"].items():
-                    function_call[key] += value
+            if getattr(chunk.choices[0].delta, "function_call", None) is not None:
+                for key, value in (
+                    chunk.choices[0].delta.function_call.model_dump().items()
+                ):
+                    if value is not None:
+                        function_call[key] += value
 
-            if chunk["choices"][0]["finish_reason"] == "function_call":
+            if chunk.choices[0].finish_reason == "function_call":
                 finish_reason_function_call = True
                 yield LLMStreamResponse(function_call=function_call)
 
@@ -107,8 +100,8 @@ class LLMDev:
             stream=True,
         )
         async for chunk in response:
-            if "content" in chunk["choices"][0]["delta"]:
-                stream_value = chunk["choices"][0]["delta"]["content"]
+            if "content" in chunk.choices[0].delta:
+                stream_value = chunk.choices[0].delta.content
                 raw_output += stream_value  # append raw output
                 yield LLMStreamResponse(raw_output=stream_value)  # return raw output
 

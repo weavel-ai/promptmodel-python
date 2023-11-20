@@ -1,6 +1,4 @@
-import json
 from typing import Dict, List, Optional, Tuple
-from uuid import uuid4, UUID
 from promptmodel.database.models import (
     PromptModel,
     PromptModelVersion,
@@ -12,175 +10,18 @@ from promptmodel.database.models import (
     DeployedPrompt,
 )
 from playhouse.shortcuts import model_to_dict
-from promptmodel.utils.enums import ModelVersionStatus, ParsingType
-from promptmodel.utils.random_utils import select_version
+from promptmodel.types.enums import ModelVersionStatus
+from promptmodel.utils.random_utils import select_version_by_ratio
 from promptmodel.utils import logger
 from promptmodel.database.config import db
 from promptmodel.database.crud_chat import *
 
 
 # Insert
-def create_prompt_model(name: str, project_uuid: str):
-    """Create a new PromptModel with the given name."""
-    return PromptModel.create(uuid=uuid4(), name=name, project_uuid=project_uuid)
-
-
-def create_prompt_models(prompt_model_list: list):
-    """Create PromptModels with List of Dict"""
-    with db.atomic():
-        PromptModel.insert_many(prompt_model_list).execute()
-    return
-
-
-def create_prompt_model_version(
-    prompt_model_uuid: str,
-    from_uuid: Optional[str],
-    status: str,
-    model: str,
-    parsing_type: Optional[ParsingType] = None,
-    output_keys: Optional[List[str]] = None,
-    functions: List[str] = [],
-):
-    """Create a new PromptModel version with the given parameters."""
-    return PromptModelVersion.create(
-        uuid=uuid4(),
-        from_uuid=from_uuid,
-        prompt_model_uuid=prompt_model_uuid,
-        status=status,
-        model=model,
-        parsing_type=parsing_type,
-        output_keys=output_keys,
-        functions=functions,
-    )
-
-
-def create_prompt_model_versions(prompt_model_version_list: list):
-    """Create PromptModel versions with List of Dict"""
-    with db.atomic():
-        PromptModelVersion.insert_many(prompt_model_version_list).execute()
-    return
-
-
-def create_prompt(
-    version_uuid: str,
-    role: str,
-    step: int,
-    content: str,
-):
-    """Create a new prompt with the given parameters."""
-    return Prompt.create(
-        version_uuid=version_uuid,
-        role=role,
-        step=step,
-        content=content,
-    )
-
-
-def create_prompts(prompt_list: list):
-    """Create prompts with List of Dict"""
-    with db.atomic():
-        Prompt.insert_many(prompt_list).execute()
-    return
-
-
-def create_run_log(
-    prompt_model_version_uuid: str,
-    inputs: str,
-    raw_output: str,
-    parsed_outputs: str,
-    is_deployed: bool = False,
-    function_call: Optional[dict] = None,
-):
-    """Create a new run log with the given parameters."""
-    return RunLog.create(
-        version_uuid=prompt_model_version_uuid,
-        inputs=inputs,
-        raw_output=raw_output,
-        parsed_outputs=parsed_outputs,
-        is_deployed=is_deployed,
-        function_call=function_call,
-    )
-
-
-def create_run_logs(run_log_list: list):
-    """Create run_logs with List of Dict"""
-    with db.atomic():
-        RunLog.insert_many(run_log_list).execute()
-    return
-
-
-# Update For delayed Insert
-def update_prompt_model_version(prompt_model_version_uuid: str, status: str):
-    """Update the status of the given PromptModel version."""
-    return (
-        PromptModelVersion.update(status=status)
-        .where(PromptModelVersion.uuid == prompt_model_version_uuid)
-        .execute()
-    )
-
 
 # Select all
-def list_prompt_models() -> List[Dict]:
-    """List all PromptModels."""
-    response: List[PromptModel] = list(PromptModel.select())
-    return [model_to_dict(x, recurse=False) for x in response]
-
-
-def list_prompt_model_versions(prompt_model_uuid: str) -> List[Dict]:
-    """List all PromptModel versions for the given PromptModel."""
-    response: List[PromptModelVersion] = list(
-        PromptModelVersion.select()
-        .where(PromptModelVersion.prompt_model_uuid == prompt_model_uuid)
-        .order_by(PromptModelVersion.created_at)
-    )
-    return [model_to_dict(x, recurse=False) for x in response]
-
-
-def list_prompts(prompt_model_version_uuid: str) -> List[Dict]:
-    """List all prompts for the given PromptModel version."""
-    response: List[Prompt] = list(
-        Prompt.select()
-        .where(Prompt.version_uuid == prompt_model_version_uuid)
-        .order_by(Prompt.step)
-    )
-    return [model_to_dict(x, recurse=False) for x in response]
-
-
-def list_samples():
-    """List all samples"""
-    response = list(SampleInputs.select())
-    return [x.__data__ for x in response]
-
-
-def list_run_logs(prompt_model_version_uuid: str) -> List[RunLog]:
-    """List all run logs for the given PromptModel version."""
-    response: List[RunLog] = list(
-        RunLog.select()
-        .where(RunLog.version_uuid == prompt_model_version_uuid)
-        .order_by(RunLog.created_at.desc())
-    )
-    return [model_to_dict(x, recurse=False) for x in response]
-
 
 # Select one
-def get_prompt_model_uuid(prompt_model_name: str) -> Dict:
-    """Get uuid of prompt_model by name"""
-    try:
-        response = PromptModel.get(PromptModel.name == prompt_model_name)
-        return model_to_dict(response, recurse=False)
-    except:
-        return None
-
-
-def get_sample_input(sample_name: str) -> Dict:
-    """Get sample input from local DB"""
-    try:
-        response = SampleInputs.get(SampleInputs.name == sample_name)
-        sample = model_to_dict(response, recurse=False)
-        # sample["contents"] = json.loads(sample["contents"])
-        return sample
-    except:
-        return None
 
 
 def get_latest_version_prompts(prompt_model_name: str) -> Tuple[List[Prompt], str]:
@@ -246,7 +87,9 @@ def get_deployed_prompts(prompt_model_name: str) -> Tuple[List[DeployedPrompt], 
                 .order_by(DeployedPrompt.step.asc())
             )
         # select version by ratio
-        selected_version = select_version([version.__data__ for version in versions])
+        selected_version = select_version_by_ratio(
+            [version.__data__ for version in versions]
+        )
         selected_prompts = list(
             filter(
                 lambda prompt: str(prompt.version_uuid.uuid)
@@ -269,33 +112,6 @@ def get_deployed_prompts(prompt_model_name: str) -> Tuple[List[DeployedPrompt], 
 
 
 # Update
-def update_is_deployed_prompt_model(prompt_model_uuid: str, is_deployed: bool):
-    """Update the name of the given PromptModel."""
-    return (
-        PromptModel.update(is_deployed=is_deployed)
-        .where(PromptModel.uuid == prompt_model_uuid)
-        .execute()
-    )
-
-
-def update_used_in_code_prompt_model(prompt_model_uuid: str, used_in_code: bool):
-    """Update the name of the given PromptModel."""
-    return (
-        PromptModel.update(used_in_code=used_in_code)
-        .where(PromptModel.uuid == prompt_model_uuid)
-        .execute()
-    )
-
-
-def update_used_in_code_prompt_model_by_name(
-    prompt_model_name: str, used_in_code: bool
-):
-    """Update the name of the given PromptModel."""
-    return (
-        PromptModel.update(used_in_code=used_in_code)
-        .where(PromptModel.name == prompt_model_name)
-        .execute()
-    )
 
 
 def rename_prompt_model(prompt_model_uuid: str, new_name: str):

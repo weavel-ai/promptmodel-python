@@ -7,9 +7,9 @@ from uuid import uuid4
 from dataclasses import dataclass
 from websockets.exceptions import ConnectionClosedOK
 from promptmodel.websocket.websocket_client import DevWebsocketClient
-from promptmodel.utils.enums import LocalTask, ParsingType
-from promptmodel.database.models import PromptModelVersion
-from promptmodel.utils.types import FunctionSchema
+from promptmodel.types.enums import LocalTask, ParsingType
+from promptmodel.database.models import PromptModelVersion, PromptModel, SampleInputs
+from promptmodel.types.response import FunctionSchema
 
 
 @dataclass
@@ -66,32 +66,35 @@ async def test_run_model_function_call(
     }
     mock_version = PromptModelVersion(**param)
     mocker.patch(
-        "promptmodel.websocket.websocket_client.get_sample_input",
+        "promptmodel.websocket.websocket_client.SampleInputs.get",
         new_callable=MagicMock,
-        return_value={
-            "name": "sample_1",
-            "contents": {"user_message": "What is the weather like in Boston?"},
-        },
+        return_value=SampleInputs(
+            **{
+                "name": "sample_1",
+                "contents": {"user_message": "What is the weather like in Boston?"},
+            }
+        ),
     )
     mocker.patch(
-        "promptmodel.websocket.websocket_client.get_prompt_model_uuid",
+        "promptmodel.websocket.websocket_client.PromptModel.get",
         new_callable=MagicMock,
-        return_value={"uuid": prompt_model_uuid},
+        return_value=PromptModel(**{"uuid": prompt_model_uuid}),
     )
     mocker.patch(
-        "promptmodel.websocket.websocket_client.create_prompt_model_version",
+        "promptmodel.websocket.websocket_client.PromptModelVersion.create",
         new_callable=MagicMock,
         return_value=mock_version,
     )
     mocker.patch(
-        "promptmodel.websocket.websocket_client.create_prompt", new_callable=MagicMock
+        "promptmodel.websocket.websocket_client.Prompt.insert_many",
+        new_callable=MagicMock,
     )
     mocker.patch(
-        "promptmodel.websocket.websocket_client.update_prompt_model_version",
+        "promptmodel.websocket.websocket_client.PromptModelVersion.update",
         new_callable=MagicMock,
     )
     create_run_log_mock = mocker.patch(
-        "promptmodel.websocket.websocket_client.create_run_log", new_callable=MagicMock
+        "promptmodel.websocket.websocket_client.RunLog.create", new_callable=MagicMock
     )
 
     # success case
@@ -119,6 +122,8 @@ async def test_run_model_function_call(
     )
     create_run_log_mock.assert_called_once()
     _, kwargs = create_run_log_mock.call_args
+    print("KWARGS")
+    print(kwargs)
     assert kwargs["function_call"] is not None, "function_call is None"
     create_run_log_mock.reset_mock()
     print(
@@ -158,12 +163,14 @@ async def test_run_model_function_call(
 
     # success case with parsing
     mocker.patch(
-        "promptmodel.websocket.websocket_client.get_sample_input",
+        "promptmodel.websocket.websocket_client.SampleInputs.get",
         new_callable=MagicMock,
-        return_value={
-            "name": "sample_2",
-            "contents": {"user_message": "Nice to Meet you!"},
-        },
+        return_value=SampleInputs(
+            **{
+                "name": "sample_2",
+                "contents": {"user_message": "Nice to Meet you!"},
+            }
+        ),
     )
     system_prompt_with_format = """
 You are a helpful assistant.

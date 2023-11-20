@@ -5,31 +5,19 @@ from typing import Any, Dict, List
 from threading import Timer
 from rich import print
 from watchdog.events import FileSystemEventHandler
+from playhouse.shortcuts import model_to_dict
 
 from promptmodel.apis.base import APIClient
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
-from promptmodel import DevApp, DevClient
+from promptmodel import DevApp
+from promptmodel.database.models import *
 from promptmodel.database.crud import (
-    list_prompt_model_versions,
-    list_chat_model_versions,
-    list_prompt_models,
-    list_chat_models,
-    update_used_in_code_prompt_model_by_name,
-    update_used_in_code_chat_model_by_name,
-    create_prompt_models,
-    create_chat_models,
-    create_prompt_model_versions,
-    create_chat_model_versions,
-    create_prompts,
-    create_run_logs,
     update_samples,
-    get_prompt_model_uuid,
-    get_chat_model_uuid,
     update_prompt_model_uuid,
     update_chat_model_uuid,
 )
-from promptmodel.utils.enums import (
+from promptmodel.types.enums import (
     ModelVersionStatus,
     ChangeLogAction,
 )
@@ -96,15 +84,17 @@ class CodeReloadHandler(FileSystemEventHandler):
         removed_name_list = list(
             set(old_prompt_model_name_list) - set(new_prompt_model_name_list)
         )
-        for removed_name in removed_name_list:
-            update_used_in_code_prompt_model_by_name(removed_name, False)
+        PromptModel.update(used_in_code=False).where(
+            PromptModel.name.in_(removed_name_list)
+        ).execute()
 
         # Update localDB chat_model.used_in_code=False which diappeared in code
         removed_name_list = list(
             set(old_chat_model_name_list) - set(new_chat_model_name_list)
         )
-        for removed_name in removed_name_list:
-            update_used_in_code_chat_model_by_name(removed_name, False)
+        ChatModel.update(used_in_code=False).where(
+            ChatModel.name.in_(removed_name_list)
+        ).execute()
 
         # Update localDB prompt_model.used_in_code True which created newly
         # TODO: Use more specific API
@@ -134,16 +124,18 @@ class CodeReloadHandler(FileSystemEventHandler):
             local_code_chat_model_name_list=new_chat_model_name_list,
         )
 
-        for prompt_model in new_devapp_instance.prompt_models:
-            if prompt_model.name not in old_prompt_model_name_list:
-                update_used_in_code_prompt_model_by_name(prompt_model.name, True)
+        PromptModel.update(used_in_code=True).where(
+            PromptModel.name.not_in(old_prompt_model_name_list)
+        ).execute()
 
-        for chat_model in new_devapp_instance.chat_models:
-            if chat_model.name not in old_chat_model_name_list:
-                update_used_in_code_chat_model_by_name(chat_model.name, True)
+        ChatModel.update(used_in_code=True).where(
+            ChatModel.name.not_in(old_chat_model_name_list)
+        ).execute()
 
         # create prompt_models in local DB
-        db_prompt_model_list = list_prompt_models()
+        db_prompt_model_list = [
+            model_to_dict(x, recurse=False) for x in [PromptModel.select()]
+        ]
         db_prompt_model_name_list = [x["name"] for x in db_prompt_model_list]
         only_in_local_names = list(
             set(new_prompt_model_name_list) - set(db_prompt_model_name_list)
@@ -151,10 +143,12 @@ class CodeReloadHandler(FileSystemEventHandler):
         only_in_local_prompt_models = [
             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local_names
         ]
-        create_prompt_models(only_in_local_prompt_models)
+        PromptModel.insert_many(only_in_local_prompt_models).execute()
 
         # create chat_models in local DB
-        db_chat_model_list = list_chat_models()
+        db_chat_model_list = [
+            model_to_dict(x, recurse=False) for x in [ChatModel.select()]
+        ]
         db_chat_model_name_list = [x["name"] for x in db_chat_model_list]
         only_in_local_names = list(
             set(new_chat_model_name_list) - set(db_chat_model_name_list)
@@ -162,7 +156,7 @@ class CodeReloadHandler(FileSystemEventHandler):
         only_in_local_chat_models = [
             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local_names
         ]
-        create_chat_models(only_in_local_chat_models)
+        ChatModel.insert_many(only_in_local_chat_models).execute()
 
         # update samples in local DB
         update_samples(new_devapp_instance.samples)
@@ -176,8 +170,12 @@ def update_by_changelog_for_reload(
     local_code_chat_model_name_list: List[str],
 ):
     """Update Local DB by changelog"""
-    local_db_prompt_model_list: list = list_prompt_models()  # {"name", "uuid"}
-    local_db_chat_model_list: list = list_chat_models()  # {"name", "uuid"}
+    local_db_prompt_model_list: list = [
+        model_to_dict(x, recurse=False) for x in [PromptModel.select()]
+    ]  # {"name", "uuid"}
+    local_db_chat_model_list: list = [
+        model_to_dict(x, recurse=False) for x in [ChatModel.select()]
+    ]  # {"name", "uuid"}
 
     for changelog in changelogs:
         level: int = changelog["level"]
@@ -296,16 +294,23 @@ def update_prompt_model_changelog(
                     # IF prompt_model in Local Code
                     prompt_model["used_in_code"] = True
                     prompt_model["is_deployed"] = True
-                    create_prompt_models([prompt_model])
                 else:
                     prompt_model["used_in_code"] = False
                     prompt_model["is_deployed"] = True
-                    create_prompt_models([prompt_model])
+
+                PromptModel.create(**prompt_model)
             else:
                 # Fix UUID of prompt_model
-                local_uuid = get_prompt_model_uuid(prompt_model["name"])["uuid"]
+                local_uuid = model_to_dict(
+                    PromptModel.get(PromptModel.name == prompt_model["name"]),
+                    recurse=False,
+                )["uuid"]
+
                 update_prompt_model_uuid(local_uuid, prompt_model["uuid"])
-                local_db_prompt_model_list: list = list_prompt_models()
+
+                local_db_prompt_model_list: list = [
+                    model_to_dict(x, recurse=False) for x in [PromptModel.select()]
+                ]
     else:
         # TODO: add code DELETE, CHANGE, FIX later
         pass
@@ -321,8 +326,18 @@ def update_prompt_model_version_changelog(
     local_code_prompt_model_name_list: List[str],
 ) -> List[Dict[str, Any]]:
     local_db_prompt_model_version_list: List[Dict] = []
-    for uuid in local_db_prompt_model_list:
-        local_db_prompt_model_version_list += list_prompt_model_versions(uuid["uuid"])
+    for local_db_prompt_model in local_db_prompt_model_list:
+        local_db_prompt_model_version_list += [
+            model_to_dict(x, recurse=False)
+            for x in [
+                PromptModelVersion.select()
+                .where(
+                    PromptModelVersion.prompt_model_uuid
+                    == local_db_prompt_model["uuid"]
+                )
+                .order_by(PromptModelVersion.created_at)
+            ]
+        ]
     uuid_list = list(
         filter(
             lambda uuid: uuid
@@ -348,9 +363,9 @@ def update_prompt_model_version_changelog(
         for prompt_model_version in prompt_model_version_list_to_update:
             prompt_model_version["status"] = ModelVersionStatus.CANDIDATE.value
 
-        create_prompt_model_versions(prompt_model_version_list_to_update)
-        create_prompts(prompts_to_update)
-        create_run_logs(run_logs_to_update)
+        PromptModelVersion.insert_many(prompt_model_version_list_to_update).execute()
+        Prompt.insert_many(prompts_to_update).execute()
+        RunLog.insert_many(run_logs_to_update).execute()
 
         # local_db_prompt_model_list += [{"name" : x['name'], "uuid" : x['uuid']} for x in prompt_model_version_list_to_update]
         return local_db_prompt_model_list
@@ -380,16 +395,22 @@ def update_chat_model_changelog(
                     # IF chat_model in Local Code
                     chat_model["used_in_code"] = True
                     chat_model["is_deployed"] = True
-                    create_chat_models([chat_model])
                 else:
                     chat_model["used_in_code"] = False
                     chat_model["is_deployed"] = True
-                    create_chat_models([chat_model])
+                ChatModel.create(**chat_model)
             else:
                 # Fix UUID of chat_model
-                local_uuid = get_chat_model_uuid(chat_model["name"])["uuid"]
+                local_uuid = model_to_dict(
+                    ChatModel.get(ChatModel.name == chat_model["name"]),
+                    recurse=False,
+                )["uuid"]
+
                 update_chat_model_uuid(local_uuid, chat_model["uuid"])
-                local_db_chat_model_list: list = list_chat_models()
+
+                local_db_chat_model_list: list = [
+                    model_to_dict(x, recurse=False) for x in [ChatModel.select()]
+                ]
     else:
         # TODO: add code DELETE, CHANGE, FIX later
         pass
@@ -405,8 +426,15 @@ def update_chat_model_version_changelog(
     local_code_chat_model_name_list: List[str],
 ) -> List[Dict[str, Any]]:
     local_db_chat_model_version_list: List[Dict] = []
-    for uuid in local_db_chat_model_list:
-        local_db_chat_model_version_list += list_chat_model_versions(uuid["uuid"])
+    for local_db_chat_model in local_db_chat_model_list:
+        local_db_chat_model_version_list += [
+            model_to_dict(x, recurse=False)
+            for x in [
+                ChatModelVersion.select()
+                .where(ChatModelVersion.chat_model_uuid == local_db_chat_model["uuid"])
+                .order_by(ChatModelVersion.created_at)
+            ]
+        ]
 
     uuid_list = list(
         filter(
@@ -425,7 +453,7 @@ def update_chat_model_version_changelog(
         for chat_model_version in chat_model_version_list_to_update:
             chat_model_version["status"] = ModelVersionStatus.CANDIDATE.value
 
-        create_chat_model_versions(chat_model_version_list_to_update)
+        ChatModelVersion.insert_many(chat_model_version_list_to_update).execute()
 
         # local_db_chat_model_list += [{"name" : x['name'], "uuid" : x['uuid']} for x in chat_model_version_list_to_update]
         return local_db_chat_model_list

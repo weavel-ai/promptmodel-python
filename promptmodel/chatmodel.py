@@ -1,34 +1,21 @@
 from __future__ import annotations
-import asyncio
 
 from dataclasses import dataclass
 from typing import (
     Any,
-    AsyncGenerator,
-    Callable,
     Dict,
-    Generator,
     List,
     Optional,
-    Tuple,
-    Union,
-    Coroutine,
 )
 from uuid import uuid4
 from promptmodel import DevClient
 
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.database.crud import create_chat_logs, create_session
+from promptmodel.database.models import ChatLog, ChatLogSession
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
-from promptmodel.utils.prompt_util import (
-    run_async_in_sync,
-)
-from promptmodel.utils.chat_util import (
-    fetch_chat_model,
-    fetch_chat_log,
-)
-from promptmodel.utils.types import LLMStreamResponse, LLMResponse
+from promptmodel.utils.async_util import run_async_in_sync
+from promptmodel.types.response import LLMStreamResponse, LLMResponse
 
 
 class RegisteringMeta(type):
@@ -56,26 +43,43 @@ class RegisteringMeta(type):
 
 
 class ChatModel(metaclass=RegisteringMeta):
-    def __init__(self, name, rate_limit_manager=None, session_uuid: str = None):
+    def __init__(self, name, session_uuid: str = None, api_key: Optional[str] = None):
         self.name = name
-        self.llm_proxy = LLMProxy(name, rate_limit_manager)
+        self.api_key = api_key
+        self.llm_proxy = LLMProxy(name)
         if session_uuid is None:
             self.session_uuid = uuid4()
             instruction, version_details = run_async_in_sync(
-                fetch_chat_model(self.name)
+                LLMProxy.fetch_chat_model(self.name)
             )
             config = read_config()
             if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
                 pass
             elif "dev_branch" in config and config["dev_branch"]["online"] == True:
                 # if dev online=True, save in Local DB
-
-                session_uuid = create_session(
-                    self.session_uuid, version_details["uuid"]
+                session: ChatLogSession = ChatLogSession.create(
+                    {
+                        "uuid": self.session_uuid,
+                        "version_uuid": version_details["uuid"],
+                        "run_from_deployment": False,
+                    }
                 )
-                if session_uuid is None:
+
+                if session is None:
                     raise Exception("Failed to create session")
-                create_chat_logs(self.session_uuid, instruction, [{}])
+
+                ChatLog.create(
+                    {
+                        "session_uuid": self.session_uuid,
+                        "role": instruction[0]["role"],
+                        "content": instruction[0]["content"],
+                        "tool_calls": None,
+                        "token_usage": None,
+                        "latency": None,
+                        "cost": None,
+                        "metadata": None,
+                    }
+                )
             else:
                 run_async_in_sync(
                     self.llm_proxy._async_chat_log_to_cloud(
@@ -99,11 +103,13 @@ class ChatModel(metaclass=RegisteringMeta):
             List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
         """
         instruction, detail = run_async_in_sync(
-            fetch_chat_model(self.name, self.session_uuid)
+            LLMProxy.fetch_chat_model(self.name, self.session_uuid)
         )
         return instruction
 
-    def add_messages(self, new_messages: List[Dict[str, Any]]) -> None:
+    def add_messages(
+        self, new_messages: List[Dict[str, Any]], metadata_list: List[Optional[Dict]]
+    ) -> None:
         """Add messages to the chat model.
 
         Args:
@@ -115,9 +121,19 @@ class ChatModel(metaclass=RegisteringMeta):
             pass
         elif "dev_branch" in config and config["dev_branch"]["online"] == True:
             # if dev online=True, add to Local DB
-            create_chat_logs(
-                self.session_uuid, new_messages, [{} for _ in range(len(new_messages))]
-            )
+            chat_logs = [
+                {
+                    "session_uuid": self.session_uuid,
+                    "role": message["role"],
+                    "content": message["content"],
+                    "latency": metadata["latency"]
+                    if metadata and "latency" in metadata
+                    else 0,
+                    "metadata": metadata,
+                }
+                for message, metadata in zip(new_messages, metadata_list)
+            ]
+            ChatLog.insert_many(chat_logs).execute()
         else:
             run_async_in_sync(
                 self.llm_proxy._async_chat_log_to_cloud(
@@ -129,7 +145,7 @@ class ChatModel(metaclass=RegisteringMeta):
             )
 
     def get_messages(self) -> List[Dict[str, Any]]:
-        message_logs = run_async_in_sync(fetch_chat_log(self.session_uuid))
+        message_logs = run_async_in_sync(LLMProxy.fetch_chat_log(self.session_uuid))
         return message_logs
 
     def run(
@@ -153,7 +169,7 @@ class ChatModel(metaclass=RegisteringMeta):
         #         yield item
         # else:
         #     return self.llm_proxy.chat_run(self.session_uuid, function_list)
-        return self.llm_proxy.chat_run(self.session_uuid, function_list)
+        return self.llm_proxy.chat_run(self.session_uuid, function_list, self.api_key)
 
     async def arun(
         self,
@@ -175,4 +191,6 @@ class ChatModel(metaclass=RegisteringMeta):
         #     return Coroutine(self.llm_proxy.chat_astream(self.session_uuid, function_list))
         # else:
         #     return await self.llm_proxy.chat_arun(self.session_uuid, function_list)
-        return await self.llm_proxy.chat_arun(self.session_uuid, function_list)
+        return await self.llm_proxy.chat_arun(
+            self.session_uuid, function_list, self.api_key
+        )

@@ -8,12 +8,27 @@ from litellm import ModelResponse
 
 from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.types import LLMResponse, LLMStreamResponse
-from promptmodel.utils.enums import ParsingPattern, ParsingType, get_pattern_by_type
+from promptmodel.types.response import (
+    LLMResponse,
+    LLMStreamResponse,
+    Choices,
+    StreamingChoices,
+    Delta,
+    Message,
+    FunctionCall,
+)
+from promptmodel.types.enums import ParsingPattern, ParsingType, get_pattern_by_type
 
 
 def generator_format(response: str):
-    return {"choices": [{"delta": {"content": response}, "finish_reason": None}]}
+    model_response = ModelResponse(stream=True)
+    model_response.choices[0] = StreamingChoices(
+        **{
+            "delta": Delta(**{"content": response}),
+            "finish_reason": None,
+        }
+    )
+    return model_response
 
 
 def string_to_generator(input_string: str):
@@ -545,20 +560,24 @@ async def test_dp_agenerator(mocker):
 async def test_run_and_parsing(mocker):
     llm = LLM()
 
-    mock_response = MagicMock()
+    mock_response = ModelResponse()
     mock_response.choices = [
-        {
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": "[key type=str]ab[/key]",
-                # "function_call": {
-                # "name": "get_current_weather",
-                # "arguments": "{\n  \"location\": \"Boston, MA\"\n}"
-                # }
-            },
-            "finish_reason": "function_call",
-        }
+        Choices(
+            **{
+                "index": 0,
+                "message": Message(
+                    **{
+                        "role": "assistant",
+                        "content": "[key type=str]ab[/key]",
+                        # "function_call": {
+                        # "name": "get_current_weather",
+                        # "arguments": "{\n  \"location\": \"Boston, MA\"\n}"
+                        # }
+                    }
+                ),
+                "finish_reason": "function_call",
+            }
+        )
     ]
     mock_completion = mocker.patch(
         "promptmodel.llms.llm.completion", return_value=mock_response
@@ -619,10 +638,12 @@ async def test_run_and_parsing(mocker):
         assert res.error == True, f"error mismatch : {res.error}"
 
     # success case with function call
-    mock_response.choices[0]["message"]["function_call"] = {
-        "name": "get_current_weather",
-        "arguments": '{\n  "location": "Boston, MA"\n}',
-    }
+    mock_response.choices[0].message.function_call = FunctionCall(
+        **{
+            "name": "get_current_weather",
+            "arguments": '{\n  "location": "Boston, MA"\n}',
+        }
+    )
     res: LLMResponse = llm.run_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
@@ -680,20 +701,24 @@ async def test_run_and_parsing(mocker):
 async def test_arun_and_parsing(mocker):
     llm = LLM()
 
-    mock_response = MagicMock()
+    mock_response = ModelResponse()
     mock_response.choices = [
-        {
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": "[key type=str]ab[/key]",
-                # "function_call": {
-                # "name": "get_current_weather",
-                # "arguments": "{\n  \"location\": \"Boston, MA\"\n}"
-                # }
-            },
-            "finish_reason": "function_call",
-        }
+        Choices(
+            **{
+                "index": 0,
+                "message": Message(
+                    **{
+                        "role": "assistant",
+                        "content": "[key type=str]ab[/key]",
+                        # "function_call": {
+                        # "name": "get_current_weather",
+                        # "arguments": "{\n  \"location\": \"Boston, MA\"\n}"
+                        # }
+                    }
+                ),
+                "finish_reason": "function_call",
+            }
+        )
     ]
     mock_completion = mocker.patch(
         "promptmodel.llms.llm.acompletion", return_value=mock_response
@@ -754,10 +779,12 @@ async def test_arun_and_parsing(mocker):
         assert res.error == True, f"error mismatch : {res.error}"
 
     # success case with function call
-    mock_response.choices[0]["message"]["function_call"] = {
-        "name": "get_current_weather",
-        "arguments": '{\n  "location": "Boston, MA"\n}',
-    }
+    mock_response.choices[0].message.function_call = FunctionCall(
+        **{
+            "name": "get_current_weather",
+            "arguments": '{\n  "location": "Boston, MA"\n}',
+        }
+    )
     res: LLMResponse = await llm.arun_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,

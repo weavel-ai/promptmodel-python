@@ -1,11 +1,9 @@
 from __future__ import annotations
-import asyncio
 
 from dataclasses import dataclass
 from typing import (
     Any,
     AsyncGenerator,
-    Callable,
     Dict,
     Generator,
     List,
@@ -15,8 +13,8 @@ from typing import (
 
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
-from promptmodel.utils.types import LLMStreamResponse, LLMResponse
+from promptmodel.utils.async_util import run_async_in_sync
+from promptmodel.types.response import LLMStreamResponse, LLMResponse
 from promptmodel import DevClient
 
 
@@ -51,9 +49,10 @@ class RegisteringMeta(type):
 
 
 class PromptModel(metaclass=RegisteringMeta):
-    def __init__(self, name, rate_limit_manager=None):
+    def __init__(self, name, api_key: Optional[str] = None):
         self.name = name
-        self.llm_proxy = LLMProxy(name, rate_limit_manager)
+        self.api_key = api_key
+        self.llm_proxy = LLMProxy(name)
 
     def get_prompts(self) -> List[Dict[str, str]]:
         """Get prompt for the promptmodel.
@@ -67,7 +66,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         # add name to the list of prompt_models
 
-        prompts, _ = run_async_in_sync(fetch_prompts(self.name))
+        prompts, _ = run_async_in_sync(LLMProxy.fetch_prompts(self.name))
         return prompts
 
     def run(
@@ -86,7 +85,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return self.llm_proxy.run(inputs, function_list)
+        return self.llm_proxy.run(inputs, function_list, self.api_key)
 
     async def arun(
         self,
@@ -104,7 +103,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return await self.llm_proxy.arun(inputs, function_list)
+        return await self.llm_proxy.arun(inputs, function_list, self.api_key)
 
     def stream(
         self,
@@ -122,7 +121,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        for item in self.llm_proxy.stream(inputs, function_list):
+        for item in self.llm_proxy.stream(inputs, function_list, self.api_key):
             yield item
 
     async def astream(
@@ -141,7 +140,12 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return (item async for item in self.llm_proxy.astream(inputs, function_list))
+        return (
+            item
+            async for item in self.llm_proxy.astream(
+                inputs, function_list, self.api_key
+            )
+        )
 
     def run_and_parse(
         self,
@@ -159,7 +163,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return self.llm_proxy.run_and_parse(inputs, function_list)
+        return self.llm_proxy.run_and_parse(inputs, function_list, self.api_key)
 
     async def arun_and_parse(
         self,
@@ -177,7 +181,7 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return await self.llm_proxy.arun_and_parse(inputs, function_list)
+        return await self.llm_proxy.arun_and_parse(inputs, function_list, self.api_key)
 
     def stream_and_parse(
         self,
@@ -195,7 +199,9 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
         """
-        for item in self.llm_proxy.stream_and_parse(inputs, function_list):
+        for item in self.llm_proxy.stream_and_parse(
+            inputs, function_list, self.api_key
+        ):
             yield item
 
     async def astream_and_parse(
@@ -216,5 +222,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         return (
             item
-            async for item in self.llm_proxy.astream_and_parse(inputs, function_list)
+            async for item in self.llm_proxy.astream_and_parse(
+                inputs, function_list, self.api_key
+            )
         )

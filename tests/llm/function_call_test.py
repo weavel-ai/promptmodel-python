@@ -7,8 +7,8 @@ from litellm import ModelResponse
 from ..constants import function_shemas
 from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.types import LLMResponse, LLMStreamResponse
-from promptmodel.utils.enums import ParsingType
+from promptmodel.types.response import LLMResponse, LLMStreamResponse
+from promptmodel.types.enums import ParsingType
 
 html_output_format = """\
 You must follow the provided output format. Keep the string between <> as it is.
@@ -46,9 +46,10 @@ def test_run_with_functions(mocker):
     assert res.error is None, "error is not None"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "function_call"
+        res.api_response.choices[0].finish_reason == "function_call"
     ), "finish_reason is not function_call"
-
+    print(res.api_response.model_dump())
+    print(res.__dict__)
     assert res.function_call is not None, "function_call is None"
 
     messages = [{"role": "user", "content": "Hello, How are you?"}]
@@ -62,7 +63,7 @@ def test_run_with_functions(mocker):
     assert res.error is None, "error is not None"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "stop"
+        res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
     assert res.function_call is None, "function_call is not None"
@@ -82,7 +83,7 @@ async def test_arun_with_functions(mocker):
     assert res.error is None, "error is not None"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "function_call"
+        res.api_response.choices[0].finish_reason == "function_call"
     ), "finish_reason is not function_call"
 
     assert res.function_call is not None, "function_call is None"
@@ -98,7 +99,7 @@ async def test_arun_with_functions(mocker):
     assert res.error is None, "error is not None"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "stop"
+        res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
     assert res.function_call is None, "function_call is not None"
@@ -118,7 +119,7 @@ def test_run_and_parse_with_functions(mocker):
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "function_call"
+        res.api_response.choices[0].finish_reason == "function_call"
     ), "finish_reason is not function_call"
 
     assert res.function_call is not None, "function_call is None"
@@ -135,7 +136,7 @@ def test_run_and_parse_with_functions(mocker):
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "stop"
+        res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
     assert res.function_call is None, "function_call is not None"
@@ -158,7 +159,6 @@ def test_run_and_parse_with_functions(mocker):
         output_keys=["response"],
     )
 
-    print(res.__dict__)
     # 1. Output 지키고 function call ->  (Pass)
     # 2. Output 지키고 stop -> OK
     # 3. Output 무시하고 function call -> OK (function call이 나타나면 파싱을 하지 않도록 수정)
@@ -167,7 +167,7 @@ def test_run_and_parse_with_functions(mocker):
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "function_call"
+        res.api_response.choices[0].finish_reason == "function_call"
     ), "finish_reason is not function_call"
 
     assert res.function_call is not None, "function_call is None"
@@ -183,17 +183,19 @@ def test_run_and_parse_with_functions(mocker):
     res: LLMResponse = llm.run_and_parse(
         messages=messages,
         functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
+
+    print(res.__dict__)
 
     if not "str" in res.raw_output:
         # if "str" in res.raw_output, it means that LLM make mistakes
         assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "stop"
+        res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
     assert res.function_call is None, "function_call is not None"
@@ -216,7 +218,7 @@ async def test_arun_and_parse_with_functions(mocker):
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "function_call"
+        res.api_response.choices[0].finish_reason == "function_call"
     ), "finish_reason is not function_call"
 
     assert res.function_call is not None, "function_call is None"
@@ -233,7 +235,7 @@ async def test_arun_and_parse_with_functions(mocker):
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "stop"
+        res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
     assert res.function_call is None, "function_call is not None"
@@ -260,7 +262,7 @@ async def test_arun_and_parse_with_functions(mocker):
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "function_call"
+        res.api_response.choices[0].finish_reason == "function_call"
     ), "finish_reason is not function_call"
 
     assert res.function_call is not None, "function_call is None"
@@ -276,18 +278,19 @@ async def test_arun_and_parse_with_functions(mocker):
     res: LLMResponse = await llm.arun_and_parse(
         messages=messages,
         functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
-    if not "str" in res.raw_output:
-        # if "str" in res.raw_output, it means that LLM make mistakes
-        assert res.error is False, "error is not False"
+    # if not "str" in res.raw_output:
+    #     # if "str" in res.raw_output, it means that LLM make mistakes
+    assert res.error is False, "error is not False"
+    assert res.parsed_outputs != {}, "parsed_outputs is empty"
+
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0]["finish_reason"] == "stop"
+        res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
     assert res.function_call is None, "function_call is not None"
     assert res.raw_output is not None, "raw_output is None"
-    assert res.parsed_outputs != {}, "parsed_outputs is empty"

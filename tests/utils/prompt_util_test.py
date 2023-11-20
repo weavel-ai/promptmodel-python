@@ -4,7 +4,7 @@ import nest_asyncio
 from typing import Coroutine
 from unittest.mock import AsyncMock
 
-from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
+from promptmodel.utils.async_util import run_async_in_sync
 
 nest_asyncio.apply()
 

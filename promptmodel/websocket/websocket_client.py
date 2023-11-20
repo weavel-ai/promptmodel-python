@@ -16,45 +16,21 @@ import promptmodel.utils.logger as logger
 from promptmodel import DevApp
 from promptmodel.llms.llm_dev import LLMDev
 from promptmodel.database.crud import (
-    create_prompt_model_version,
-    create_prompt,
-    create_run_log,
-    list_prompt_models,
-    list_prompt_model_versions,
-    list_prompts,
-    list_run_logs,
-    list_samples,
-    get_sample_input,
-    get_prompt_model_uuid,
-    update_prompt_model_version,
     find_ancestor_version,
     find_ancestor_versions,
     update_candidate_prompt_model_version,
-    create_chat_model_version,
-    create_chat_log,
-    list_chat_models,
-    list_chat_model_versions,
-    list_sessions,
-    list_chat_logs,
-    get_chat_model_uuid,
-    update_chat_model_version,
     update_candidate_chat_model_version,
     find_ancestor_chat_model_version,
     find_ancestor_chat_model_versions,
 )
-from promptmodel.database.models import (
-    PromptModelVersion,
-    PromptModel,
-    ChatModelVersion,
-    ChatModel,
-)
-from promptmodel.utils.enums import (
+from promptmodel.database.models import *
+from promptmodel.types.enums import (
     ServerTask,
     LocalTask,
     ModelVersionStatus,
 )
 from promptmodel.utils.config_utils import upsert_config, read_config
-from promptmodel.utils.types import LLMStreamResponse
+from promptmodel.types.response import LLMStreamResponse
 from promptmodel.constants import ENDPOINT_URL
 
 load_dotenv()
@@ -116,22 +92,33 @@ class DevWebsocketClient:
         data = None
         try:
             if message["type"] == LocalTask.LIST_PROMPT_MODELS:
-                res_from_local_db = list_prompt_models()
-                modules_with_used_in_code = [
-                    module
-                    for module in res_from_local_db
-                    if module["used_in_code"] == True
+                prompt_model_rows = [
+                    PromptModel.select().where(PromptModel.used_in_code == True)
                 ]
-                data = {"prompt_models": modules_with_used_in_code}
+                prompt_model_list = [
+                    model_to_dict(model, recurse=False) for model in prompt_model_rows
+                ]
+                data = {"prompt_models": prompt_model_list}
 
             elif message["type"] == LocalTask.LIST_PROMPT_MODEL_VERSIONS:
                 prompt_model_uuid = message["prompt_model_uuid"]
-                res_from_local_db = list_prompt_model_versions(prompt_model_uuid)
-                data = {"prompt_model_versions": res_from_local_db}
+                prompt_model_version_rows = [
+                    PromptModelVersion.select()
+                    .where(PromptModelVersion.prompt_model_uuid == prompt_model_uuid)
+                    .order_by(PromptModelVersion.created_at)
+                ]
+                prompt_model_version_list = [
+                    model_to_dict(model, recurse=False)
+                    for model in prompt_model_version_rows
+                ]
+                data = {"prompt_model_versions": prompt_model_version_list}
 
             elif message["type"] == LocalTask.LIST_SAMPLES:
-                res_from_local_db = list_samples()
-                data = {"samples": res_from_local_db}
+                sample_inputs_rows = [SampleInputs.select()]
+                sample_inputs_list = [
+                    model_to_dict(model, recurse=False) for model in sample_inputs_rows
+                ]
+                data = {"samples": sample_inputs_list}
 
             elif message["type"] == LocalTask.LIST_FUNCTIONS:
                 function_name_list = self._devapp._get_function_name_list()
@@ -139,20 +126,35 @@ class DevWebsocketClient:
 
             elif message["type"] == LocalTask.GET_PROMPTS:
                 prompt_model_version_uuid = message["prompt_model_version_uuid"]
-                res_from_local_db = list_prompts(prompt_model_version_uuid)
-                data = {"prompts": res_from_local_db}
+                prompt_rows = [
+                    Prompt.select()
+                    .where(Prompt.version_uuid == prompt_model_version_uuid)
+                    .order_by(Prompt.step)
+                ]
+                prompt_list = [
+                    model_to_dict(model, recurse=False) for model in prompt_rows
+                ]
+                data = {"prompts": prompt_list}
 
             elif message["type"] == LocalTask.GET_RUN_LOGS:
                 prompt_model_version_uuid = message["prompt_model_version_uuid"]
-                res_from_local_db = list_run_logs(prompt_model_version_uuid)
-                data = {"run_logs": res_from_local_db}
+                run_log_rows = [
+                    RunLog.select()
+                    .where(RunLog.version_uuid == prompt_model_version_uuid)
+                    .order_by(RunLog.created_at.desc())
+                ]
+                run_log_list = [
+                    model_to_dict(model, recurse=False) for model in run_log_rows
+                ]
+                data = {"run_logs": run_log_list}
 
             elif message["type"] == LocalTask.CHANGE_PROMPT_MODEL_VERSION_STATUS:
                 prompt_model_version_uuid = message["prompt_model_version_uuid"]
                 new_status = message["status"]
-                res_from_local_db = update_prompt_model_version(
-                    prompt_model_version_uuid=prompt_model_version_uuid,
-                    status=new_status,
+                (
+                    PromptModelVersion.update(status=new_status)
+                    .where(PromptModelVersion.uuid == prompt_model_version_uuid)
+                    .execute()
                 )
                 data = {
                     "prompt_model_version_uuid": prompt_model_version_uuid,
@@ -252,11 +254,17 @@ class DevWebsocketClient:
 
                 # get sample from db
                 if sample_name:
-                    sample_input_row = get_sample_input(sample_name)
-                    if sample_input_row is None or "contents" not in sample_input_row:
+                    try:
+                        sample_input_row = SampleInputs.get(
+                            SampleInputs.name == sample_name
+                        )
+                        sample_input_dict = model_to_dict(sample_input_row)
+                    except:
+                        sample_input_dict = None
+                    if sample_input_dict is None or "contents" not in sample_input_dict:
                         logger.error(f"There is no sample input {sample_name}.")
                         return
-                    sample_input = sample_input_row["contents"]
+                    sample_input = sample_input_dict["contents"]
                 else:
                     sample_input = None
 
@@ -329,15 +337,18 @@ class DevWebsocketClient:
                     # create prompt_model_dev_instance
                     prompt_model_dev = LLMDev()
                     # fine prompt_model_uuid from local db
-                    prompt_model_uuid: str = get_prompt_model_uuid(prompt_model_name)[
-                        "uuid"
-                    ]
+                    prompt_model_row = PromptModel.get(
+                        PromptModel.name == prompt_model_name
+                    )
+                    prompt_model_uuid: str = model_to_dict(
+                        prompt_model_row, recurse=False
+                    )["uuid"]
 
                     prompt_model_version_uuid: Optional[str] = message["uuid"]
                     # If prompt_model_version_uuid is None, create new version & prompt
                     if prompt_model_version_uuid is None:
                         prompt_model_version: PromptModelVersion = (
-                            create_prompt_model_version(
+                            PromptModelVersion.create(
                                 prompt_model_uuid=prompt_model_uuid,
                                 status=ModelVersionStatus.BROKEN.value,
                                 from_uuid=message["from_uuid"],
@@ -350,13 +361,17 @@ class DevWebsocketClient:
                         prompt_model_version_uuid: str = prompt_model_version.uuid
 
                         prompts = message["prompts"]
-                        for prompt in prompts:
-                            create_prompt(
-                                version_uuid=prompt_model_version_uuid,
-                                role=prompt["role"],
-                                step=prompt["step"],
-                                content=prompt["content"],
-                            )
+                        prompt_rows_to_insert = [
+                            {
+                                "version_uuid": prompt_model_version_uuid,
+                                "role": prompt["role"],
+                                "step": prompt["step"],
+                                "content": prompt["content"],
+                            }
+                            for prompt in prompts
+                        ]
+                        Prompt.insert_many(prompt_rows_to_insert).execute()
+
                         # send message to backend
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
@@ -504,12 +519,19 @@ class DevWebsocketClient:
                                 "status": "failed",
                                 "log": f"Function call Failed, {error}",
                             }
-                            update_prompt_model_version(
-                                prompt_model_version_uuid=prompt_model_version_uuid,
-                                status=ModelVersionStatus.BROKEN.value,
+
+                            (
+                                PromptModelVersion.update(
+                                    status=ModelVersionStatus.BROKEN.value
+                                )
+                                .where(
+                                    PromptModelVersion.uuid == prompt_model_version_uuid
+                                )
+                                .execute()
                             )
-                            create_run_log(
-                                prompt_model_version_uuid=prompt_model_version_uuid,
+
+                            RunLog.create(
+                                version_uuid=prompt_model_version_uuid,
                                 inputs=sample_input,
                                 raw_output=output["raw_output"],
                                 parsed_outputs=output["parsed_outputs"],
@@ -588,12 +610,17 @@ class DevWebsocketClient:
                             "status": "failed",
                             "log": f"parsing failed, {error_log}",
                         }
-                        update_prompt_model_version(
-                            prompt_model_version_uuid=prompt_model_version_uuid,
-                            status=ModelVersionStatus.BROKEN.value,
+
+                        (
+                            PromptModelVersion.update(
+                                status=ModelVersionStatus.BROKEN.value
+                            )
+                            .where(PromptModelVersion.uuid == prompt_model_version_uuid)
+                            .execute()
                         )
-                        create_run_log(
-                            prompt_model_version_uuid=prompt_model_version_uuid,
+
+                        RunLog.create(
+                            version_uuid=prompt_model_version_uuid,
                             inputs=sample_input,
                             raw_output=output["raw_output"],
                             parsed_outputs=output["parsed_outputs"],
@@ -607,13 +634,16 @@ class DevWebsocketClient:
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
                         "status": "completed",
                     }
-                    update_prompt_model_version(
-                        prompt_model_version_uuid=prompt_model_version_uuid,
-                        status=ModelVersionStatus.WORKING.value,
-                    )
 
-                    create_run_log(
-                        prompt_model_version_uuid=prompt_model_version_uuid,
+                    (
+                        PromptModelVersion.update(
+                            status=ModelVersionStatus.WORKING.value
+                        )
+                        .where(PromptModelVersion.uuid == prompt_model_version_uuid)
+                        .execute()
+                    )
+                    RunLog.create(
+                        version_uuid=prompt_model_version_uuid,
                         inputs=sample_input,
                         raw_output=output["raw_output"],
                         parsed_outputs=output["parsed_outputs"],
@@ -634,10 +664,12 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.CHANGE_CHAT_MODEL_VERSION_STATUS:
                 chat_model_version_uuid = message["chat_model_version_uuid"]
                 new_status = message["status"]
-                res_from_local_db = update_chat_model_version(
-                    chat_model_version_uuid=chat_model_version_uuid,
-                    status=new_status,
+                (
+                    ChatModelVersion.update(status=new_status)
+                    .where(ChatModelVersion.uuid == chat_model_version_uuid)
+                    .execute()
                 )
+
                 data = {
                     "chat_model_version_uuid": chat_model_version_uuid,
                     "status": new_status,
@@ -645,13 +677,28 @@ class DevWebsocketClient:
 
             elif message["type"] == LocalTask.GET_CHAT_LOG_SESSIONS:
                 chat_model_version_uuid = message["chat_model_version_uuid"]
-                res_from_local_db = list_sessions(chat_model_version_uuid)
-                data = {"sessions": res_from_local_db}
+                session_rows = [
+                    ChatLogSession.select()
+                    .where(ChatLogSession.version_uuid == chat_model_version_uuid)
+                    .order_by(ChatLogSession.created_at.desc())
+                ]
+                session_list = [
+                    model_to_dict(model, recurse=False) for model in session_rows
+                ]
+
+                data = {"sessions": session_list}
 
             elif message["type"] == LocalTask.GET_CHAT_LOGS:
                 session_uuid = message["session_uuid"]
-                res_from_local_db = list_chat_logs(session_uuid)
-                data = {"chat_logs": res_from_local_db}
+                chat_log_rows = [
+                    ChatLog.select()
+                    .where(ChatLog.session_uuid == session_uuid)
+                    .order_by(ChatLog.created_at.asc())
+                ]
+                chat_log_list = [
+                    model_to_dict(model, recurse=False) for model in chat_log_rows
+                ]
+                data = {"chat_logs": chat_log_list}
 
             elif message["type"] == LocalTask.GET_CHAT_MODEL_VERSION_TO_SAVE:
                 chat_model_version_uuid = message["chat_model_version_uuid"]
@@ -668,7 +715,7 @@ class DevWebsocketClient:
                 chat_model = ChatModel.get(
                     ChatModel.uuid == chat_model_version.chat_model_uuid
                 ).__data__
-                
+
                 is_deployed = chat_model["is_deployed"]
                 if not is_deployed:
                     data = {
@@ -725,7 +772,7 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.UPDATE_CANDIDATE_CHAT_MODEL_VERSION_ID:
                 new_candidates = message["new_candidates"]
                 update_candidate_chat_model_version(new_candidates)
-                
+
             elif message["type"] == LocalTask.RUN_CHAT_MODEL:
                 pass
 
