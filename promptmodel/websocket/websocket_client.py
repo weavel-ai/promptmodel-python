@@ -336,7 +336,7 @@ class DevWebsocketClient:
                     logger.info(f"Started PromptModel: {prompt_model_name}")
                     # create prompt_model_dev_instance
                     prompt_model_dev = LLMDev()
-                    # fine prompt_model_uuid from local db
+                    # find prompt_model_uuid from local db
                     prompt_model_row = PromptModel.get(
                         PromptModel.name == prompt_model_name
                     )
@@ -689,6 +689,7 @@ class DevWebsocketClient:
                 data = {"sessions": session_list}
 
             elif message["type"] == LocalTask.GET_CHAT_LOGS:
+                # TODO: Make this API different with GET_CHAT_LOG_SESSIONS
                 session_uuid = message["session_uuid"]
                 chat_log_rows = [
                     ChatLog.select()
@@ -774,7 +775,272 @@ class DevWebsocketClient:
                 update_candidate_chat_model_version(new_candidates)
 
             elif message["type"] == LocalTask.RUN_CHAT_MODEL:
-                pass
+                chat_model_name: str = message["chat_model_name"]
+                session_uuid: Optional[str] = message["session_uuid"]
+
+                # check chat_model in Local Usage
+                chat_model_names = self._devapp._get_chat_model_name_list()
+                if chat_model_name not in chat_model_names:
+                    logger.error(f"There is no chat_model {chat_model_name}.")
+                    return
+
+                # Start ChatModel Running
+                try:
+                    logger.info(f"Started ChatModel: {chat_model_name}")
+                    chat_model_dev = LLMDev()
+                    chat_model_row = ChatModel.get(ChatModel.name == chat_model_name)
+                    chat_model_uuid: str = model_to_dict(chat_model_row, recurse=False)[
+                        "uuid"
+                    ]
+
+                    chat_model_version_uuid = message["uuid"]
+                    if chat_model_version_uuid is None:
+                        chat_model_version: ChatModelVersion = ChatModelVersion.create(
+                            chat_model_uuid=chat_model_uuid,
+                            status=ModelVersionStatus.BROKEN.value,
+                            from_uuid=message["from_uuid"],
+                            model=message["model"],
+                            functions=message["functions"],
+                            system_prompt=message["system_prompt"],
+                        )
+                        chat_model_version_uuid: str = chat_model_version.uuid
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                            "chat_model_version_uuid": chat_model_version_uuid,
+                            "status": "running",
+                        }
+                        data.update(response)
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+
+                    if session_uuid:
+                        # get session message list
+                        chat_log_rows: List[ChatLog] = [
+                            ChatLog.select()
+                            .where(ChatLog.session_uuid == session_uuid)
+                            .order_by(ChatLog.created_at.asc())
+                        ]
+                        chat_log_list = [
+                            {
+                                "role": chat_log.role,
+                                "content": chat_log.content,
+                                "tool_calls": chat_log.tool_calls,
+                            }
+                            for chat_log in chat_log_rows
+                        ]
+                        # delete tool_calls if None
+                        for chat_log in chat_log_list:
+                            if chat_log["tool_calls"] is None:
+                                del chat_log["tool_calls"]
+                    else:
+                        # make new session
+                        session_uuid = uuid4()
+                        ChatLogSession.create(
+                            session_uuid=session_uuid,
+                            version_uuid=message["chat_model_version_uuid"],
+                        )
+                        # save instruction message to chat_log
+                        ChatLog.create(
+                            session_uuid=session_uuid,
+                            role="system",
+                            content=message["system_prompt"],
+                        )
+                        chat_log_list = [
+                            {"role": "system", "content": message["system_prompt"]}
+                        ]
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                            "session_uuid": session_uuid,
+                            "status": "running",
+                        }
+                        data.update(response)
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+
+                    messages_for_run = chat_log_list + message["new_messages"]
+
+                    ChatLog.insert_many(
+                        [
+                            {
+                                "session_uuid": session_uuid,
+                                "role": m["role"],
+                                "content": m["content"],
+                            }
+                            for m in message["new_messages"]
+                        ]
+                    ).execute()
+
+                    error_log = None
+                    function_call = {}
+                    function_call_log = None
+                    # get function schemas from register & send to LLM
+                    tool_names: List[str] = message["tools"]
+                    logger.debug(f"tool_names : {function_names}")
+                    try:
+                        function_schemas: List[
+                            str
+                        ] = self._devapp._get_function_schemas(tool_names)
+                    except Exception as error:
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                            "status": "failed",
+                            "log": f"There is no function. : {error}",
+                        }
+                        data.update(response)
+                        # logger.debug(f"Sent response: {data}")
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                        return
+
+                    logger.debug(f"functions : {function_schemas}")
+
+                    res: AsyncGenerator[
+                        LLMStreamResponse, None
+                    ] = chat_model_dev.dev_chat(
+                        messages=messages_for_run,
+                        tools=function_schemas,
+                        model=message["model"],
+                    )
+                    raw_output = ""
+                    async for chunk in res:
+                        if chunk.raw_output is not None:
+                            raw_output += chunk.raw_output
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "running",
+                                "raw_output": chunk.raw_output,
+                            }
+                        if chunk.function_call is not None:
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "running",
+                                "function_call": chunk.function_call,
+                            }
+                            for key, value in chunk.function_call.items():
+                                function_call[key] += value
+
+                        if chunk.error:
+                            error_log = chunk.error_log
+
+                        data.update(response)
+                        # logger.debug(f"Sent response: {data}")
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                    # IF function_call in response -> call function -> call LLM once more
+
+                    ChatLog.create(
+                        session_uuid=session_uuid,
+                        role="assistant",
+                        content=raw_output if raw_output != "" else None,
+                        tool_calls=function_call,
+                    )
+
+                    if function_call != {}:
+                        # make function_call_log
+                        function_call_log = {
+                            "name": function_call["name"],
+                            "arguments": function_call["arguments"],
+                            "response": None,
+                            "initial_raw_output": raw_output,
+                        }
+
+                        # call function
+                        try:
+                            function_call_args: Dict[str, Any] = json.loads(
+                                function_call["arguments"]
+                            )
+                            function_response = self._devapp._call_register_function(
+                                function_call["name"], function_call_args
+                            )
+                            function_call_log["response"] = function_response
+                            # Send function call response for check LLM response validity
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "running",
+                                "function_response": function_response,
+                            }
+                            data.update(response)
+                            # logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                        except Exception as error:
+                            logger.error(f"{error}")
+
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "failed",
+                                "log": f"Function call Failed, {error}",
+                            }
+
+                            ChatLog.create(
+                                session_uuid=session_uuid,
+                                role="function",
+                                content="ERROR",
+                            )
+                            response.update(data)
+                            await ws.send(json.dumps(response, cls=CustomJSONEncoder))
+                            return
+                        # call LLM once more
+                        messages_for_run += [
+                            {
+                                "role": "assistant",
+                                "function_call": function_call,
+                            },
+                            {
+                                "role": "function",
+                                "name": function_call["name"],
+                                "content": str(function_response),
+                            },
+                        ]
+
+                        res_after_function_call: AsyncGenerator[
+                            LLMStreamResponse, None
+                        ] = chat_model_dev.dev_chat(
+                            messages=messages_for_run,
+                            model=message["model"],
+                        )
+
+                        raw_output = ""
+                        async for item in res_after_function_call:
+                            if item.raw_output is not None:
+                                raw_output += item.raw_output
+                                data = {
+                                    "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                    "status": "running",
+                                    "raw_output": item.raw_output,
+                                }
+
+                            if item.error:
+                                error_log = item.error_log
+
+                            data.update(response)
+                            # logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                            "status": "completed",
+                        }
+
+                        (
+                            ChatModelVersion.update(
+                                status=ModelVersionStatus.WORKING.value
+                            )
+                            .where(uuid=chat_model_version_uuid)
+                            .execute()
+                        )
+
+                        ChatLog.create(
+                            session_uuid=session_uuid,
+                            role="assistant",
+                            content=raw_output if raw_output != "" else None,
+                        )
+
+                except Exception as error:
+                    logger.error(f"Error running service: {error}")
+                    data = {
+                        "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                        "status": "failed",
+                        "log": str(error),
+                    }
+                    response.update(data)
+                    await ws.send(json.dumps(response, cls=CustomJSONEncoder))
+                    return
 
             if data:
                 response.update(data)
