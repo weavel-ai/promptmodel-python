@@ -693,11 +693,11 @@ class LLM:
                 functions=function_list, model=chunk["model"]
             )
             prompt_token += function_list_token
-        if function_call:
-            function_call_token = num_tokens_from_function_call_output(
-                function_call_output=function_call, model=chunk["model"]
-            )
-            completion_token += function_call_token
+        # if function_call:
+        #     function_call_token = num_tokens_from_function_call_output(
+        #         function_call_output=function_call, model=chunk["model"]
+        #     )
+        #     completion_token += function_call_token
 
         count_end_time = datetime.datetime.now()
         logger.debug(
