@@ -159,7 +159,6 @@ def test_run_and_parse_with_functions(mocker):
         output_keys=["response"],
     )
 
-    print(res.__dict__)
     # 1. Output 지키고 function call ->  (Pass)
     # 2. Output 지키고 stop -> OK
     # 3. Output 무시하고 function call -> OK (function call이 나타나면 파싱을 하지 않도록 수정)
@@ -184,10 +183,12 @@ def test_run_and_parse_with_functions(mocker):
     res: LLMResponse = llm.run_and_parse(
         messages=messages,
         functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
+
+    print(res.__dict__)
 
     if not "str" in res.raw_output:
         # if "str" in res.raw_output, it means that LLM make mistakes

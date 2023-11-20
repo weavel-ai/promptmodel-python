@@ -1,13 +1,10 @@
 """Base module for interacting with LLM APIs."""
 import re
-import os
 import json
-import time
 import datetime
-from typing import Any, AsyncGenerator, List, Dict, Optional, Union, Generator, Tuple
+from typing import Any, AsyncGenerator, List, Dict, Optional, Generator
 from attr import dataclass
 
-import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import completion, acompletion
@@ -696,7 +693,6 @@ class LLM:
                 functions=function_list, model=chunk["model"]
             )
             prompt_token += function_list_token
-
         if function_call:
             function_call_token = num_tokens_from_function_call_output(
                 function_call_output=function_call, model=chunk["model"]
@@ -721,9 +717,8 @@ class LLM:
             if getattr(chunk.choices[0].delta, "role", None)
             else "assistant",
             content=raw_output if raw_output != "" else None,
-            function_call=FunctionCall(**function_call) if function_call else None,
+            function_call=function_call if function_call else None,
         )
-
         choices = [
             Choices(finish_reason=chunk.choices[0].finish_reason, message=last_message)
         ]
@@ -758,7 +753,8 @@ class LLM:
                     for key, value in (
                         chunk.choices[0].delta.function_call.model_dump().items()
                     ):
-                        function_call[key] += value
+                        if value is not None:
+                            function_call[key] += value
 
                     yield LLMStreamResponse(
                         api_response=chunk,
@@ -823,7 +819,8 @@ class LLM:
                     for key, value in (
                         chunk.choices[0].delta.function_call.model_dump().items()
                     ):
-                        function_call[key] += value
+                        if value is not None:
+                            function_call[key] += value
 
                     yield LLMStreamResponse(
                         api_response=chunk,
@@ -966,7 +963,8 @@ class LLM:
                     for key, value in (
                         chunk.choices[0].delta.function_call.model_dump().items()
                     ):
-                        function_call[key] += value
+                        if value is not None:
+                            function_call[key] += value
 
                     yield LLMStreamResponse(
                         api_response=chunk,
@@ -1092,7 +1090,8 @@ class LLM:
                     for key, value in (
                         chunk.choices[0].delta.function_call.model_dump().items()
                     ):
-                        function_call[key] += value
+                        if value is not None:
+                            function_call[key] += value
 
                     yield LLMStreamResponse(
                         api_response=chunk,
@@ -1158,7 +1157,8 @@ class LLM:
                     for key, value in (
                         chunk.choices[0].delta.function_call.model_dump().items()
                     ):
-                        function_call[key] += value
+                        if value is not None:
+                            function_call[key] += value
 
                     yield LLMStreamResponse(
                         api_response=chunk,
@@ -1304,7 +1304,8 @@ class LLM:
                     for key, value in (
                         chunk.choices[0].delta.function_call.model_dump().items()
                     ):
-                        function_call[key] += value
+                        if value is not None:
+                            function_call[key] += value
 
                     yield LLMStreamResponse(
                         api_response=chunk,

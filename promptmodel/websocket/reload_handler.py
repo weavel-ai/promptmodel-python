@@ -10,7 +10,7 @@ from playhouse.shortcuts import model_to_dict
 from promptmodel.apis.base import APIClient
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils import logger
-from promptmodel import DevApp, DevClient
+from promptmodel import DevApp
 from promptmodel.database.models import *
 from promptmodel.database.crud import (
     update_samples,

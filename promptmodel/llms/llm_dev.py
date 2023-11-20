@@ -1,15 +1,11 @@
 """LLM for Development TestRun"""
 import re
-import os
-import json
-import openai
-
-from typing import Any, AsyncGenerator, List, Dict, Optional, Union, Generator
+from typing import Any, AsyncGenerator, List, Dict, Optional
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from litellm import acompletion
 
-from promptmodel.types.enums import ParsingType, ParsingPattern, get_pattern_by_type
+from promptmodel.types.enums import ParsingType, get_pattern_by_type
 from promptmodel.utils import logger
 from promptmodel.utils.output_utils import convert_str_to_type
 from promptmodel.types.response import LLMStreamResponse, ModelResponse
@@ -68,7 +64,8 @@ class LLMDev:
                 for key, value in (
                     chunk.choices[0].delta.function_call.model_dump().items()
                 ):
-                    function_call[key] += value
+                    if value is not None:
+                        function_call[key] += value
 
             if chunk.choices[0].finish_reason == "function_call":
                 finish_reason_function_call = True

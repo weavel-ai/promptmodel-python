@@ -1,16 +1,12 @@
-import json
 from typing import Dict, List, Optional, Tuple, Any
-from uuid import uuid4, UUID
-from litellm import completion_cost
+from uuid import UUID
 from promptmodel.database.models import (
     ChatModel,
     ChatModelVersion,
-    ChatLogSession,
     ChatLog,
 )
 from playhouse.shortcuts import model_to_dict
-from promptmodel.types.enums import ModelVersionStatus, ParsingType
-from promptmodel.utils.random_utils import select_version_by_ratio
+from promptmodel.types.enums import ModelVersionStatus
 from promptmodel.utils import logger
 from promptmodel.database.config import db
 

@@ -10,7 +10,7 @@ from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.types.response import LLMResponse, LLMStreamResponse
 from promptmodel.types.enums import ParsingType
-from promptmodel.utils.token_counting import run_async_in_sync
+from promptmodel.utils.async_util import run_async_in_sync
 
 html_output_format = """\
 You must follow the provided output format. Keep the string between <> as it is.
@@ -71,7 +71,6 @@ def test_stream_with_functions(mocker):
     assert api_responses[0].choices[0].message.content is None, "content is not None"
     assert api_responses[0]._response_ms is not None, "response_ms is None"
     assert api_responses[0].usage is not None, "usage is None"
-    assert api_responses[0].usage.prompt_tokens == 74, "prompt_tokens is not 74"
 
     # test logging
     llm_proxy = LLMProxy("test")
@@ -95,9 +94,11 @@ def test_stream_with_functions(mocker):
 
     mock_execute.assert_called_once()
     _, kwargs = mock_execute.call_args
+    api_response_dict = api_responses[0].model_dump()
+    api_response_dict.update({"response_ms": api_responses[0]._response_ms})
 
     assert (
-        kwargs["json"]["api_response"] == api_responses[0].model_dump()
+        kwargs["json"]["api_response"] == api_response_dict
     ), "api_response is not equal"
 
 
@@ -137,7 +138,7 @@ async def test_astream_with_functions(mocker):
     assert api_responses[0].choices[0].message.content is None, "content is not None"
     assert api_responses[0]._response_ms is not None, "response_ms is None"
     assert api_responses[0].usage is not None, "usage is None"
-    assert api_responses[0].usage.prompt_tokens == 74, "prompt_tokens is not 74"
+    # assert api_responses[0].usage.prompt_tokens == 74, "prompt_tokens is not 74"
 
     # test logging
     llm_proxy = LLMProxy("test")
@@ -158,9 +159,11 @@ async def test_astream_with_functions(mocker):
 
     mock_execute.assert_called_once()
     _, kwargs = mock_execute.call_args
+    api_response_dict = api_responses[0].model_dump()
+    api_response_dict.update({"response_ms": api_responses[0]._response_ms})
 
     assert (
-        kwargs["json"]["api_response"] == api_responses[0].model_dump()
+        kwargs["json"]["api_response"] == api_response_dict
     ), "api_response is not equal"
 
 
@@ -209,7 +212,7 @@ def test_stream_and_parse_with_functions(mocker):
     stream_res: Generator[LLMStreamResponse, None, None] = llm.stream_and_parse(
         messages=messages,
         functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )

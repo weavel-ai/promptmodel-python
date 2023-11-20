@@ -1,13 +1,12 @@
 import time
-from ...apis.base import APIClient
-from requests import request
+from promptmodel.apis.base import APIClient
 import typer
 import webbrowser
 from rich import print
 
-from ...constants import ENDPOINT_URL, GRANT_ACCESS_URL
-from ...utils.config_utils import upsert_config
-from ...utils.crypto import generate_api_key, encrypt_message
+from promptmodel.constants import ENDPOINT_URL, GRANT_ACCESS_URL
+from promptmodel.utils.config_utils import upsert_config
+from promptmodel.utils.crypto import generate_api_key, encrypt_message
 
 
 def login():

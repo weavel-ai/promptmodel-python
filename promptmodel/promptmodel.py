@@ -1,11 +1,9 @@
 from __future__ import annotations
-import asyncio
 
 from dataclasses import dataclass
 from typing import (
     Any,
     AsyncGenerator,
-    Callable,
     Dict,
     Generator,
     List,
@@ -68,7 +66,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         # add name to the list of prompt_models
 
-        prompts, _ = run_async_in_sync(self.llm_proxy.fetch_prompts(self.name))
+        prompts, _ = run_async_in_sync(LLMProxy.fetch_prompts(self.name))
         return prompts
 
     def run(

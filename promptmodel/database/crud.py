@@ -1,6 +1,4 @@
-import json
 from typing import Dict, List, Optional, Tuple
-from uuid import uuid4, UUID
 from promptmodel.database.models import (
     PromptModel,
     PromptModelVersion,
@@ -12,7 +10,7 @@ from promptmodel.database.models import (
     DeployedPrompt,
 )
 from playhouse.shortcuts import model_to_dict
-from promptmodel.types.enums import ModelVersionStatus, ParsingType
+from promptmodel.types.enums import ModelVersionStatus
 from promptmodel.utils.random_utils import select_version_by_ratio
 from promptmodel.utils import logger
 from promptmodel.database.config import db

@@ -1,20 +1,12 @@
-import os
 import time
 import asyncio
 import typer
-import json
-import sys
 import importlib
 import signal
-from importlib import resources
-from requests import request
-from typing import Callable, Dict, Any, List
+from typing import Dict, Any, List
 from playhouse.shortcuts import model_to_dict
 
-
 import webbrowser
-import inspect
-
 from rich import print
 from InquirerPy import inquirer
 from watchdog.observers import Observer
@@ -25,9 +17,7 @@ from promptmodel.constants import ENDPOINT_URL, WEB_CLIENT_URL
 from promptmodel.cli.commands.init import init as promptmodel_init
 from promptmodel.cli.utils import get_org, get_project
 from promptmodel.cli.signal_handler import dev_terminate_signal_handler
-from promptmodel.utils import logger
 from promptmodel.utils.config_utils import read_config, upsert_config
-from promptmodel.utils.crypto import generate_api_key, encrypt_message
 from promptmodel.types.enums import ModelVersionStatus, ChangeLogAction
 from promptmodel.websocket import DevWebsocketClient, CodeReloadHandler
 from promptmodel.database.orm import initialize_db

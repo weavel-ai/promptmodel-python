@@ -1,4 +1,3 @@
-import asyncio
 from typing import (
     Any,
     AsyncGenerator,
@@ -8,14 +7,12 @@ from typing import (
     List,
     Optional,
     Tuple,
-    Union,
-    Coroutine,
 )
+
 from uuid import UUID
 from threading import Thread
-from concurrent.futures import Future
 from rich import print
-from litellm.utils import ModelResponse, get_max_tokens, token_counter
+from litellm.utils import ModelResponse, get_max_tokens
 from promptmodel.llms.llm import LLM
 from promptmodel.database.models import *
 from promptmodel.database.crud import (
@@ -33,13 +30,10 @@ from promptmodel.utils.token_counting import (
     num_tokens_from_functions_input,
 )
 from promptmodel.utils.output_utils import update_dict
-from promptmodel.apis.base import APIClient, AsyncAPIClient
+from promptmodel.apis.base import AsyncAPIClient
 from promptmodel.types.response import (
     LLMResponse,
     LLMStreamResponse,
-    Message,
-    Usage,
-    FunctionCall,
 )
 
 
@@ -50,7 +44,9 @@ class LLMProxy(LLM):
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = run_async_in_sync(self.fetch_prompts(self._name))
+            prompts, version_details = run_async_in_sync(
+                LLMProxy.fetch_prompts(self._name)
+            )
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -96,7 +92,7 @@ class LLMProxy(LLM):
 
     def _wrap_async_gen(self, async_gen: Callable[..., Any]) -> Callable[..., Any]:
         async def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = await self.fetch_prompts(self._name)
+            prompts, version_details = await LLMProxy.fetch_prompts(self._name)
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -148,7 +144,9 @@ class LLMProxy(LLM):
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = run_async_in_sync(self.fetch_prompts(self._name))
+            prompts, version_details = run_async_in_sync(
+                LLMProxy.fetch_prompts(self._name)
+            )
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -192,7 +190,7 @@ class LLMProxy(LLM):
 
     def _wrap_async_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         async def async_wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = await self.fetch_prompts(
+            prompts, version_details = await LLMProxy.fetch_prompts(
                 self._name
             )  # messages, model, uuid = self._fetch_prompts()
             call_args = self._prepare_call_args(
@@ -236,9 +234,9 @@ class LLMProxy(LLM):
 
     def _wrap_chat(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(session_uuid: str, **kwargs):
-            message_logs = run_async_in_sync(self.fetch_chat_log(session_uuid))
+            message_logs = run_async_in_sync(LLMProxy.fetch_chat_log(session_uuid))
             instruction, version_details = run_async_in_sync(
-                self.fetch_chat_model(self._name, session_uuid)
+                LLMProxy.fetch_chat_model(self._name, session_uuid)
             )
 
             if len(message_logs) == 0 or message_logs[0]["role"] != "system":
@@ -282,8 +280,8 @@ class LLMProxy(LLM):
 
     def _wrap_async_chat(self, method: Callable[..., Any]) -> Callable[..., Any]:
         async def async_wrapper(session_uuid: str, **kwargs):
-            message_logs = await self.fetch_chat_log(session_uuid)
-            instruction, version_details = await self.fetch_chat_model(
+            message_logs = await LLMProxy.fetch_chat_log(session_uuid)
+            instruction, version_details = await LLMProxy.fetch_chat_model(
                 self._name, session_uuid
             )
 

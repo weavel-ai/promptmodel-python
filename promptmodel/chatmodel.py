@@ -1,18 +1,11 @@
 from __future__ import annotations
-import asyncio
 
 from dataclasses import dataclass
 from typing import (
     Any,
-    AsyncGenerator,
-    Callable,
     Dict,
-    Generator,
     List,
     Optional,
-    Tuple,
-    Union,
-    Coroutine,
 )
 from uuid import uuid4
 from promptmodel import DevClient
@@ -57,7 +50,7 @@ class ChatModel(metaclass=RegisteringMeta):
         if session_uuid is None:
             self.session_uuid = uuid4()
             instruction, version_details = run_async_in_sync(
-                self.llm_proxy.fetch_chat_model(self.name)
+                LLMProxy.fetch_chat_model(self.name)
             )
             config = read_config()
             if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
@@ -110,7 +103,7 @@ class ChatModel(metaclass=RegisteringMeta):
             List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
         """
         instruction, detail = run_async_in_sync(
-            self.llm_proxy.fetch_chat_model(self.name, self.session_uuid)
+            LLMProxy.fetch_chat_model(self.name, self.session_uuid)
         )
         return instruction
 
@@ -152,9 +145,7 @@ class ChatModel(metaclass=RegisteringMeta):
             )
 
     def get_messages(self) -> List[Dict[str, Any]]:
-        message_logs = run_async_in_sync(
-            self.llm_proxy.fetch_chat_log(self.session_uuid)
-        )
+        message_logs = run_async_in_sync(LLMProxy.fetch_chat_log(self.session_uuid))
         return message_logs
 
     def run(
