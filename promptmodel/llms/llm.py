@@ -746,7 +746,6 @@ class LLM:
         function_call = {"name": "", "arguments": ""}
         check_finished = False
         try:
-            yield_api_response_with_fc = False
             for chunk in response:
                 yield_api_response_with_fc = False
                 if getattr(chunk.choices[0].delta, "function_call", None) is not None:
@@ -811,7 +810,6 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            yield_api_response_with_fc = False
             check_finished = False
             for chunk in response:
                 yield_api_response_with_fc = False
@@ -955,7 +953,6 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            yield_api_response_with_fc = False
             check_finished = False
             for chunk in response:
                 yield_api_response_with_fc = False
@@ -1082,7 +1079,6 @@ class LLM:
         raw_output = ""
         function_call = {"name": "", "arguments": ""}
         try:
-            yield_api_response_with_fc = False
             check_finished = False
             async for chunk in response:
                 yield_api_response_with_fc = False
@@ -1149,7 +1145,6 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            yield_api_response_with_fc = False
             check_finished = False
             async for chunk in response:
                 yield_api_response_with_fc = False
@@ -1296,7 +1291,6 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            yield_api_response_with_fc = False
             check_finished = False
             async for chunk in response:
                 yield_api_response_with_fc = False

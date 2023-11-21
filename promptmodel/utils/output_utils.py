@@ -7,10 +7,11 @@ def update_dict(
     source: Dict[str, str],
 ):
     for key, value in source.items():
-        if key not in target:
-            target[key] = value
-        else:
-            target[key] += value
+        if value is not None:
+            if key not in target:
+                target[key] = value
+            else:
+                target[key] += value
     return target
 
 

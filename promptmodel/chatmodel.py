@@ -160,8 +160,14 @@ class ChatModel(metaclass=RegisteringMeta):
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
         if stream:
-            for item in self.llm_proxy.chat_stream(self.session_uuid, function_list):
-                yield item
+
+            def gen():
+                for item in self.llm_proxy.chat_stream(
+                    self.session_uuid, function_list
+                ):
+                    yield item
+
+            return gen()
         else:
             return self.llm_proxy.chat_run(self.session_uuid, function_list)
         # return self.llm_proxy.chat_run(self.session_uuid, function_list, self.api_key)

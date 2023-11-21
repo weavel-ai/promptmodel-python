@@ -30,6 +30,7 @@ from promptmodel.types.enums import (
     ModelVersionStatus,
 )
 from promptmodel.utils.config_utils import upsert_config, read_config
+from promptmodel.utils.output_utils import update_dict
 from promptmodel.types.response import LLMStreamResponse
 from promptmodel.constants import ENDPOINT_URL
 
@@ -819,6 +820,7 @@ class DevWebsocketClient:
                             .where(ChatLog.session_uuid == session_uuid)
                             .order_by(ChatLog.created_at.asc())
                         ]
+                        print(chat_log_rows)
                         chat_log_list = [
                             {
                                 "role": chat_log.role,
@@ -836,17 +838,15 @@ class DevWebsocketClient:
                         session_uuid = uuid4()
                         ChatLogSession.create(
                             session_uuid=session_uuid,
-                            version_uuid=message["chat_model_version_uuid"],
+                            version_uuid=chat_model_version_uuid,
                         )
                         # save instruction message to chat_log
                         ChatLog.create(
                             session_uuid=session_uuid,
-                            role="system",
-                            content=message["system_prompt"],
+                            role=message["system_prompt"]["role"],
+                            content=message["system_prompt"]["content"],
                         )
-                        chat_log_list = [
-                            {"role": "system", "content": message["system_prompt"]}
-                        ]
+                        chat_log_list = [message["system_prompt"]]
                         data = {
                             "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
                             "session_uuid": session_uuid,
@@ -869,11 +869,11 @@ class DevWebsocketClient:
                     ).execute()
 
                     error_log = None
-                    function_call = {}
+                    function_call = None
                     function_call_log = None
                     # get function schemas from register & send to LLM
-                    tool_names: List[str] = message["tools"]
-                    logger.debug(f"tool_names : {function_names}")
+                    tool_names: List[str] = message["functions"]
+                    logger.debug(f"tool_names : {tool_names}")
                     try:
                         function_schemas: List[
                             str
@@ -913,8 +913,11 @@ class DevWebsocketClient:
                                 "status": "running",
                                 "function_call": chunk.function_call,
                             }
-                            for key, value in chunk.function_call.items():
-                                function_call[key] += value
+                            if function_call is None:
+                                function_call = {}
+                            function_call = update_dict(
+                                function_call, chunk.function_call
+                            )
 
                         if chunk.error:
                             error_log = chunk.error_log
@@ -923,15 +926,13 @@ class DevWebsocketClient:
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                     # IF function_call in response -> call function -> call LLM once more
-
                     ChatLog.create(
                         session_uuid=session_uuid,
                         role="assistant",
                         content=raw_output if raw_output != "" else None,
                         tool_calls=function_call,
                     )
-
-                    if function_call != {}:
+                    if function_call is not None:
                         # make function_call_log
                         function_call_log = {
                             "name": function_call["name"],
@@ -979,6 +980,7 @@ class DevWebsocketClient:
                         messages_for_run += [
                             {
                                 "role": "assistant",
+                                "content": "",
                                 "function_call": function_call,
                             },
                             {
@@ -987,6 +989,12 @@ class DevWebsocketClient:
                                 "content": str(function_response),
                             },
                         ]
+
+                        ChatLog.create(
+                            session_uuid=session_uuid,
+                            role="function",
+                            content=str(function_response),
+                        )
 
                         res_after_function_call: AsyncGenerator[
                             LLMStreamResponse, None

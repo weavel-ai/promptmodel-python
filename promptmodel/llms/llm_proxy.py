@@ -125,10 +125,10 @@ class LLMProxy(LLM):
             # # add string_cache in model_response
             # if api_response:
             #     if "message" not in api_response.choices[0]:
-            #         api_response.choices[0]["message"] = {}
-            #     if "content" not in api_response.choices[0]["message"]:
-            #         api_response.choices[0]["message"]["content"] = string_cache
-            #         api_response.choices[0]["message"]["role"] = "assistant"
+            #         api_response.choices[0].message = {}
+            #     if "content" not in api_response.choices[0].message:
+            #         api_response.choices[0].message["content"] = string_cache
+            #         api_response.choices[0].message["role"] = "assistant"
 
             metadata = {
                 "error_occurs": error_occurs,
@@ -255,14 +255,18 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             if llm_response.api_response:
-                metadata["api_response"] = llm_response.api_response.__dict__
-                metadata["token_usage"] = llm_response.api_response["token_usage"]
+                metadata["api_response"] = llm_response.api_response.model_dump()
+                metadata["token_usage"] = (
+                    llm_response.api_response.usage
+                    if isinstance(llm_response.api_response.usage, dict)
+                    else llm_response.api_response.usage.model_dump()
+                )
                 metadata["latency"] = llm_response.api_response._response_ms
 
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
                     session_uuid,
-                    [llm_response.api_response.choices[0]["message"]],
+                    [llm_response.api_response.choices[0].message],
                     version_details["uuid"],
                     [metadata],
                 )
@@ -301,13 +305,17 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             if llm_response.api_response:
-                metadata["api_response"] = llm_response.api_response.__dict__
-                metadata["token_usage"] = llm_response.api_response["token_usage"]
+                metadata["api_response"] = llm_response.api_response.model_dump()
+                metadata["token_usage"] = (
+                    llm_response.api_response.usage
+                    if isinstance(llm_response.api_response.usage, dict)
+                    else llm_response.api_response.usage.model_dump()
+                )
                 metadata["latency"] = llm_response.api_response._response_ms
 
             await self._async_chat_log_to_cloud(
                 session_uuid,
-                [llm_response.api_response.choices[0]["message"]],
+                [llm_response.api_response.choices[0].message],
                 version_details["uuid"],
                 [metadata],
             )
@@ -366,7 +374,7 @@ class LLMProxy(LLM):
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
                     session_uuid,
-                    [api_response.choices[0]["message"]],
+                    [api_response.choices[0].message],
                     version_details["uuid"],
                     [metadata],
                 )
@@ -419,7 +427,7 @@ class LLMProxy(LLM):
             }
             await self._async_chat_log_to_cloud(
                 session_uuid,
-                [api_response.choices[0]["message"]],
+                [api_response.choices[0].message],
                 version_details["uuid"],
                 [metadata],
             )

@@ -27,7 +27,13 @@ def num_tokens_for_messages(
     #     tokens_per_message = 3
     #     tokens_per_name = 1
     # sum = 0
-    sum = token_counter(model=model, messages=messages)
+    processed_messages = [
+        {**message, "function_call": str(message["function_call"])}
+        if "function_call" in message
+        else message
+        for message in messages
+    ]
+    sum = token_counter(model=model, messages=processed_messages)
     # for message in messages:
     #     sum += tokens_per_message
     #     if "name" in message:
@@ -38,7 +44,15 @@ def num_tokens_for_messages(
 def num_tokens_for_messages_for_each(
     messages: List[Dict[str, str]], model: str = "gpt-3.5-turbo-0613"
 ) -> List[int]:
-    return [token_counter(model=model, messages=[message]) for message in messages]
+    processed_messages = [
+        {**message, "function_call": str(message["function_call"])}
+        if "function_call" in message
+        else message
+        for message in messages
+    ]
+    return [
+        token_counter(model=model, messages=[message]) for message in processed_messages
+    ]
 
 
 def num_tokens_from_functions_input(

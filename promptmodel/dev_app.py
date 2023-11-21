@@ -66,7 +66,7 @@ class DevClient:
             if chat_model.name == name:
                 return
 
-        self.prompt_models.append(ChatModelInterface(name=name))
+        self.chat_models.append(ChatModelInterface(name=name))
 
     def _get_prompt_model_name_list(self) -> List[str]:
         return [prompt_model.name for prompt_model in self.prompt_models]

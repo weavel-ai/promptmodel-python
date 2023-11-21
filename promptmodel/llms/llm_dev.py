@@ -29,7 +29,7 @@ class LLMDev:
         self._model: str
 
     def __validate_openai_messages(
-        self, messages: List[Dict[str, str]]
+        self, messages: List[Dict[str, Any]]
     ) -> List[OpenAIMessage]:
         """Validate and convert list of dictionaries to list of OpenAIMessage."""
         res = []
@@ -39,7 +39,7 @@ class LLMDev:
 
     async def dev_run(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         parsing_type: Optional[ParsingType] = None,
         functions: List[Any] = [],
         model: Optional[str] = None,
@@ -88,7 +88,7 @@ class LLMDev:
 
     async def dev_chat(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         tools: List[Any] = [],
         model: Optional[str] = None,
     ) -> AsyncGenerator[Any, None]:
@@ -98,10 +98,8 @@ class LLMDev:
         # Truncate the output if it is too long
         # truncate messages to make length <= model's max length
         token_per_tools = num_tokens_from_functions_input(functions=tools, model=model)
-
         model_max_tokens = get_max_tokens(model=model)
         token_per_messages = num_tokens_for_messages_for_each(messages, model)
-
         token_limit_exceeded = (
             sum(token_per_messages) + token_per_tools
         ) - model_max_tokens
@@ -114,7 +112,6 @@ class LLMDev:
                 token_limit_exceeded -= token_per_messages[1]
                 del messages[1]
                 del token_per_messages[1]
-
         response: AsyncGenerator[ModelResponse, None] = await acompletion(
             model=_model,
             messages=[
@@ -122,12 +119,13 @@ class LLMDev:
                 for message in self.__validate_openai_messages(messages)
             ],
             stream=True,
-            funcions=tools,
+            functions=tools,
         )
 
         function_call = {"name": "", "arguments": ""}
 
         async for chunk in response:
+            yield_api_response_with_fc = False
             if getattr(chunk.choices[0].delta, "function_call", None) is not None:
                 for key, value in (
                     chunk.choices[0].delta.function_call.model_dump().items()
