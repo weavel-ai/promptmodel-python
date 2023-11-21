@@ -452,17 +452,10 @@ class DevWebsocketClient:
                                 "raw_output": item.raw_output,
                             }
                         if item.parsed_outputs:
-                            if (
-                                list(item.parsed_outputs.keys())[0]
-                                not in output["parsed_outputs"]
-                            ):
-                                output["parsed_outputs"][
-                                    list(item.parsed_outputs.keys())[0]
-                                ] = list(item.parsed_outputs.values())[0]
-                            else:
-                                output["parsed_outputs"][
-                                    list(item.parsed_outputs.keys())[0]
-                                ] += list(item.parsed_outputs.values())[0]
+                            output["parsed_outputs"] = update_dict(
+                                output["parsed_outputs"], item.parsed_outputs
+                            )
+
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
@@ -541,59 +534,6 @@ class DevWebsocketClient:
                             response.update(data)
                             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                             return
-                        # # call LLM once more
-                        # messages_for_run += [
-                        #     {
-                        #         "role": "assistant",
-                        #         "function_call": function_call,
-                        #     },
-                        #     {
-                        #         "role": "function",
-                        #         "name": function_call["name"],
-                        #         "content": str(function_response),
-                        #     },
-                        # ]
-
-                        # res_after_function_call: AsyncGenerator[
-                        #     LLMStreamResponse, None
-                        # ] = prompt_model_dev.dev_chat(
-                        #     messages_for_run, parsing_type, model
-                        # )
-
-                        # output = {"raw_output": "", "parsed_outputs": {}}
-                        # async for item in res_after_function_call:
-                        #     if item.raw_output is not None:
-                        #         output["raw_output"] += item.raw_output
-                        #         data = {
-                        #             "type": ServerTask.UPDATE_RESULT_RUN.value,
-                        #             "status": "running",
-                        #             "raw_output": item.raw_output,
-                        #         }
-                        #     if item.parsed_outputs:
-                        #         if (
-                        #             list(item.parsed_outputs.keys())[0]
-                        #             not in output["parsed_outputs"]
-                        #         ):
-                        #             output["parsed_outputs"][
-                        #                 list(item.parsed_outputs.keys())[0]
-                        #             ] = list(item.parsed_outputs.values())[0]
-                        #         else:
-                        #             output["parsed_outputs"][
-                        #                 list(item.parsed_outputs.keys())[0]
-                        #             ] += list(item.parsed_outputs.values())[0]
-                        #         data = {
-                        #             "type": ServerTask.UPDATE_RESULT_RUN.value,
-                        #             "status": "running",
-                        #             "parsed_outputs": item.parsed_outputs,
-                        #         }
-
-                        #     if item.error and parsing_success is True:
-                        #         parsing_success = not item.error
-                        #         error_log = item.error_log
-
-                        #     data.update(response)
-                        #     # logger.debug(f"Sent response: {data}")
-                        #     await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
                     if (
                         message["output_keys"] is not None
@@ -690,7 +630,6 @@ class DevWebsocketClient:
                 data = {"sessions": session_list}
 
             elif message["type"] == LocalTask.GET_CHAT_LOGS:
-                # TODO: Make this API different with GET_CHAT_LOG_SESSIONS
                 session_uuid = message["session_uuid"]
                 chat_log_rows = [
                     ChatLog.select()
