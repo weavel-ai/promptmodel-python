@@ -6,15 +6,15 @@ from litellm import ModelResponse
 
 from promptmodel.llms.llm import LLM, ParseResult
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.types import LLMResponse, LLMStreamResponse
-from promptmodel.utils.enums import ParsingType
+from promptmodel.types.response import LLMResponse, LLMStreamResponse
+from promptmodel.types.enums import ParsingType
 
 proxy = LLMProxy(name="test")
 
 
 def test_run(mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: AsyncMock):
     fetch_prompts = mocker.patch(
-        "promptmodel.llms.llm_proxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.llms.llm_proxy.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     async_log_to_cloud = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
@@ -35,7 +35,7 @@ async def test_arun(
     mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: AsyncMock
 ):
     fetch_prompts = mocker.patch(
-        "promptmodel.llms.llm_proxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.llms.llm_proxy.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     async_log_to_cloud = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
@@ -55,7 +55,7 @@ def test_stream(
     mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: AsyncMock
 ):
     fetch_prompts = mocker.patch(
-        "promptmodel.llms.llm_proxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.llms.llm_proxy.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     async_log_to_cloud = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
@@ -80,7 +80,7 @@ async def test_astream(
     mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: AsyncMock
 ):
     fetch_prompts = mocker.patch(
-        "promptmodel.llms.llm_proxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.llms.llm_proxy.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     async_log_to_cloud = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
@@ -104,7 +104,7 @@ def test_run_and_parse(
     mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: AsyncMock
 ):
     fetch_prompts = mocker.patch(
-        "promptmodel.llms.llm_proxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.llms.llm_proxy.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     async_log_to_cloud = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
@@ -142,7 +142,7 @@ async def test_arun_and_parse(
     mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: AsyncMock
 ):
     fetch_prompts = mocker.patch(
-        "promptmodel.llms.llm_proxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.llms.llm_proxy.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     async_log_to_cloud = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
@@ -179,7 +179,7 @@ def test_stream_and_parse(
     mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: AsyncMock
 ):
     fetch_prompts = mocker.patch(
-        "promptmodel.llms.llm_proxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.llms.llm_proxy.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     async_log_to_cloud = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
@@ -226,7 +226,7 @@ async def test_astream_and_parse(
     mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: AsyncMock
 ):
     fetch_prompts = mocker.patch(
-        "promptmodel.llms.llm_proxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.llms.llm_proxy.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     async_log_to_cloud = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",

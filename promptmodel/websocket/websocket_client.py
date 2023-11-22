@@ -16,29 +16,22 @@ import promptmodel.utils.logger as logger
 from promptmodel import DevApp
 from promptmodel.llms.llm_dev import LLMDev
 from promptmodel.database.crud import (
-    create_prompt_model_version,
-    create_prompt,
-    create_run_log,
-    list_prompt_models,
-    list_prompt_model_versions,
-    list_prompts,
-    list_run_logs,
-    list_samples,
-    get_sample_input,
-    get_prompt_model_uuid,
-    update_prompt_model_version,
     find_ancestor_version,
     find_ancestor_versions,
     update_candidate_prompt_model_version,
+    update_candidate_chat_model_version,
+    find_ancestor_chat_model_version,
+    find_ancestor_chat_model_versions,
 )
-from promptmodel.database.models import PromptModelVersion, PromptModel
-from promptmodel.utils.enums import (
+from promptmodel.database.models import *
+from promptmodel.types.enums import (
     ServerTask,
     LocalTask,
-    PromptModelVersionStatus,
+    ModelVersionStatus,
 )
 from promptmodel.utils.config_utils import upsert_config, read_config
-from promptmodel.utils.types import LLMStreamResponse
+from promptmodel.utils.output_utils import update_dict
+from promptmodel.types.response import LLMStreamResponse
 from promptmodel.constants import ENDPOINT_URL
 
 load_dotenv()
@@ -100,22 +93,33 @@ class DevWebsocketClient:
         data = None
         try:
             if message["type"] == LocalTask.LIST_PROMPT_MODELS:
-                res_from_local_db = list_prompt_models()
-                modules_with_used_in_code = [
-                    module
-                    for module in res_from_local_db
-                    if module["used_in_code"] == True
+                prompt_model_rows = list(
+                    PromptModel.select().where(PromptModel.used_in_code == True)
+                )
+                prompt_model_list = [
+                    model_to_dict(model, recurse=False) for model in prompt_model_rows
                 ]
-                data = {"prompt_models": modules_with_used_in_code}
+                data = {"prompt_models": prompt_model_list}
 
             elif message["type"] == LocalTask.LIST_PROMPT_MODEL_VERSIONS:
                 prompt_model_uuid = message["prompt_model_uuid"]
-                res_from_local_db = list_prompt_model_versions(prompt_model_uuid)
-                data = {"prompt_model_versions": res_from_local_db}
+                prompt_model_version_rows = list(
+                    PromptModelVersion.select()
+                    .where(PromptModelVersion.prompt_model_uuid == prompt_model_uuid)
+                    .order_by(PromptModelVersion.created_at)
+                )
+                prompt_model_version_list = [
+                    model_to_dict(model, recurse=False)
+                    for model in prompt_model_version_rows
+                ]
+                data = {"prompt_model_versions": prompt_model_version_list}
 
             elif message["type"] == LocalTask.LIST_SAMPLES:
-                res_from_local_db = list_samples()
-                data = {"samples": res_from_local_db}
+                sample_inputs_rows = list(SampleInputs.select())
+                sample_inputs_list = [
+                    model_to_dict(model, recurse=False) for model in sample_inputs_rows
+                ]
+                data = {"samples": sample_inputs_list}
 
             elif message["type"] == LocalTask.LIST_FUNCTIONS:
                 function_name_list = self._devapp._get_function_name_list()
@@ -123,20 +127,35 @@ class DevWebsocketClient:
 
             elif message["type"] == LocalTask.GET_PROMPTS:
                 prompt_model_version_uuid = message["prompt_model_version_uuid"]
-                res_from_local_db = list_prompts(prompt_model_version_uuid)
-                data = {"prompts": res_from_local_db}
+                prompt_rows = list(
+                    Prompt.select()
+                    .where(Prompt.version_uuid == prompt_model_version_uuid)
+                    .order_by(Prompt.step)
+                )
+                prompt_list = [
+                    model_to_dict(model, recurse=False) for model in prompt_rows
+                ]
+                data = {"prompts": prompt_list}
 
             elif message["type"] == LocalTask.GET_RUN_LOGS:
                 prompt_model_version_uuid = message["prompt_model_version_uuid"]
-                res_from_local_db = list_run_logs(prompt_model_version_uuid)
-                data = {"run_logs": res_from_local_db}
+                run_log_rows = list(
+                    RunLog.select()
+                    .where(RunLog.version_uuid == prompt_model_version_uuid)
+                    .order_by(RunLog.created_at.desc())
+                )
+                run_log_list = [
+                    model_to_dict(model, recurse=False) for model in run_log_rows
+                ]
+                data = {"run_logs": run_log_list}
 
             elif message["type"] == LocalTask.CHANGE_PROMPT_MODEL_VERSION_STATUS:
                 prompt_model_version_uuid = message["prompt_model_version_uuid"]
                 new_status = message["status"]
-                res_from_local_db = update_prompt_model_version(
-                    prompt_model_version_uuid=prompt_model_version_uuid,
-                    status=new_status,
+                (
+                    PromptModelVersion.update(status=new_status)
+                    .where(PromptModelVersion.uuid == prompt_model_version_uuid)
+                    .execute()
                 )
                 data = {
                     "prompt_model_version_uuid": prompt_model_version_uuid,
@@ -236,11 +255,17 @@ class DevWebsocketClient:
 
                 # get sample from db
                 if sample_name:
-                    sample_input_row = get_sample_input(sample_name)
-                    if sample_input_row is None or "contents" not in sample_input_row:
+                    try:
+                        sample_input_row = SampleInputs.get(
+                            SampleInputs.name == sample_name
+                        )
+                        sample_input_dict = model_to_dict(sample_input_row)
+                    except:
+                        sample_input_dict = None
+                    if sample_input_dict is None or "contents" not in sample_input_dict:
                         logger.error(f"There is no sample input {sample_name}.")
                         return
-                    sample_input = sample_input_row["contents"]
+                    sample_input = sample_input_dict["contents"]
                 else:
                     sample_input = None
 
@@ -312,18 +337,21 @@ class DevWebsocketClient:
                     logger.info(f"Started PromptModel: {prompt_model_name}")
                     # create prompt_model_dev_instance
                     prompt_model_dev = LLMDev()
-                    # fine prompt_model_uuid from local db
-                    prompt_model_uuid: str = get_prompt_model_uuid(prompt_model_name)[
-                        "uuid"
-                    ]
+                    # find prompt_model_uuid from local db
+                    prompt_model_row = PromptModel.get(
+                        PromptModel.name == prompt_model_name
+                    )
+                    prompt_model_uuid: str = model_to_dict(
+                        prompt_model_row, recurse=False
+                    )["uuid"]
 
                     prompt_model_version_uuid: Optional[str] = message["uuid"]
                     # If prompt_model_version_uuid is None, create new version & prompt
                     if prompt_model_version_uuid is None:
                         prompt_model_version: PromptModelVersion = (
-                            create_prompt_model_version(
+                            PromptModelVersion.create(
                                 prompt_model_uuid=prompt_model_uuid,
-                                status=PromptModelVersionStatus.BROKEN.value,
+                                status=ModelVersionStatus.BROKEN.value,
                                 from_uuid=message["from_uuid"],
                                 model=message["model"],
                                 parsing_type=message["parsing_type"],
@@ -334,13 +362,17 @@ class DevWebsocketClient:
                         prompt_model_version_uuid: str = prompt_model_version.uuid
 
                         prompts = message["prompts"]
-                        for prompt in prompts:
-                            create_prompt(
-                                version_uuid=prompt_model_version_uuid,
-                                role=prompt["role"],
-                                step=prompt["step"],
-                                content=prompt["content"],
-                            )
+                        prompt_rows_to_insert = [
+                            {
+                                "version_uuid": prompt_model_version_uuid,
+                                "role": prompt["role"],
+                                "step": prompt["step"],
+                                "content": prompt["content"],
+                            }
+                            for prompt in prompts
+                        ]
+                        Prompt.insert_many(prompt_rows_to_insert).execute()
+
                         # send message to backend
                         data = {
                             "type": ServerTask.UPDATE_RESULT_RUN.value,
@@ -420,17 +452,10 @@ class DevWebsocketClient:
                                 "raw_output": item.raw_output,
                             }
                         if item.parsed_outputs:
-                            if (
-                                list(item.parsed_outputs.keys())[0]
-                                not in output["parsed_outputs"]
-                            ):
-                                output["parsed_outputs"][
-                                    list(item.parsed_outputs.keys())[0]
-                                ] = list(item.parsed_outputs.values())[0]
-                            else:
-                                output["parsed_outputs"][
-                                    list(item.parsed_outputs.keys())[0]
-                                ] += list(item.parsed_outputs.values())[0]
+                            output["parsed_outputs"] = update_dict(
+                                output["parsed_outputs"], item.parsed_outputs
+                            )
+
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
@@ -440,9 +465,9 @@ class DevWebsocketClient:
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
-                                "function_call": item.function_call,
+                                "function_call": item.function_call.model_dump(),
                             }
-                            function_call = item.function_call
+                            function_call = item.function_call.model_dump()
 
                         if item.error and parsing_success is True:
                             parsing_success = not item.error
@@ -488,12 +513,19 @@ class DevWebsocketClient:
                                 "status": "failed",
                                 "log": f"Function call Failed, {error}",
                             }
-                            update_prompt_model_version(
-                                prompt_model_version_uuid=prompt_model_version_uuid,
-                                status=PromptModelVersionStatus.BROKEN.value,
+
+                            (
+                                PromptModelVersion.update(
+                                    status=ModelVersionStatus.BROKEN.value
+                                )
+                                .where(
+                                    PromptModelVersion.uuid == prompt_model_version_uuid
+                                )
+                                .execute()
                             )
-                            create_run_log(
-                                prompt_model_version_uuid=prompt_model_version_uuid,
+
+                            RunLog.create(
+                                version_uuid=prompt_model_version_uuid,
                                 inputs=sample_input,
                                 raw_output=output["raw_output"],
                                 parsed_outputs=output["parsed_outputs"],
@@ -502,59 +534,6 @@ class DevWebsocketClient:
                             response.update(data)
                             await ws.send(json.dumps(response, cls=CustomJSONEncoder))
                             return
-                        # # call LLM once more
-                        # messages_for_run += [
-                        #     {
-                        #         "role": "assistant",
-                        #         "function_call": function_call,
-                        #     },
-                        #     {
-                        #         "role": "function",
-                        #         "name": function_call["name"],
-                        #         "content": str(function_response),
-                        #     },
-                        # ]
-
-                        # res_after_function_call: AsyncGenerator[
-                        #     LLMStreamResponse, None
-                        # ] = prompt_model_dev.dev_chat(
-                        #     messages_for_run, parsing_type, model
-                        # )
-
-                        # output = {"raw_output": "", "parsed_outputs": {}}
-                        # async for item in res_after_function_call:
-                        #     if item.raw_output is not None:
-                        #         output["raw_output"] += item.raw_output
-                        #         data = {
-                        #             "type": ServerTask.UPDATE_RESULT_RUN.value,
-                        #             "status": "running",
-                        #             "raw_output": item.raw_output,
-                        #         }
-                        #     if item.parsed_outputs:
-                        #         if (
-                        #             list(item.parsed_outputs.keys())[0]
-                        #             not in output["parsed_outputs"]
-                        #         ):
-                        #             output["parsed_outputs"][
-                        #                 list(item.parsed_outputs.keys())[0]
-                        #             ] = list(item.parsed_outputs.values())[0]
-                        #         else:
-                        #             output["parsed_outputs"][
-                        #                 list(item.parsed_outputs.keys())[0]
-                        #             ] += list(item.parsed_outputs.values())[0]
-                        #         data = {
-                        #             "type": ServerTask.UPDATE_RESULT_RUN.value,
-                        #             "status": "running",
-                        #             "parsed_outputs": item.parsed_outputs,
-                        #         }
-
-                        #     if item.error and parsing_success is True:
-                        #         parsing_success = not item.error
-                        #         error_log = item.error_log
-
-                        #     data.update(response)
-                        #     # logger.debug(f"Sent response: {data}")
-                        #     await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
                     if (
                         message["output_keys"] is not None
@@ -572,12 +551,17 @@ class DevWebsocketClient:
                             "status": "failed",
                             "log": f"parsing failed, {error_log}",
                         }
-                        update_prompt_model_version(
-                            prompt_model_version_uuid=prompt_model_version_uuid,
-                            status=PromptModelVersionStatus.BROKEN.value,
+
+                        (
+                            PromptModelVersion.update(
+                                status=ModelVersionStatus.BROKEN.value
+                            )
+                            .where(PromptModelVersion.uuid == prompt_model_version_uuid)
+                            .execute()
                         )
-                        create_run_log(
-                            prompt_model_version_uuid=prompt_model_version_uuid,
+
+                        RunLog.create(
+                            version_uuid=prompt_model_version_uuid,
                             inputs=sample_input,
                             raw_output=output["raw_output"],
                             parsed_outputs=output["parsed_outputs"],
@@ -591,13 +575,16 @@ class DevWebsocketClient:
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
                         "status": "completed",
                     }
-                    update_prompt_model_version(
-                        prompt_model_version_uuid=prompt_model_version_uuid,
-                        status=PromptModelVersionStatus.WORKING.value,
-                    )
 
-                    create_run_log(
-                        prompt_model_version_uuid=prompt_model_version_uuid,
+                    (
+                        PromptModelVersion.update(
+                            status=ModelVersionStatus.WORKING.value
+                        )
+                        .where(PromptModelVersion.uuid == prompt_model_version_uuid)
+                        .execute()
+                    )
+                    RunLog.create(
+                        version_uuid=prompt_model_version_uuid,
                         inputs=sample_input,
                         raw_output=output["raw_output"],
                         parsed_outputs=output["parsed_outputs"],
@@ -607,6 +594,393 @@ class DevWebsocketClient:
                     logger.error(f"Error running service: {error}")
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
+                        "status": "failed",
+                        "log": str(error),
+                    }
+                    response.update(data)
+                    await ws.send(json.dumps(response, cls=CustomJSONEncoder))
+                    return
+
+            # ChatModel LocalTasks
+            elif message["type"] == LocalTask.CHANGE_CHAT_MODEL_VERSION_STATUS:
+                chat_model_version_uuid = message["chat_model_version_uuid"]
+                new_status = message["status"]
+                (
+                    ChatModelVersion.update(status=new_status)
+                    .where(ChatModelVersion.uuid == chat_model_version_uuid)
+                    .execute()
+                )
+
+                data = {
+                    "chat_model_version_uuid": chat_model_version_uuid,
+                    "status": new_status,
+                }
+
+            elif message["type"] == LocalTask.GET_CHAT_LOG_SESSIONS:
+                chat_model_version_uuid = message["chat_model_version_uuid"]
+                session_rows = list(
+                    ChatLogSession.select()
+                    .where(ChatLogSession.version_uuid == chat_model_version_uuid)
+                    .order_by(ChatLogSession.created_at.desc())
+                )
+                session_list = [
+                    model_to_dict(model, recurse=False) for model in session_rows
+                ]
+
+                data = {"sessions": session_list}
+
+            elif message["type"] == LocalTask.GET_CHAT_LOGS:
+                session_uuid = message["session_uuid"]
+                chat_log_rows = list(
+                    ChatLog.select()
+                    .where(ChatLog.session_uuid == session_uuid)
+                    .order_by(ChatLog.created_at.asc())
+                )
+                chat_log_list = [
+                    model_to_dict(model, recurse=False) for model in chat_log_rows
+                ]
+                data = {"chat_logs": chat_log_list}
+
+            elif message["type"] == LocalTask.GET_CHAT_MODEL_VERSION_TO_SAVE:
+                chat_model_version_uuid = message["chat_model_version_uuid"]
+                # change from_uuid to candidate ancestor
+                chat_model_version = find_ancestor_chat_model_version(
+                    chat_model_version_uuid
+                )
+                # delete status, is_published
+                del chat_model_version["status"]
+                del chat_model_version["is_published"]
+                config = read_config()
+                chat_model_version["dev_branch_uuid"] = config["dev_branch"]["uuid"]
+
+                chat_model = ChatModel.get(
+                    ChatModel.uuid == chat_model_version.chat_model_uuid
+                ).__data__
+
+                is_deployed = chat_model["is_deployed"]
+                if not is_deployed:
+                    data = {
+                        "chat_model": {
+                            "uuid": chat_model["uuid"],
+                            "name": chat_model["name"],
+                            "project_uuid": chat_model["project_uuid"],
+                        },
+                        "version": chat_model_version,
+                    }
+                else:
+                    data = {
+                        "chat_model": None,
+                        "version": chat_model_version,
+                    }
+
+            elif message["type"] == LocalTask.GET_CHAT_MODEL_VERSIONS_TO_SAVE:
+                target_chat_model_uuid = (
+                    message["chat_model_uuid"] if "chat_model_uuid" in message else None
+                )
+
+                chat_model_versions = find_ancestor_chat_model_versions(
+                    target_chat_model_uuid
+                )
+
+                config = read_config()
+                for chat_model_version in chat_model_versions:
+                    chat_model_version["dev_branch_uuid"] = config["dev_branch"]["uuid"]
+                    del chat_model_version["id"]
+                    del chat_model_version["status"]
+                    del chat_model_version["is_published"]
+
+                chat_model_uuids = [
+                    version["chat_model_uuid"] for version in chat_model_versions
+                ]
+                chat_models = list(
+                    ChatModel.select().where(ChatModel.uuid.in_(chat_model_uuids))
+                )
+                chat_models = [model_to_dict(chat_model) for chat_model in chat_models]
+                # find chat_model which is not deployed
+                chat_models_only_in_local = []
+                for chat_model in chat_models:
+                    if chat_model["is_deployed"] is False:
+                        del chat_model["is_deployed"]
+                        del chat_model["used_in_code"]
+                        del chat_model["id"]
+
+                        chat_models_only_in_local.append(chat_model)
+                data = {
+                    "chat_models": chat_models_only_in_local,
+                    "versions": chat_model_versions,
+                }
+
+            elif message["type"] == LocalTask.UPDATE_CANDIDATE_CHAT_MODEL_VERSION_ID:
+                new_candidates = message["new_candidates"]
+                update_candidate_chat_model_version(new_candidates)
+
+            elif message["type"] == LocalTask.RUN_CHAT_MODEL:
+                chat_model_name: str = message["chat_model_name"]
+                session_uuid: Optional[str] = message["session_uuid"]
+
+                # check chat_model in Local Usage
+                chat_model_names = self._devapp._get_chat_model_name_list()
+                if chat_model_name not in chat_model_names:
+                    logger.error(f"There is no chat_model {chat_model_name}.")
+                    return
+
+                # Start ChatModel Running
+                try:
+                    logger.info(f"Started ChatModel: {chat_model_name}")
+                    chat_model_dev = LLMDev()
+                    chat_model_row = ChatModel.get(ChatModel.name == chat_model_name)
+                    chat_model_uuid: str = model_to_dict(chat_model_row, recurse=False)[
+                        "uuid"
+                    ]
+
+                    chat_model_version_uuid = message["uuid"]
+                    if chat_model_version_uuid is None:
+                        chat_model_version: ChatModelVersion = ChatModelVersion.create(
+                            chat_model_uuid=chat_model_uuid,
+                            status=ModelVersionStatus.BROKEN.value,
+                            from_uuid=message["from_uuid"],
+                            model=message["model"],
+                            functions=message["functions"],
+                            system_prompt=message["system_prompt"],
+                        )
+                        chat_model_version_uuid: str = chat_model_version.uuid
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                            "chat_model_version_uuid": chat_model_version_uuid,
+                            "status": "running",
+                        }
+                        data.update(response)
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+
+                    if session_uuid:
+                        # get session message list
+                        chat_log_rows: List[ChatLog] = list(
+                            ChatLog.select()
+                            .where(ChatLog.session_uuid == session_uuid)
+                            .order_by(ChatLog.created_at.asc())
+                        )
+                        print(chat_log_rows)
+                        chat_log_list = [
+                            {
+                                "role": chat_log.role,
+                                "content": chat_log.content,
+                                "tool_calls": chat_log.tool_calls,
+                            }
+                            for chat_log in chat_log_rows
+                        ]
+                        # delete tool_calls if None
+                        for chat_log in chat_log_list:
+                            if chat_log["tool_calls"] is None:
+                                del chat_log["tool_calls"]
+                    else:
+                        # make new session
+                        session_uuid = uuid4()
+                        ChatLogSession.create(
+                            session_uuid=session_uuid,
+                            version_uuid=chat_model_version_uuid,
+                        )
+                        # save instruction message to chat_log
+                        ChatLog.create(
+                            session_uuid=session_uuid,
+                            role=message["system_prompt"]["role"],
+                            content=message["system_prompt"]["content"],
+                        )
+                        chat_log_list = [message["system_prompt"]]
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                            "session_uuid": session_uuid,
+                            "status": "running",
+                        }
+                        data.update(response)
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+
+                    messages_for_run = chat_log_list + message["new_messages"]
+
+                    ChatLog.insert_many(
+                        [
+                            {
+                                "session_uuid": session_uuid,
+                                "role": m["role"],
+                                "content": m["content"],
+                            }
+                            for m in message["new_messages"]
+                        ]
+                    ).execute()
+
+                    error_log = None
+                    function_call = None
+                    function_call_log = None
+                    # get function schemas from register & send to LLM
+                    function_names: List[str] = message["functions"]
+                    logger.debug(f"function_names : {function_names}")
+                    try:
+                        function_schemas: List[
+                            Dict
+                        ] = self._devapp._get_function_schemas(function_names)
+                    except Exception as error:
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                            "status": "failed",
+                            "log": f"There is no function. : {error}",
+                        }
+                        data.update(response)
+                        # logger.debug(f"Sent response: {data}")
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                        return
+
+                    res: AsyncGenerator[
+                        LLMStreamResponse, None
+                    ] = chat_model_dev.dev_chat(
+                        messages=messages_for_run,
+                        functions=function_schemas,
+                        model=message["model"],
+                    )
+
+                    raw_output = ""
+                    async for chunk in res:
+                        if chunk.raw_output is not None:
+                            raw_output += chunk.raw_output
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "running",
+                                "raw_output": chunk.raw_output,
+                            }
+                        if chunk.function_call is not None:
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "running",
+                                "function_call": chunk.function_call.model_dump(),
+                            }
+                            if function_call is None:
+                                function_call = {}
+                            function_call = update_dict(
+                                function_call, chunk.function_call.model_dump()
+                            )
+
+                        if chunk.error:
+                            error_log = chunk.error_log
+
+                        data.update(response)
+                        # logger.debug(f"Sent response: {data}")
+                        await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                    # IF function_call in response -> call function -> call LLM once more
+                    ChatLog.create(
+                        session_uuid=session_uuid,
+                        role="assistant",
+                        content=raw_output if raw_output != "" else None,
+                        tool_calls=function_call,
+                    )
+                    if function_call is not None:
+                        # make function_call_log
+                        function_call_log = {
+                            "name": function_call["name"],
+                            "arguments": function_call["arguments"],
+                            "response": None,
+                            "initial_raw_output": raw_output,
+                        }
+
+                        # call function
+                        try:
+                            function_call_args: Dict[str, Any] = json.loads(
+                                function_call["arguments"]
+                            )
+                            function_response = self._devapp._call_register_function(
+                                function_call["name"], function_call_args
+                            )
+                            function_call_log["response"] = function_response
+                            # Send function call response for check LLM response validity
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "running",
+                                "function_response": function_response,
+                            }
+                            data.update(response)
+                            # logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                        except Exception as error:
+                            logger.error(f"{error}")
+
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "failed",
+                                "log": f"Function call Failed, {error}",
+                            }
+
+                            ChatLog.create(
+                                session_uuid=session_uuid,
+                                role="function",
+                                content="ERROR",
+                            )
+                            response.update(data)
+                            await ws.send(json.dumps(response, cls=CustomJSONEncoder))
+                            return
+                        # call LLM once more
+                        messages_for_run += [
+                            {
+                                "role": "assistant",
+                                "content": "",
+                                "function_call": function_call,
+                            },
+                            {
+                                "role": "function",
+                                "name": function_call["name"],
+                                "content": str(function_response),
+                            },
+                        ]
+
+                        ChatLog.create(
+                            session_uuid=session_uuid,
+                            role="function",
+                            content=str(function_response),
+                        )
+
+                        res_after_function_call: AsyncGenerator[
+                            LLMStreamResponse, None
+                        ] = chat_model_dev.dev_chat(
+                            messages=messages_for_run,
+                            model=message["model"],
+                        )
+
+                        raw_output = ""
+                        async for item in res_after_function_call:
+                            if item.raw_output is not None:
+                                raw_output += item.raw_output
+                                data = {
+                                    "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                    "status": "running",
+                                    "raw_output": item.raw_output,
+                                }
+
+                            if item.error:
+                                error_log = item.error_log
+
+                            data.update(response)
+                            # logger.debug(f"Sent response: {data}")
+                            await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+
+                        data = {
+                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                            "status": "completed",
+                        }
+
+                        (
+                            ChatModelVersion.update(
+                                status=ModelVersionStatus.WORKING.value
+                            )
+                            .where(uuid=chat_model_version_uuid)
+                            .execute()
+                        )
+
+                        ChatLog.create(
+                            session_uuid=session_uuid,
+                            role="assistant",
+                            content=raw_output if raw_output != "" else None,
+                        )
+
+                except Exception as error:
+                    logger.error(f"Error running service: {error}")
+                    data = {
+                        "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
                         "status": "failed",
                         "log": str(error),
                     }

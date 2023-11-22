@@ -1,4 +1,3 @@
-import asyncio
 from typing import (
     Any,
     AsyncGenerator,
@@ -8,26 +7,46 @@ from typing import (
     List,
     Optional,
     Tuple,
-    Union,
 )
+
+from uuid import UUID
+from threading import Thread
 from rich import print
-from litellm.utils import ModelResponse
+from litellm.utils import ModelResponse, get_max_tokens
 from promptmodel.llms.llm import LLM
+from promptmodel.database.models import *
+from promptmodel.database.crud import (
+    get_latest_version_prompts,
+    get_deployed_prompts,
+    get_latest_version_chat_model,
+)
+from promptmodel.promptmodel_init import CacheManager
+from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.utils.random_utils import select_version_by_ratio
 from promptmodel.utils import logger
-from promptmodel.utils.prompt_util import fetch_prompts, run_async_in_sync
+from promptmodel.utils.async_util import run_async_in_sync
+from promptmodel.utils.token_counting import (
+    num_tokens_for_messages_for_each,
+    num_tokens_from_functions_input,
+)
 from promptmodel.utils.output_utils import update_dict
-from promptmodel.apis.base import APIClient, AsyncAPIClient
-from promptmodel.utils.types import LLMResponse, LLMStreamResponse
+from promptmodel.apis.base import AsyncAPIClient
+from promptmodel.types.response import (
+    LLMResponse,
+    LLMStreamResponse,
+)
 
 
 class LLMProxy(LLM):
-    def __init__(self, name: str, rate_limit_manager=None):
-        super().__init__(rate_limit_manager)
+    def __init__(self, name: str):
+        super().__init__()
         self._name = name
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = run_async_in_sync(fetch_prompts(self._name))
+            prompts, version_details = run_async_in_sync(
+                LLMProxy.fetch_prompts(self._name)
+            )
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -41,7 +60,7 @@ class LLMProxy(LLM):
             error_log = None
             for item in stream_response:
                 if (
-                    item.api_response and "delta" not in item.api_response["choices"][0]
+                    item.api_response and "delta" not in item.api_response.choices[0]
                 ):  # only get the last api_response, not delta response
                     api_response = item.api_response
                 if item.parsed_outputs:
@@ -59,27 +78,21 @@ class LLMProxy(LLM):
                     item.function_call = None
                 yield item
 
-            # add string_cache in model_response
-            if api_response:
-                if "message" not in api_response.choices[0]:
-                    api_response.choices[0]["message"] = {}
-                if "content" not in api_response.choices[0]["message"]:
-                    api_response.choices[0]["message"]["content"] = string_cache
-                    api_response.choices[0]["message"]["role"] = "assistant"
-
             metadata = {
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
-            self._sync_log_to_cloud(
-                version_details["uuid"], inputs, api_response, dict_cache, metadata
+            run_async_in_sync(
+                self._async_log_to_cloud(
+                    version_details["uuid"], inputs, api_response, dict_cache, metadata
+                )
             )
 
         return wrapper
 
     def _wrap_async_gen(self, async_gen: Callable[..., Any]) -> Callable[..., Any]:
         async def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = await fetch_prompts(self._name)
+            prompts, version_details = await LLMProxy.fetch_prompts(self._name)
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -97,7 +110,7 @@ class LLMProxy(LLM):
             api_response: Optional[ModelResponse] = None
             async for item in stream_response:
                 if (
-                    item.api_response and "delta" not in item.api_response["choices"][0]
+                    item.api_response and "delta" not in item.api_response.choices[0]
                 ):  # only get the last api_response, not delta response
                     api_response = item.api_response
                 if item.parsed_outputs:
@@ -109,13 +122,13 @@ class LLMProxy(LLM):
                     error_log = item.error_log
                 yield item
 
-            # add string_cache in model_response
-            if api_response:
-                if "message" not in api_response.choices[0]:
-                    api_response.choices[0]["message"] = {}
-                if "content" not in api_response.choices[0]["message"]:
-                    api_response.choices[0]["message"]["content"] = string_cache
-                    api_response.choices[0]["message"]["role"] = "assistant"
+            # # add string_cache in model_response
+            # if api_response:
+            #     if "message" not in api_response.choices[0]:
+            #         api_response.choices[0].message = {}
+            #     if "content" not in api_response.choices[0].message:
+            #         api_response.choices[0].message["content"] = string_cache
+            #         api_response.choices[0].message["role"] = "assistant"
 
             metadata = {
                 "error_occurs": error_occurs,
@@ -131,7 +144,9 @@ class LLMProxy(LLM):
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = run_async_in_sync(fetch_prompts(self._name))
+            prompts, version_details = run_async_in_sync(
+                LLMProxy.fetch_prompts(self._name)
+            )
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -145,20 +160,24 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             if llm_response.parsed_outputs:
-                self._sync_log_to_cloud(
-                    version_details["uuid"],
-                    inputs,
-                    llm_response.api_response,
-                    llm_response.parsed_outputs,
-                    metadata,
+                run_async_in_sync(
+                    self._async_log_to_cloud(
+                        version_details["uuid"],
+                        inputs,
+                        llm_response.api_response,
+                        llm_response.parsed_outputs,
+                        metadata,
+                    )
                 )
             else:
-                self._sync_log_to_cloud(
-                    version_details["uuid"],
-                    inputs,
-                    llm_response.api_response,
-                    {},
-                    metadata,
+                run_async_in_sync(
+                    self._async_log_to_cloud(
+                        version_details["uuid"],
+                        inputs,
+                        llm_response.api_response,
+                        {},
+                        metadata,
+                    )
                 )
             if error_occurs:
                 # delete all promptmodel data in llm_response
@@ -171,7 +190,7 @@ class LLMProxy(LLM):
 
     def _wrap_async_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         async def async_wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = await fetch_prompts(
+            prompts, version_details = await LLMProxy.fetch_prompts(
                 self._name
             )  # messages, model, uuid = self._fetch_prompts()
             call_args = self._prepare_call_args(
@@ -213,6 +232,208 @@ class LLMProxy(LLM):
 
         return async_wrapper
 
+    def _wrap_chat(self, method: Callable[..., Any]) -> Callable[..., Any]:
+        def wrapper(session_uuid: str, **kwargs):
+            message_logs = run_async_in_sync(LLMProxy.fetch_chat_log(session_uuid))
+            instruction, version_details = run_async_in_sync(
+                LLMProxy.fetch_chat_model(self._name, session_uuid)
+            )
+
+            if len(message_logs) == 0 or message_logs[0]["role"] != "system":
+                message_logs = instruction + message_logs
+
+            call_args = self._prepare_call_args_for_chat(
+                message_logs, version_details, kwargs
+            )
+
+            # Call the method with the arguments
+            llm_response: LLMResponse = method(**call_args)
+            error_occurs = llm_response.error
+            error_log = llm_response.error_log
+            metadata = {
+                "error_occurs": error_occurs,
+                "error_log": error_log,
+            }
+            if llm_response.api_response:
+                metadata["api_response"] = llm_response.api_response.model_dump()
+                metadata["token_usage"] = (
+                    llm_response.api_response.usage
+                    if isinstance(llm_response.api_response.usage, dict)
+                    else llm_response.api_response.usage.model_dump()
+                )
+                metadata["latency"] = llm_response.api_response._response_ms
+
+            run_async_in_sync(
+                self._async_chat_log_to_cloud(
+                    session_uuid,
+                    [llm_response.api_response.choices[0].message],
+                    version_details["uuid"],
+                    [metadata],
+                )
+            )
+
+            if error_occurs:
+                # delete all promptmodel data in llm_response
+                llm_response.raw_output = None
+                llm_response.parsed_outputs = None
+                llm_response.function_call = None
+
+            return llm_response
+
+        return wrapper
+
+    def _wrap_async_chat(self, method: Callable[..., Any]) -> Callable[..., Any]:
+        async def async_wrapper(session_uuid: str, **kwargs):
+            message_logs = await LLMProxy.fetch_chat_log(session_uuid)
+            instruction, version_details = await LLMProxy.fetch_chat_model(
+                self._name, session_uuid
+            )
+
+            if len(message_logs) == 0 or message_logs[0]["role"] != "system":
+                message_logs = instruction + message_logs
+
+            call_args = self._prepare_call_args_for_chat(
+                message_logs, version_details, kwargs
+            )
+
+            # Call the method with the arguments
+            llm_response: LLMResponse = await method(**call_args)
+            error_occurs = llm_response.error
+            error_log = llm_response.error_log
+            metadata = {
+                "error_occurs": error_occurs,
+                "error_log": error_log,
+            }
+            if llm_response.api_response:
+                metadata["api_response"] = llm_response.api_response.model_dump()
+                metadata["token_usage"] = (
+                    llm_response.api_response.usage
+                    if isinstance(llm_response.api_response.usage, dict)
+                    else llm_response.api_response.usage.model_dump()
+                )
+                metadata["latency"] = llm_response.api_response._response_ms
+
+            await self._async_chat_log_to_cloud(
+                session_uuid,
+                [llm_response.api_response.choices[0].message],
+                version_details["uuid"],
+                [metadata],
+            )
+
+            if error_occurs:
+                # delete all promptmodel data in llm_response
+                llm_response.raw_output = None
+                llm_response.parsed_outputs = None
+                llm_response.function_call = None
+
+            return llm_response
+
+        return async_wrapper
+
+    def _wrap_chat_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
+        def wrapper(session_uuid: str, **kwargs):
+            message_logs = run_async_in_sync(LLMProxy.fetch_chat_log(session_uuid))
+            instruction, version_details = run_async_in_sync(
+                LLMProxy.fetch_chat_model(self._name, session_uuid)
+            )
+
+            if len(message_logs) == 0 or message_logs[0]["role"] != "system":
+                message_logs = instruction + message_logs
+
+            call_args = self._prepare_call_args_for_chat(
+                message_logs, version_details, kwargs
+            )
+            # Call the generator with the arguments
+            stream_response: Generator[LLMStreamResponse, None, None] = gen(**call_args)
+
+            api_response = None
+            error_occurs = False
+            error_log = None
+            for item in stream_response:
+                if (
+                    item.api_response and "delta" not in item.api_response.choices[0]
+                ):  # only get the last api_response, not delta response
+                    api_response = item.api_response
+
+                if item.error and not error_occurs:
+                    error_occurs = True
+                    error_log = item.error_log
+
+                if error_occurs:
+                    # delete all promptmodel data in item
+                    item.raw_output = None
+                    item.parsed_outputs = None
+                    item.function_call = None
+
+                yield item
+
+            metadata = {
+                "error_occurs": error_occurs,
+                "error_log": error_log,
+            }
+            run_async_in_sync(
+                self._async_chat_log_to_cloud(
+                    session_uuid,
+                    [api_response.choices[0].message],
+                    version_details["uuid"],
+                    [metadata],
+                )
+            )
+
+        return wrapper
+
+    def _wrap_async_chat_gen(self, async_gen: Callable[..., Any]) -> Callable[..., Any]:
+        async def wrapper(session_uuid: str, **kwargs):
+            message_logs = await LLMProxy.fetch_chat_log(session_uuid)
+            instruction, version_details = await LLMProxy.fetch_chat_model(
+                self._name, session_uuid
+            )
+
+            if len(message_logs) == 0 or message_logs[0]["role"] != "system":
+                message_logs = instruction + message_logs
+
+            call_args = self._prepare_call_args_for_chat(
+                message_logs, version_details, kwargs
+            )
+            # Call the generator with the arguments
+            stream_response: AsyncGenerator[LLMStreamResponse, None] = async_gen(
+                **call_args
+            )
+
+            api_response = None
+            error_occurs = False
+            error_log = None
+            async for item in stream_response:
+                if (
+                    item.api_response and "delta" not in item.api_response.choices[0]
+                ):  # only get the last api_response, not delta response
+                    api_response = item.api_response
+
+                if item.error and not error_occurs:
+                    error_occurs = True
+                    error_log = item.error_log
+
+                if error_occurs:
+                    # delete all promptmodel data in item
+                    item.raw_output = None
+                    item.parsed_outputs = None
+                    item.function_call = None
+
+                yield item
+
+            metadata = {
+                "error_occurs": error_occurs,
+                "error_log": error_log,
+            }
+            await self._async_chat_log_to_cloud(
+                session_uuid,
+                [api_response.choices[0].message],
+                version_details["uuid"],
+                [metadata],
+            )
+
+        return wrapper
+
     def _prepare_call_args(
         self,
         prompts: List[Dict[str, str]],
@@ -238,8 +459,67 @@ class LLMProxy(LLM):
             del call_args["parsing_type"]
             del call_args["output_keys"]
 
-        if "function_list" in kwargs:
-            call_args["functions"] = kwargs["function_list"]
+        if "functions" in kwargs:
+            call_args["functions"] = kwargs["functions"]
+
+        if "tools" in kwargs:
+            call_args["tools"] = kwargs["tools"]
+
+        if "api_key" in kwargs:
+            call_args["api_key"] = kwargs["api_key"]
+        return call_args
+
+    def _prepare_call_args_for_chat(
+        self,
+        messages: List[Dict[str, Any]],
+        version_detail: Dict[str, Any],
+        kwargs,
+    ):
+        call_args = {}
+        token_per_tools = 0
+        if "functions" in kwargs:
+            call_args["functions"] = kwargs["functions"]
+            token_per_tools = num_tokens_from_functions_input(
+                functions=kwargs["functions"],
+                model=version_detail["model"] if version_detail else "gpt-3.5-turbo",
+            )
+
+        if "tools" in kwargs:
+            call_args["tools"] = kwargs["tools"]
+            token_per_tools = num_tokens_from_functions_input(
+                functions=kwargs["tools"],
+                model=version_detail["model"] if version_detail else "gpt-3.5-turbo",
+            )
+
+        # truncate messages to make length <= model's max length
+        model_max_tokens = get_max_tokens(
+            model=version_detail["model"] if version_detail else "gpt-3.5-turbo"
+        )
+        token_per_messages = num_tokens_for_messages_for_each(
+            messages, version_detail["model"]
+        )
+        token_limit_exceeded = (
+            sum(token_per_messages) + token_per_tools
+        ) - model_max_tokens
+        if token_limit_exceeded > 0:
+            while token_limit_exceeded > 0:
+                # erase the second oldest message (first one is system prompt, so it should not be erased)
+                if len(messages) == 1:
+                    # if there is only one message, Error cannot be solved. Just call LLM and get error response
+                    break
+                token_limit_exceeded -= token_per_messages[1]
+                del messages[1]
+                del token_per_messages[1]
+
+        call_args["messages"] = messages
+        call_args["model"] = version_detail["model"] if version_detail else None
+
+        if "api_key" in kwargs:
+            call_args["api_key"] = kwargs["api_key"]
+
+        if "tools" in kwargs:
+            call_args["tools"] = kwargs["tools"]
+
         return call_args
 
     async def _async_log_to_cloud(
@@ -252,14 +532,8 @@ class LLMProxy(LLM):
     ):
         # Perform the logging asynchronously
         if api_response:
-            api_response_dict = api_response.to_dict_recursive()
-            api_response_dict.update(
-                {
-                    "response_ms": api_response["response_ms"]
-                    if "response_ms" in api_response
-                    else api_response.response_ms
-                }
-            )
+            api_response_dict = api_response.model_dump()
+            api_response_dict.update({"response_ms": api_response._response_ms})
         else:
             api_response_dict = None
         res = await AsyncAPIClient.execute(
@@ -280,112 +554,349 @@ class LLMProxy(LLM):
             print(f"[red]Failed to log to cloud: {res.json()}[/red]")
         return res
 
-    def _sync_log_to_cloud(
+    async def _async_chat_log_to_cloud(
         self,
-        version_uuid: str,
-        inputs: Optional[Dict] = None,
-        api_response: Optional[ModelResponse] = None,
-        parsed_outputs: Optional[Dict] = None,
-        metadata: Optional[Dict] = None,
+        session_uuid: str,
+        messages: List[Dict[str, Any]],
+        version_uuid: Optional[str] = None,
+        metadata: Optional[List[Dict]] = None,
     ):
-        coro = self._async_log_to_cloud(
-            version_uuid,
-            inputs,
-            api_response,
-            parsed_outputs,
-            metadata,
+        # Perform the logging asynchronously
+        res = await AsyncAPIClient.execute(
+            method="POST",
+            path="/log_deployment_chat",
+            params={
+                "session_uuid": session_uuid,
+                "version_uuid": version_uuid,
+            },
+            json={
+                "messages": messages,
+                "metadata": metadata,
+            },
+            use_cli_key=False,
         )
-        # This is the synchronous wrapper that will wait for the async function to complete.
-        try:
-            # Try to get a running event loop
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # If there is no running loop, create a new one and set it as the event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            result = loop.run_until_complete(coro)
-            # loop.close()  # Make sure to close the loop after use
-            return result
+        if res.status_code != 200:
+            print(f"[red]Failed to log to cloud: {res.json()}[/red]")
+        return res
 
-        if loop.is_running():
-            # nest_asyncio.apply already done
-            return loop.run_until_complete(coro)
-        else:
-            return loop.run_until_complete(coro)
+    def make_kwargs(self, **kwargs):
+        res = {}
+        for key, value in kwargs.items():
+            if value is not None:
+                res[key] = value
+        return res
 
     def run(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_method(super().run)(inputs, **kwargs)
 
     def arun(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_method(super().arun)(inputs, **kwargs)
 
     def stream(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_gen(super().stream)(inputs, **kwargs)
 
     def astream(
         self,
         inputs: Optional[Dict[str, Any]] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_gen(super().astream)(inputs, **kwargs)
 
     def run_and_parse(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_method(super().run_and_parse)(inputs, **kwargs)
 
     def arun_and_parse(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_method(super().arun_and_parse)(inputs, **kwargs)
 
     def stream_and_parse(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_gen(super().stream_and_parse)(inputs, **kwargs)
 
     def astream_and_parse(
-        self, inputs: Dict[str, Any] = {}, function_list: Optional[List[Any]] = None
+        self,
+        inputs: Dict[str, Any] = {},
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        kwargs = {"function_list": function_list} if function_list else {}
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_gen(super().astream_and_parse)(inputs, **kwargs)
 
-    # def run_and_parse_function_call(
-    #     self,
-    #     inputs: Dict[str, Any] = {},
-    #     function_list: List[Callable[..., Any]] = [],
-    # ) -> Generator[str, None, None]:
-    #     return self._wrap_method(super().run_and_parse_function_call)(
-    #         inputs, function_list
-    #     )
+    def chat_run(
+        self,
+        session_uuid: str,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
+    ) -> LLMResponse:
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
+        return self._wrap_chat(super().run)(session_uuid, **kwargs)
 
-    # def arun_and_parse_function_call(
-    #     self,
-    #     inputs: Dict[str, Any] = {},
-    #     function_list: List[Callable[..., Any]] = [],
-    # ) -> Generator[str, None, None]:
-    #     return self._wrap_async_method(super().arun_and_parse_function_call)(
-    #         inputs, function_list
-    #     )
+    def chat_arun(
+        self,
+        session_uuid: str,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
+    ) -> LLMResponse:
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
+        return self._wrap_async_chat(super().arun)(session_uuid, **kwargs)
 
-    # def astream_and_parse_function_call(
-    #     self,
-    #     inputs: Dict[str, Any] = {},
-    #     function_list: List[Callable[..., Any]] = [],
-    # ) -> AsyncGenerator[str, None]:
-    #     return self._wrap_async_gen(super().astream_and_parse_function_call)(
-    #         inputs, function_list
-    #     )
+    def chat_stream(
+        self,
+        session_uuid: str,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
+    ) -> LLMResponse:
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
+        return self._wrap_chat_gen(super().stream)(session_uuid, **kwargs)
+
+    def chat_astream(
+        self,
+        session_uuid: str,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
+        api_key: Optional[str] = None,
+    ) -> LLMResponse:
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
+        return self._wrap_async_chat_gen(super().astream)(session_uuid, **kwargs)
+
+    @staticmethod
+    async def fetch_prompts(name) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
+        """fetch prompts.
+
+        Args:
+            name (str): name of PromptModel
+
+        Returns:
+            Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
+        """
+        # Check dev_branch activate
+        config = read_config()
+        if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+            return [], {}
+        elif "dev_branch" in config and config["dev_branch"]["online"] == True:
+            # get prompt from local DB
+            prompt_rows, version_detail = get_latest_version_prompts(name)
+            if prompt_rows is None:
+                return [], {}
+            return [
+                {"role": prompt.role, "content": prompt.content}
+                for prompt in prompt_rows
+            ], version_detail
+        else:
+            if (
+                "project" in config
+                and "use_cache" in config["project"]
+                and config["project"]["use_cache"] == True
+            ):
+                cache_manager = CacheManager()
+                # call update_local API in background task
+                cache_update_thread = Thread(
+                    target=cache_manager.cache_update_background_task, args=(config,)
+                )
+                cache_update_thread.daemon = True
+                cache_update_thread.start()
+
+                # get prompt from local DB by ratio
+                prompt_rows, version_detail = get_deployed_prompts(name)
+                if prompt_rows is None:
+                    return [], {}
+
+                return [
+                    {"role": prompt.role, "content": prompt.content}
+                    for prompt in prompt_rows
+                ], version_detail
+
+            else:
+                try:
+                    prompts_data = await AsyncAPIClient.execute(
+                        method="GET",
+                        path="/fetch_published_prompt_model_version",
+                        params={"prompt_model_name": name},
+                        use_cli_key=False,
+                    )
+                    prompts_data = prompts_data.json()
+                except Exception as e:
+                    raise e
+                prompt_model_versions = prompts_data["prompt_model_versions"]
+                prompts = prompts_data["prompts"]
+                for version in prompt_model_versions:
+                    if version["is_published"] is True:
+                        version["ratio"] = 1.0
+                selected_version = select_version_by_ratio(prompt_model_versions)
+
+                prompt_rows = list(
+                    filter(
+                        lambda prompt: str(prompt["version_uuid"])
+                        == str(selected_version["uuid"]),
+                        prompts,
+                    )
+                )
+                # sort prompt_rows by step
+                prompt_rows = sorted(prompt_rows, key=lambda prompt: prompt["step"])
+
+                version_detail = {
+                    "model": selected_version["model"],
+                    "uuid": selected_version["uuid"],
+                    "parsing_type": selected_version["parsing_type"],
+                    "output_keys": selected_version["output_keys"],
+                }
+
+                if prompt_rows is None:
+                    return [], {}
+
+                return [
+                    {"role": prompt["role"], "content": prompt["content"]}
+                    for prompt in prompt_rows
+                ], version_detail
+
+    @staticmethod
+    async def fetch_chat_model(
+        name: str, session_uuid: Optional[str] = None
+    ) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
+        """fetch instruction and version detail
+
+        Args:
+            name (str): name of ChatModel
+
+        Returns:
+            Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
+        """
+        # Check dev_branch activate
+        config = read_config()
+        if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+            return [], {}
+        elif "dev_branch" in config and config["dev_branch"]["online"] == True:
+            # get prompt from local DB
+            instruction, version_detail = get_latest_version_chat_model(
+                name, session_uuid
+            )
+            if version_detail is None:
+                return [], {}
+            return instruction, version_detail
+        else:
+            try:
+                res_data = await AsyncAPIClient.execute(
+                    method="GET",
+                    path="/fetch_published_chat_model_version",
+                    params={"chat_model_name": name, "session_uuid": session_uuid},
+                    use_cli_key=False,
+                )
+                res_data = res_data.json()
+            except Exception as e:
+                raise e
+            chat_model_versions = res_data["chat_model_versions"]
+
+            for version in chat_model_versions:
+                if version["is_published"] is True:
+                    version["ratio"] = 1.0
+            selected_version = select_version_by_ratio(chat_model_versions)
+
+            instruction = [selected_version["system_prompt"]]
+
+            version_detail = {
+                "model": selected_version["model"],
+                "uuid": selected_version["uuid"],
+            }
+
+            return instruction, version_detail
+
+    @staticmethod
+    async def fetch_chat_log(session_uuid: str) -> List[Dict[str, Any]]:
+        """fetch conversation log for session_uuid and version detail
+
+        Args:
+            session_uuid (str): session_uuid
+
+        Returns:
+            List[Dict[str, Any]] : list of conversation log
+        """
+        config = read_config()
+        if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+            return []
+        elif "dev_branch" in config and config["dev_branch"]["online"] == True:
+            try:
+                chat_log_rows: List[ChatLog] = list(
+                    ChatLog.select()
+                    .where(ChatLog.session_uuid == UUID(session_uuid))
+                    .order_by(ChatLog.created_at.asc())
+                )
+                chat_logs = [
+                    {
+                        "role": message.role,
+                        "content": message.content,
+                        "tool_calls": message.tool_calls,
+                    }
+                    for message in chat_log_rows
+                ]
+            except:
+                chat_logs = []
+            return chat_logs
+        else:
+            try:
+                res_data = await AsyncAPIClient.execute(
+                    method="GET",
+                    path="/fetch_chat_logs",
+                    params={"session_uuid": session_uuid},
+                    use_cli_key=False,
+                )
+                res_data = res_data.json()
+            except Exception as e:
+                raise e
+
+            # filter out unnecessary data
+            res_data = [
+                {
+                    "role": message["role"],
+                    "content": message["content"],
+                    "function_call": message["function_call"],
+                }
+                for message in res_data["chat_logs"]
+            ]
+            return res_data

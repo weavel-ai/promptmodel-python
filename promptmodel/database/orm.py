@@ -9,6 +9,10 @@ from .models import (
     DeployedPromptModel,
     DeployedPromptModelVersion,
     DeployedPrompt,
+    ChatModel,
+    ChatModelVersion,
+    ChatLogSession,
+    ChatLog,
 )
 from .config import db
 
@@ -31,6 +35,10 @@ def initialize_db():
                         DeployedPromptModel,
                         DeployedPromptModelVersion,
                         DeployedPrompt,
+                        ChatModel,
+                        ChatModelVersion,
+                        ChatLogSession,
+                        ChatLog,
                     ]
                 )
         db.close()
