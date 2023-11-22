@@ -459,8 +459,11 @@ class LLMProxy(LLM):
             del call_args["parsing_type"]
             del call_args["output_keys"]
 
-        if "function_list" in kwargs:
-            call_args["functions"] = kwargs["function_list"]
+        if "functions" in kwargs:
+            call_args["functions"] = kwargs["functions"]
+
+        if "tools" in kwargs:
+            call_args["tools"] = kwargs["tools"]
 
         if "api_key" in kwargs:
             call_args["api_key"] = kwargs["api_key"]
@@ -474,12 +477,20 @@ class LLMProxy(LLM):
     ):
         call_args = {}
         token_per_tools = 0
-        if "function_list" in kwargs:
-            call_args["functions"] = kwargs["function_list"]
+        if "functions" in kwargs:
+            call_args["functions"] = kwargs["functions"]
             token_per_tools = num_tokens_from_functions_input(
-                functions=kwargs["function_list"],
+                functions=kwargs["functions"],
                 model=version_detail["model"] if version_detail else "gpt-3.5-turbo",
             )
+
+        if "tools" in kwargs:
+            call_args["tools"] = kwargs["tools"]
+            token_per_tools = num_tokens_from_functions_input(
+                functions=kwargs["tools"],
+                model=version_detail["model"] if version_detail else "gpt-3.5-turbo",
+            )
+
         # truncate messages to make length <= model's max length
         model_max_tokens = get_max_tokens(
             model=version_detail["model"] if version_detail else "gpt-3.5-turbo"
@@ -505,6 +516,9 @@ class LLMProxy(LLM):
 
         if "api_key" in kwargs:
             call_args["api_key"] = kwargs["api_key"]
+
+        if "tools" in kwargs:
+            call_args["tools"] = kwargs["tools"]
 
         return call_args
 
@@ -575,109 +589,121 @@ class LLMProxy(LLM):
     def run(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_method(super().run)(inputs, **kwargs)
 
     def arun(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_method(super().arun)(inputs, **kwargs)
 
     def stream(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_gen(super().stream)(inputs, **kwargs)
 
     def astream(
         self,
         inputs: Optional[Dict[str, Any]] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_gen(super().astream)(inputs, **kwargs)
 
     def run_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_method(super().run_and_parse)(inputs, **kwargs)
 
     def arun_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_method(super().arun_and_parse)(inputs, **kwargs)
 
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_gen(super().stream_and_parse)(inputs, **kwargs)
 
     def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_gen(super().astream_and_parse)(inputs, **kwargs)
 
     def chat_run(
         self,
         session_uuid: str,
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_chat(super().run)(session_uuid, **kwargs)
 
     def chat_arun(
         self,
         session_uuid: str,
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_chat(super().arun)(session_uuid, **kwargs)
 
     def chat_stream(
         self,
         session_uuid: str,
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_chat_gen(super().stream)(session_uuid, **kwargs)
 
     def chat_astream(
         self,
         session_uuid: str,
-        function_list: Optional[List[Any]] = None,
+        functions: Optional[List[Any]] = None,
+        tools: Optional[List[Any]] = None,
         api_key: Optional[str] = None,
     ) -> LLMResponse:
-        kwargs = self.make_kwargs(function_list=function_list, api_key=api_key)
+        kwargs = self.make_kwargs(functions=functions, api_key=api_key, tools=tools)
         return self._wrap_async_chat_gen(super().astream)(session_uuid, **kwargs)
 
     @staticmethod

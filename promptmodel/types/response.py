@@ -17,29 +17,32 @@ from litellm.utils import (
     ChatCompletionMessageToolCall,
 )
 from openai._models import BaseModel as OpenAIObject
-
-
-class ChoiceDeltaFunctionCall(OpenAIObject):
-    arguments: str
-    name: str
+from openai.types.chat.chat_completion import *
+from openai.types.chat.chat_completion_chunk import (
+    ChoiceDeltaFunctionCall,
+    ChoiceDeltaToolCall,
+    ChoiceDeltaToolCallFunction,
+)
 
 
 class LLMResponse(OpenAIObject):
     api_response: Optional[ModelResponse] = None
     raw_output: Optional[str] = None
-    parsed_outputs: Optional[Dict[str, str]] = None
+    parsed_outputs: Optional[Dict[str, Any]] = None
     error: Optional[bool] = None
     error_log: Optional[str] = None
-    function_call: Optional[Dict[str, Any]] = None
+    function_call: Optional[FunctionCall] = None
+    tool_calls: Optional[List[ChatCompletionMessageToolCall]] = None
 
 
 class LLMStreamResponse(OpenAIObject):
     api_response: Optional[ModelResponse] = None
     raw_output: Optional[str] = None
-    parsed_outputs: Optional[Dict[str, str]] = None
+    parsed_outputs: Optional[Dict[str, Any]] = None
     error: Optional[bool] = None
     error_log: Optional[str] = None
-    function_call: Optional[Dict[str, Any]] = None
+    function_call: Optional[ChoiceDeltaFunctionCall] = None
+    tool_calls: Optional[List[ChoiceDeltaToolCall]] = None
 
 
 class FunctionSchema(BaseModel):

@@ -17,6 +17,10 @@ from promptmodel.types.response import (
     Choices,
     Message,
     FunctionCall,
+    ChatCompletionMessageToolCall,
+    Function,
+    ChoiceDeltaToolCallFunction,
+    ChoiceDeltaToolCall,
 )
 from promptmodel.utils import logger
 from promptmodel.types.enums import ParsingType, ParsingPattern, get_pattern_by_type
@@ -104,6 +108,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         api_key: Optional[str] = None,
         *args,
@@ -119,6 +124,7 @@ class LLM:
                     for message in self.__validate_openai_messages(messages)
                 ],
                 functions=functions,
+                tools=tools,
                 api_key=api_key,
             )
 
@@ -130,10 +136,15 @@ class LLM:
                 response.choices[0].message, "function_call", None
             )
 
+            call_tools: Optional[List[ChatCompletionMessageToolCall]] = getattr(
+                response.choices[0].message, "tool_calls", None
+            )
+
             return LLMResponse(
                 api_response=response,
                 raw_output=content,
-                function_call=call_func.model_dump() if call_func else None,
+                function_call=call_func if call_func else None,
+                tool_calls=call_tools if call_tools else None,
             )
         except Exception as e:
             if response is not None:
@@ -145,6 +156,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         api_key: Optional[str] = None,
         *args,
@@ -160,6 +172,7 @@ class LLM:
                     for message in self.__validate_openai_messages(messages)
                 ],
                 functions=functions,
+                tools=tools,
                 api_key=api_key,
             )
             content: Optional[str] = getattr(
@@ -170,11 +183,17 @@ class LLM:
                 response.choices[0].message, "function_call", None
             )
 
+            call_tools: Optional[ChatCompletionMessageToolCall] = getattr(
+                response.choices[0].message, "tool_calls", None
+            )
+
             return LLMResponse(
                 api_response=response,
                 raw_output=content,
-                function_call=call_func.model_dump() if call_func else None,
+                function_call=call_func if call_func else None,
+                tool_calls=call_tools if call_tools else None,
             )
+
         except Exception as e:
             if response is not None:
                 return LLMResponse(api_response=response, error=True, error_log=str(e))
@@ -185,6 +204,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],  # input
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         api_key: Optional[str] = None,
         *args,
@@ -203,11 +223,12 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
+                tools=tools,
                 api_key=api_key,
             )
 
             for chunk in self.__llm_stream_response_generator__(
-                messages, response, start_time, functions
+                messages, response, start_time, functions, tools
             ):
                 yield chunk
         except Exception as e:
@@ -217,6 +238,7 @@ class LLM:
         self,
         messages: List[Dict[str, str]],
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         api_key: Optional[str] = None,
         *args,
@@ -234,11 +256,12 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
+                tools=tools,
                 api_key=api_key,
             )
 
             async for chunk in self.__llm_stream_response_agenerator__(
-                messages, response, start_time, functions
+                messages, response, start_time, functions, tools
             ):
                 yield chunk
         except Exception as e:
@@ -249,6 +272,7 @@ class LLM:
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         api_key: Optional[str] = None,
@@ -266,6 +290,7 @@ class LLM:
                     for message in self.__validate_openai_messages(messages)
                 ],
                 functions=functions,
+                tools=tools,
                 api_key=api_key,
             )
             raw_output = getattr(response.choices[0].message, "content", None)
@@ -274,7 +299,11 @@ class LLM:
                 response.choices[0].message, "function_call", None
             )
 
-            if not call_func:
+            call_tools: Optional[List[ChatCompletionMessageToolCall]] = getattr(
+                response.choices[0].message, "tool_calls", None
+            )
+
+            if not call_func and not call_tools:
                 # function call does not appear in output
 
                 parse_result: ParseResult = self.__parse_output_pattern__(
@@ -298,7 +327,8 @@ class LLM:
                 api_response=response,
                 raw_output=raw_output,
                 parsed_outputs=parse_result.parsed_outputs if parse_result else None,
-                function_call=call_func.model_dump() if call_func else None,
+                function_call=call_func if call_func else None,
+                tool_calls=call_tools if call_tools else None,
                 error=not parsed_success,
                 error_log=error_log,
             )
@@ -313,6 +343,7 @@ class LLM:
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         api_key: Optional[str] = None,
@@ -345,6 +376,7 @@ class LLM:
                     for message in self.__validate_openai_messages(messages)
                 ],
                 functions=functions,
+                tools=tools,
                 api_key=api_key,
             )
             raw_output = getattr(response.choices[0].message, "content", None)
@@ -353,9 +385,12 @@ class LLM:
                 response.choices[0].message, "function_call", None
             )
 
-            if not call_func:
-                # function call does not appear in output
+            call_tools: Optional[List[ChatCompletionMessageToolCall]] = getattr(
+                response.choices[0].message, "tool_calls", None
+            )
 
+            if not call_func and not call_tools:
+                # function call does not appear in output
                 parse_result: ParseResult = self.__parse_output_pattern__(
                     raw_output, parsing_type
                 )
@@ -377,7 +412,8 @@ class LLM:
                 api_response=response,
                 raw_output=raw_output,
                 parsed_outputs=parse_result.parsed_outputs if parse_result else None,
-                function_call=call_func.model_dump() if call_func else None,
+                function_call=call_func if call_func else None,
+                tool_calls=call_tools if call_tools else None,
                 error=not parsed_success,
                 error_log=error_log,
             )
@@ -392,6 +428,7 @@ class LLM:
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         api_key: Optional[str] = None,
@@ -415,6 +452,7 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
+                tools=tools,
                 api_key=api_key,
             )
 
@@ -422,7 +460,7 @@ class LLM:
             error_occurs = False
             error_log = None
 
-            if len(functions) > 0:
+            if len(functions) > 0 or (tools and len(tools) > 0):
                 # if function exists, cannot parsing in stream time
                 # just stream raw output and parse after stream
                 streamed_outputs = {
@@ -432,7 +470,7 @@ class LLM:
                 }
                 response_with_api_res = None
                 for chunk in self.__llm_stream_response_generator__(
-                    messages, response, start_time, functions
+                    messages, response, start_time, functions, tools
                 ):
                     if chunk.raw_output:
                         streamed_outputs["content"] += chunk.raw_output
@@ -487,7 +525,7 @@ class LLM:
             else:
                 if parsing_type is None:
                     for chunk in self.__llm_stream_response_generator__(
-                        messages, response, start_time, functions
+                        messages, response, start_time, functions, tools
                     ):
                         yield chunk
 
@@ -497,7 +535,7 @@ class LLM:
 
                 elif parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
                     for chunk in self.__double_type_sp_generator__(
-                        messages, response, parsing_type, start_time, functions
+                        messages, response, parsing_type, start_time, functions, tools
                     ):
                         yield chunk
                         if chunk.parsed_outputs:
@@ -509,7 +547,7 @@ class LLM:
                             error_log = chunk.error_log
                 else:
                     for chunk in self.__single_type_sp_generator__(
-                        messages, response, parsing_type, start_time
+                        messages, response, parsing_type, start_time, functions, tools
                     ):
                         yield chunk
                         if chunk.parsed_outputs:
@@ -536,6 +574,7 @@ class LLM:
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         output_keys: Optional[List[str]] = None,
         model: Optional[str] = DEFAULT_MODEL,
         api_key: Optional[str] = None,
@@ -558,13 +597,14 @@ class LLM:
                 ],
                 stream=True,
                 functions=functions,
+                tools=tools,
                 api_key=api_key,
             )
 
             parsed_outputs = {}
             error_occurs = False  # error in stream time
             error_log = None
-            if len(functions) > 0:
+            if len(functions) > 0 or (tools and len(tools) > 0):
                 # if function exists, cannot parsing in stream time
                 # just stream raw output and parse after stream
                 streamed_outputs = {
@@ -574,7 +614,7 @@ class LLM:
                 }
                 response_with_api_res = None
                 async for chunk in self.__llm_stream_response_agenerator__(
-                    messages, response, start_time, functions
+                    messages, response, start_time, functions, tools
                 ):
                     if chunk.raw_output:
                         streamed_outputs["content"] += chunk.raw_output
@@ -628,7 +668,7 @@ class LLM:
             else:
                 if parsing_type is None:
                     async for chunk in self.__llm_stream_response_agenerator__(
-                        messages, response, start_time, functions
+                        messages, response, start_time, functions, tools
                     ):
                         yield chunk
 
@@ -638,7 +678,7 @@ class LLM:
 
                 elif parsing_type == ParsingType.DOUBLE_SQUARE_BRACKET.value:
                     async for chunk in self.__double_type_sp_agenerator__(
-                        messages, response, parsing_type, start_time, functions
+                        messages, response, parsing_type, start_time, functions, tools
                     ):
                         yield chunk
                         if chunk.parsed_outputs:
@@ -649,7 +689,7 @@ class LLM:
                             error_occurs = True
                 else:
                     async for chunk in self.__single_type_sp_agenerator__(
-                        messages, response, parsing_type, start_time, functions
+                        messages, response, parsing_type, start_time, functions, tools
                     ):
                         yield chunk
                         if chunk.parsed_outputs:
@@ -676,8 +716,10 @@ class LLM:
         response_ms,
         messages: List[Dict[str, str]],
         raw_output: str,
-        function_list: List[Any] = [],
-        function_call: Optional[dict] = None,
+        functions: List[Any] = [],
+        function_call: Optional[Dict[str, Any]] = None,
+        tools: Optional[List[Any]] = None,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
     ) -> ModelResponse:
         count_start_time = datetime.datetime.now()
         prompt_token: int = num_tokens_for_messages(
@@ -688,11 +730,18 @@ class LLM:
             messages=[{"role": "assistant", "content": raw_output}],
         )
 
-        if len(function_list) > 0:
-            function_list_token = num_tokens_from_functions_input(
-                functions=function_list, model=chunk["model"]
+        if len(functions) > 0 or (tools and len(tools) > 0):
+            functions_token = num_tokens_from_functions_input(
+                functions=functions, model=chunk["model"]
             )
-            prompt_token += function_list_token
+            prompt_token += functions_token
+
+        if tools and len(tools) > 0:
+            tools_token = num_tokens_from_functions_input(
+                functions=[tool["function"] for tool in tools], model=chunk["model"]
+            )
+            prompt_token += tools_token
+
         # if function_call:
         #     function_call_token = num_tokens_from_function_call_output(
         #         function_call_output=function_call, model=chunk["model"]
@@ -718,6 +767,7 @@ class LLM:
             else "assistant",
             content=raw_output if raw_output != "" else None,
             function_call=function_call if function_call else None,
+            tool_calls=tool_calls if tool_calls else None,
         )
         choices = [
             Choices(finish_reason=chunk.choices[0].finish_reason, message=last_message)
@@ -729,7 +779,6 @@ class LLM:
             model=chunk["model"],
             stream=True,
         )
-
         res.choices = choices
         res.usage = usage
         res._response_ms = response_ms
@@ -741,10 +790,12 @@ class LLM:
         response: Generator[ModelResponse, None, None],
         start_time: datetime.datetime,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
         raw_output = ""
         function_call = {"name": "", "arguments": ""}
-        check_finished = False
+        tool_calls = []
+
         try:
             for chunk in response:
                 yield_api_response_with_fc = False
@@ -757,7 +808,32 @@ class LLM:
 
                     yield LLMStreamResponse(
                         api_response=chunk,
-                        function_call=chunk.choices[0].delta.function_call.model_dump(),
+                        function_call=chunk.choices[0].delta.function_call,
+                    )
+                    yield_api_response_with_fc = True
+
+                if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
+                    # tool_calls: list
+                    tool_calls_delta: List[Any] = chunk.choices[0].delta.tool_calls
+                    index = tool_calls_delta[0].index
+                    if index == len(tool_calls):
+                        tool_calls.append(
+                            {
+                                "id": tool_calls_delta[0].id,
+                                "function": {},
+                                "type": "function",
+                            }
+                        )
+                    tool_delta: ChoiceDeltaToolCallFunction = tool_calls_delta[
+                        0
+                    ].function
+                    tool_calls[index]["function"] = update_dict(
+                        tool_calls[index]["function"], tool_delta.model_dump()
+                    )
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        tool_calls=chunk.choices[0].delta.tool_calls,
                     )
                     yield_api_response_with_fc = True
 
@@ -768,8 +844,7 @@ class LLM:
                         raw_output=chunk.choices[0].delta.content,
                     )
 
-                if chunk.choices[0].finish_reason != None and not check_finished:
-                    check_finished = True
+                if chunk.choices[0].finish_reason != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
@@ -778,9 +853,13 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
-                            function_list=functions,
+                            functions=functions,
                             function_call=function_call
                             if chunk.choices[0].finish_reason == "function_call"
+                            else None,
+                            tools=tools,
+                            tool_calls=tool_calls
+                            if chunk.choices[0].finish_reason == "tool_calls"
                             else None,
                         )
                     )
@@ -795,6 +874,7 @@ class LLM:
         parsing_type: ParsingType,
         start_time: datetime.datetime,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
@@ -810,7 +890,8 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            check_finished = False
+            tool_calls = []
+
             for chunk in response:
                 yield_api_response_with_fc = False
                 if getattr(chunk.choices[0].delta, "function_call", None) is not None:
@@ -822,7 +903,32 @@ class LLM:
 
                     yield LLMStreamResponse(
                         api_response=chunk,
-                        function_call=chunk.choices[0].delta.function_call.model_dump(),
+                        function_call=chunk.choices[0].delta.function_call,
+                    )
+                    yield_api_response_with_fc = True
+
+                if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
+                    # tool_calls: list
+                    tool_calls_delta: List[Any] = chunk.choices[0].delta.tool_calls
+                    index = tool_calls_delta[0].index
+                    if index == len(tool_calls):
+                        tool_calls.append(
+                            {
+                                "id": tool_calls_delta[0].id,
+                                "function": {},
+                                "type": "function",
+                            }
+                        )
+                    tool_delta: ChoiceDeltaToolCallFunction = tool_calls_delta[
+                        0
+                    ].function
+                    tool_calls[index]["function"] = update_dict(
+                        tool_calls[index]["function"], tool_delta.model_dump()
+                    )
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        tool_calls=chunk.choices[0].delta.tool_calls,
                     )
                     yield_api_response_with_fc = True
 
@@ -911,8 +1017,7 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if chunk.choices[0].finish_reason != None and not check_finished:
-                    check_finished = True
+                if chunk.choices[0].finish_reason != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
@@ -921,9 +1026,13 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
-                            function_list=functions,
+                            functions=functions,
                             function_call=function_call
                             if chunk.choices[0].finish_reason == "function_call"
+                            else None,
+                            tools=tools,
+                            tool_calls=tool_calls
+                            if chunk.choices[0].finish_reason == "tool_calls"
                             else None,
                         )
                     )
@@ -938,6 +1047,7 @@ class LLM:
         parsing_type: ParsingType,
         start_time: datetime.datetime,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
     ) -> Generator[LLMStreamResponse, None, None]:
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
@@ -953,7 +1063,8 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            check_finished = False
+            tool_calls = []
+
             for chunk in response:
                 yield_api_response_with_fc = False
                 if getattr(chunk.choices[0].delta, "function_call", None) is not None:
@@ -965,7 +1076,32 @@ class LLM:
 
                     yield LLMStreamResponse(
                         api_response=chunk,
-                        function_call=chunk.choices[0].delta.function_call.model_dump(),
+                        function_call=chunk.choices[0].delta.function_call,
+                    )
+                    yield_api_response_with_fc = True
+
+                if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
+                    # tool_calls: list
+                    tool_calls_delta: List[Any] = chunk.choices[0].delta.tool_calls
+                    index = tool_calls_delta[0].index
+                    if index == len(tool_calls):
+                        tool_calls.append(
+                            {
+                                "id": tool_calls_delta[0].id,
+                                "function": {},
+                                "type": "function",
+                            }
+                        )
+                    tool_delta: ChoiceDeltaToolCallFunction = tool_calls_delta[
+                        0
+                    ].function
+                    tool_calls[index]["function"] = update_dict(
+                        tool_calls[index]["function"], tool_delta.model_dump()
+                    )
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        tool_calls=chunk.choices[0].delta.tool_calls,
                     )
                     yield_api_response_with_fc = True
 
@@ -1049,8 +1185,7 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if chunk.choices[0].finish_reason != None and not check_finished:
-                    check_finished = True
+                if chunk.choices[0].finish_reason != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
@@ -1059,9 +1194,13 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
-                            function_list=functions,
+                            functions=functions,
                             function_call=function_call
                             if chunk.choices[0].finish_reason == "function_call"
+                            else None,
+                            tools=tools,
+                            tool_calls=tool_calls
+                            if chunk.choices[0].finish_reason == "tool_calls"
                             else None,
                         )
                     )
@@ -1075,11 +1214,12 @@ class LLM:
         response: AsyncGenerator[ModelResponse, None],
         start_time: datetime.datetime,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         raw_output = ""
         function_call = {"name": "", "arguments": ""}
+        tool_calls = []
         try:
-            check_finished = False
             async for chunk in response:
                 yield_api_response_with_fc = False
                 if getattr(chunk.choices[0].delta, "function_call", None) is not None:
@@ -1091,7 +1231,32 @@ class LLM:
 
                     yield LLMStreamResponse(
                         api_response=chunk,
-                        function_call=chunk.choices[0].delta.function_call.model_dump(),
+                        function_call=chunk.choices[0].delta.function_call,
+                    )
+                    yield_api_response_with_fc = True
+
+                if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
+                    # tool_calls: list
+                    tool_calls_delta: List[Any] = chunk.choices[0].delta.tool_calls
+                    index = tool_calls_delta[0].index
+                    if index == len(tool_calls):
+                        tool_calls.append(
+                            {
+                                "id": tool_calls_delta[0].id,
+                                "function": {},
+                                "type": "function",
+                            }
+                        )
+                    tool_delta: ChoiceDeltaToolCallFunction = tool_calls_delta[
+                        0
+                    ].function
+                    tool_calls[index]["function"] = update_dict(
+                        tool_calls[index]["function"], tool_delta.model_dump()
+                    )
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        tool_calls=chunk.choices[0].delta.tool_calls,
                     )
                     yield_api_response_with_fc = True
 
@@ -1103,8 +1268,7 @@ class LLM:
                         raw_output=stream_value,
                     )
 
-                if chunk.choices[0].finish_reason != None and not check_finished:
-                    check_finished = True
+                if chunk.choices[0].finish_reason != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
@@ -1113,9 +1277,13 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
-                            function_list=functions,
+                            functions=functions,
                             function_call=function_call
                             if chunk.choices[0].finish_reason == "function_call"
+                            else None,
+                            tools=tools,
+                            tool_calls=tool_calls
+                            if chunk.choices[0].finish_reason == "tool_calls"
                             else None,
                         )
                     )
@@ -1130,6 +1298,7 @@ class LLM:
         parsing_type: ParsingType,
         start_time: datetime.datetime,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
@@ -1145,7 +1314,8 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            check_finished = False
+            tool_calls = []
+
             async for chunk in response:
                 yield_api_response_with_fc = False
                 if getattr(chunk.choices[0].delta, "function_call", None) is not None:
@@ -1157,7 +1327,32 @@ class LLM:
 
                     yield LLMStreamResponse(
                         api_response=chunk,
-                        function_call=chunk.choices[0].delta.function_call.model_dump(),
+                        function_call=chunk.choices[0].delta.function_call,
+                    )
+                    yield_api_response_with_fc = True
+
+                if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
+                    # tool_calls: list
+                    tool_calls_delta: List[Any] = chunk.choices[0].delta.tool_calls
+                    index = tool_calls_delta[0].index
+                    if index == len(tool_calls):
+                        tool_calls.append(
+                            {
+                                "id": tool_calls_delta[0].id,
+                                "function": {},
+                                "type": "function",
+                            }
+                        )
+                    tool_delta: ChoiceDeltaToolCallFunction = tool_calls_delta[
+                        0
+                    ].function
+                    tool_calls[index]["function"] = update_dict(
+                        tool_calls[index]["function"], tool_delta.model_dump()
+                    )
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        tool_calls=chunk.choices[0].delta.tool_calls,
                     )
                     yield_api_response_with_fc = True
 
@@ -1249,8 +1444,7 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if chunk.choices[0].finish_reason != None and not check_finished:
-                    check_finished = True
+                if chunk.choices[0].finish_reason != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
@@ -1259,9 +1453,13 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
-                            function_list=functions,
+                            functions=functions,
                             function_call=function_call
                             if chunk.choices[0].finish_reason == "function_call"
+                            else None,
+                            tools=tools,
+                            tool_calls=tool_calls
+                            if chunk.choices[0].finish_reason == "tool_calls"
                             else None,
                         )
                     )
@@ -1276,6 +1474,7 @@ class LLM:
         parsing_type: ParsingType,
         start_time: datetime.datetime,
         functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         try:
             parsing_pattern = get_pattern_by_type(parsing_type)
@@ -1291,7 +1490,8 @@ class LLM:
             stream_pause = False
             end_tag = None
             function_call = {"name": "", "arguments": ""}
-            check_finished = False
+            tool_calls = []
+
             async for chunk in response:
                 yield_api_response_with_fc = False
                 if getattr(chunk.choices[0].delta, "function_call", None) is not None:
@@ -1303,7 +1503,32 @@ class LLM:
 
                     yield LLMStreamResponse(
                         api_response=chunk,
-                        function_call=chunk.choices[0].delta.function_call.model_dump(),
+                        function_call=chunk.choices[0].delta.function_call,
+                    )
+                    yield_api_response_with_fc = True
+
+                if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
+                    # tool_calls: list
+                    tool_calls_delta: List[Any] = chunk.choices[0].delta.tool_calls
+                    index = tool_calls_delta[0].index
+                    if index == len(tool_calls):
+                        tool_calls.append(
+                            {
+                                "id": tool_calls_delta[0].id,
+                                "function": {},
+                                "type": "function",
+                            }
+                        )
+                    tool_delta: ChoiceDeltaToolCallFunction = tool_calls_delta[
+                        0
+                    ].function
+                    tool_calls[index]["function"] = update_dict(
+                        tool_calls[index]["function"], tool_delta.model_dump()
+                    )
+
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        tool_calls=chunk.choices[0].delta.tool_calls,
                     )
                     yield_api_response_with_fc = True
 
@@ -1394,8 +1619,7 @@ class LLM:
                                     buffer = ""
                                 break
 
-                if chunk.choices[0].finish_reason != None and not check_finished:
-                    check_finished = True
+                if chunk.choices[0].finish_reason != None:
                     end_time = datetime.datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
                     yield LLMStreamResponse(
@@ -1404,9 +1628,13 @@ class LLM:
                             response_ms,
                             messages,
                             raw_output,
-                            function_list=functions,
+                            functions=functions,
                             function_call=function_call
                             if chunk.choices[0].finish_reason == "function_call"
+                            else None,
+                            tools=tools,
+                            tool_calls=tool_calls
+                            if chunk.choices[0].finish_reason == "tool_calls"
                             else None,
                         )
                     )

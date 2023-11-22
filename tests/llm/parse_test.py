@@ -569,10 +569,6 @@ async def test_run_and_parsing(mocker):
                     **{
                         "role": "assistant",
                         "content": "[key type=str]ab[/key]",
-                        # "function_call": {
-                        # "name": "get_current_weather",
-                        # "arguments": "{\n  \"location\": \"Boston, MA\"\n}"
-                        # }
                     }
                 ),
                 "finish_reason": "function_call",
@@ -656,10 +652,12 @@ async def test_run_and_parsing(mocker):
     assert (
         res.parsed_outputs is None
     ), f"If function call, do not parse but : {res.parsed_outputs}"
-    assert res.function_call == {
-        "name": "get_current_weather",
-        "arguments": '{\n  "location": "Boston, MA"\n}',
-    }, f"function call mismatch : {res.function_call}"
+    assert res.function_call == FunctionCall(
+        **{
+            "name": "get_current_weather",
+            "arguments": '{\n  "location": "Boston, MA"\n}',
+        }
+    ), f"function call mismatch : {res.function_call}"
 
     # success case because function_call, did not parse
     mocker.patch(
@@ -710,10 +708,6 @@ async def test_arun_and_parsing(mocker):
                     **{
                         "role": "assistant",
                         "content": "[key type=str]ab[/key]",
-                        # "function_call": {
-                        # "name": "get_current_weather",
-                        # "arguments": "{\n  \"location\": \"Boston, MA\"\n}"
-                        # }
                     }
                 ),
                 "finish_reason": "function_call",
@@ -797,10 +791,12 @@ async def test_arun_and_parsing(mocker):
     assert (
         res.parsed_outputs is None
     ), f"If function call, do not parse but : {res.parsed_outputs}"
-    assert res.function_call == {
-        "name": "get_current_weather",
-        "arguments": '{\n  "location": "Boston, MA"\n}',
-    }, f"function call mismatch : {res.function_call}"
+    assert res.function_call == FunctionCall(
+        **{
+            "name": "get_current_weather",
+            "arguments": '{\n  "location": "Boston, MA"\n}',
+        }
+    ), f"function call mismatch : {res.function_call}"
 
     # success case because function_call, did not parse
     mocker.patch(
