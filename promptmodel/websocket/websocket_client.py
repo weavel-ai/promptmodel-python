@@ -93,9 +93,9 @@ class DevWebsocketClient:
         data = None
         try:
             if message["type"] == LocalTask.LIST_PROMPT_MODELS:
-                prompt_model_rows = [
+                prompt_model_rows = list(
                     PromptModel.select().where(PromptModel.used_in_code == True)
-                ]
+                )
                 prompt_model_list = [
                     model_to_dict(model, recurse=False) for model in prompt_model_rows
                 ]
@@ -103,11 +103,11 @@ class DevWebsocketClient:
 
             elif message["type"] == LocalTask.LIST_PROMPT_MODEL_VERSIONS:
                 prompt_model_uuid = message["prompt_model_uuid"]
-                prompt_model_version_rows = [
+                prompt_model_version_rows = list(
                     PromptModelVersion.select()
                     .where(PromptModelVersion.prompt_model_uuid == prompt_model_uuid)
                     .order_by(PromptModelVersion.created_at)
-                ]
+                )
                 prompt_model_version_list = [
                     model_to_dict(model, recurse=False)
                     for model in prompt_model_version_rows
@@ -127,11 +127,11 @@ class DevWebsocketClient:
 
             elif message["type"] == LocalTask.GET_PROMPTS:
                 prompt_model_version_uuid = message["prompt_model_version_uuid"]
-                prompt_rows = [
+                prompt_rows = list(
                     Prompt.select()
                     .where(Prompt.version_uuid == prompt_model_version_uuid)
                     .order_by(Prompt.step)
-                ]
+                )
                 prompt_list = [
                     model_to_dict(model, recurse=False) for model in prompt_rows
                 ]
@@ -139,11 +139,11 @@ class DevWebsocketClient:
 
             elif message["type"] == LocalTask.GET_RUN_LOGS:
                 prompt_model_version_uuid = message["prompt_model_version_uuid"]
-                run_log_rows = [
+                run_log_rows = list(
                     RunLog.select()
                     .where(RunLog.version_uuid == prompt_model_version_uuid)
                     .order_by(RunLog.created_at.desc())
-                ]
+                )
                 run_log_list = [
                     model_to_dict(model, recurse=False) for model in run_log_rows
                 ]
@@ -618,11 +618,11 @@ class DevWebsocketClient:
 
             elif message["type"] == LocalTask.GET_CHAT_LOG_SESSIONS:
                 chat_model_version_uuid = message["chat_model_version_uuid"]
-                session_rows = [
+                session_rows = list(
                     ChatLogSession.select()
                     .where(ChatLogSession.version_uuid == chat_model_version_uuid)
                     .order_by(ChatLogSession.created_at.desc())
-                ]
+                )
                 session_list = [
                     model_to_dict(model, recurse=False) for model in session_rows
                 ]
@@ -631,11 +631,11 @@ class DevWebsocketClient:
 
             elif message["type"] == LocalTask.GET_CHAT_LOGS:
                 session_uuid = message["session_uuid"]
-                chat_log_rows = [
+                chat_log_rows = list(
                     ChatLog.select()
                     .where(ChatLog.session_uuid == session_uuid)
                     .order_by(ChatLog.created_at.asc())
-                ]
+                )
                 chat_log_list = [
                     model_to_dict(model, recurse=False) for model in chat_log_rows
                 ]
@@ -754,11 +754,11 @@ class DevWebsocketClient:
 
                     if session_uuid:
                         # get session message list
-                        chat_log_rows: List[ChatLog] = [
+                        chat_log_rows: List[ChatLog] = list(
                             ChatLog.select()
                             .where(ChatLog.session_uuid == session_uuid)
                             .order_by(ChatLog.created_at.asc())
-                        ]
+                        )
                         print(chat_log_rows)
                         chat_log_list = [
                             {

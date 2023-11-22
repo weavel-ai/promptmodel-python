@@ -38,7 +38,7 @@ def get_latest_version_prompts(prompt_model_name: str) -> Tuple[List[Prompt], st
                 .get()
             )
 
-            prompts: List[Prompt] = (
+            prompts: List[Prompt] = list(
                 Prompt.select()
                 .where(Prompt.version_uuid == latest_run_log.version_uuid.uuid)
                 .order_by(Prompt.step.asc())

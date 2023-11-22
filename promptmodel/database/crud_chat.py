@@ -100,11 +100,10 @@ def rename_chat_model(chat_model_uuid: str, new_name: str):
 def fetch_chat_log_with_uuid(session_uuid: str):
     try:
         try:
-            chat_logs: List[ChatLog] = (
+            chat_logs: List[ChatLog] = list(
                 ChatLog.select()
                 .where(ChatLog.session_uuid == UUID(session_uuid))
                 .order_by(ChatLog.created_at.asc())
-                .get()
             )
         except:
             return []
@@ -143,22 +142,20 @@ def get_latest_version_chat_model(
         else:
             with db.atomic():
                 try:
-                    sessions_with_version: List[ChatLogSession] = (
+                    sessions_with_version: List[ChatLogSession] = list(
                         ChatLogSession.select()
                         .join(ChatModelVersion)
                         .where(
                             ChatModelVersion.chat_model_uuid
                             == ChatModel.get(ChatModel.name == chat_model_name).uuid
                         )
-                        .get()
                     )
                     session_uuids = [x.uuid for x in sessions_with_version]
 
-                    latest_chat_log: List[ChatLog] = (
+                    latest_chat_log: List[ChatLog] = list(
                         ChatLog.select()
                         .where(ChatLog.session_uuid.in_(session_uuids))
                         .order_by(ChatLog.created_at.desc())
-                        .get()
                     )
 
                     latest_chat_log: ChatLog = latest_chat_log[0]
@@ -172,14 +169,13 @@ def get_latest_version_chat_model(
                         .get()
                     )
                 except:
-                    version: List[ChatModelVersion] = (
+                    version: ChatModelVersion = list(
                         ChatModelVersion.select()
                         .join(ChatModel)
                         .where(ChatModel.name == chat_model_name)
                         .order_by(ChatModelVersion.created_at.desc())
                         .get()
                     )
-                    version: ChatModelVersion = version[0]
 
                 instruction: List[Dict[str, Any]] = [version["system_prompt"]]
 

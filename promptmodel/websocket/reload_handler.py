@@ -334,14 +334,14 @@ def update_prompt_model_version_changelog(
     for local_db_prompt_model in local_db_prompt_model_list:
         local_db_prompt_model_version_list += [
             model_to_dict(x, recurse=False)
-            for x in [
+            for x in list(
                 PromptModelVersion.select()
                 .where(
                     PromptModelVersion.prompt_model_uuid
                     == local_db_prompt_model["uuid"]
                 )
                 .order_by(PromptModelVersion.created_at)
-            ]
+            )
         ]
     uuid_list = list(
         filter(
@@ -434,11 +434,11 @@ def update_chat_model_version_changelog(
     for local_db_chat_model in local_db_chat_model_list:
         local_db_chat_model_version_list += [
             model_to_dict(x, recurse=False)
-            for x in [
+            for x in list(
                 ChatModelVersion.select()
                 .where(ChatModelVersion.chat_model_uuid == local_db_chat_model["uuid"])
                 .order_by(ChatModelVersion.created_at)
-            ]
+            )
         ]
 
     uuid_list = list(

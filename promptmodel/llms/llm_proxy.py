@@ -862,11 +862,10 @@ class LLMProxy(LLM):
             return []
         elif "dev_branch" in config and config["dev_branch"]["online"] == True:
             try:
-                chat_log_rows: List[ChatLog] = (
+                chat_log_rows: List[ChatLog] = list(
                     ChatLog.select()
                     .where(ChatLog.session_uuid == UUID(session_uuid))
                     .order_by(ChatLog.created_at.asc())
-                    .get()
                 )
                 chat_logs = [
                     {
