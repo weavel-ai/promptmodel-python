@@ -12,7 +12,7 @@ from litellm import acompletion
 from promptmodel.utils.enums import ParsingType, ParsingPattern, get_pattern_by_type
 from promptmodel.utils import logger
 from promptmodel.utils.output_utils import convert_str_to_type
-from promptmodel.utils.types import LLMStreamResponse
+from promptmodel.utils.types import LLMStreamResponse, ModelResponse
 
 load_dotenv()
 
@@ -94,24 +94,34 @@ class LLMDev:
         messages: List[Dict[str, str]],
         parsing_type: Optional[ParsingType] = None,
         model: Optional[str] = None,
-    ) -> AsyncGenerator[Any, None]:
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
-        response = await acompletion(
+        stream = False if model == "HCX-002" else True
+        response: ModelResponse = await acompletion(
             model=_model,
             messages=[
                 message.model_dump(exclude_none=True)
                 for message in self.__validate_openai_messages(messages)
             ],
-            stream=True,
+            stream=stream,
         )
-        async for chunk in response:
-            if "content" in chunk["choices"][0]["delta"]:
-                stream_value = chunk["choices"][0]["delta"]["content"]
-                raw_output += stream_value  # append raw output
-                yield LLMStreamResponse(raw_output=stream_value)  # return raw output
-
+        if not stream:
+            print(response)
+            yield LLMStreamResponse(
+                raw_output=response["choices"][0]["message"]["content"]
+            )
+        else:
+            async for chunk in response:
+                print(chunk)
+                if "content" in chunk["choices"][0]["delta"]:
+                    stream_value = chunk["choices"][0]["delta"]["content"]
+                    if stream_value is not None:
+                        raw_output += stream_value  # append raw output
+                        yield LLMStreamResponse(
+                            raw_output=stream_value
+                        )  # return raw output
         # parsing
         if parsing_type:
             parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)
