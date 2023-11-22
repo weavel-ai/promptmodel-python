@@ -109,7 +109,7 @@ class LLMDev:
         if not is_stream_unsupported:
             args["stream"] = True
         response: ModelResponse = await acompletion(**args)
-        if not is_stream_unsupported:
+        if is_stream_unsupported:
             print(response)
             yield LLMStreamResponse(
                 raw_output=response["choices"][0]["message"]["content"]
