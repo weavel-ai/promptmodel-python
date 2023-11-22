@@ -98,25 +98,26 @@ class LLMDev:
         _model = model or self._model
         raw_output = ""
 
-        # Truncate the output if it is too long
-        # truncate messages to make length <= model's max length
-        token_per_functions = num_tokens_from_functions_input(
-            functions=functions, model=model
-        )
-        model_max_tokens = get_max_tokens(model=model)
-        token_per_messages = num_tokens_for_messages_for_each(messages, model)
-        token_limit_exceeded = (
-            sum(token_per_messages) + token_per_functions
-        ) - model_max_tokens
-        if token_limit_exceeded > 0:
-            while token_limit_exceeded > 0:
-                # erase the second oldest message (first one is system prompt, so it should not be erased)
-                if len(messages) == 1:
-                    # if there is only one message, Error cannot be solved. Just call LLM and get error response
-                    break
-                token_limit_exceeded -= token_per_messages[1]
-                del messages[1]
-                del token_per_messages[1]
+        if model != "HCX-002":
+            # Truncate the output if it is too long
+            # truncate messages to make length <= model's max length
+            token_per_functions = num_tokens_from_functions_input(
+                functions=functions, model=model
+            )
+            model_max_tokens = get_max_tokens(model=model)
+            token_per_messages = num_tokens_for_messages_for_each(messages, model)
+            token_limit_exceeded = (
+                sum(token_per_messages) + token_per_functions
+            ) - model_max_tokens
+            if token_limit_exceeded > 0:
+                while token_limit_exceeded > 0:
+                    # erase the second oldest message (first one is system prompt, so it should not be erased)
+                    if len(messages) == 1:
+                        # if there is only one message, Error cannot be solved. Just call LLM and get error response
+                        break
+                    token_limit_exceeded -= token_per_messages[1]
+                    del messages[1]
+                    del token_per_messages[1]
 
         args = dict(
             model=_model,
