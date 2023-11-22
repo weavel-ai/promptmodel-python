@@ -125,6 +125,8 @@ async def test_run_model_function_call(
     print("KWARGS")
     print(kwargs)
     assert kwargs["function_call"] is not None, "function_call is None"
+    assert isinstance(kwargs["function_call"], dict)
+
     create_run_log_mock.reset_mock()
     print(
         "======================================================================================="
@@ -202,7 +204,7 @@ Output Format:
     create_run_log_mock.assert_called_once()
     _, kwargs = create_run_log_mock.call_args
     assert kwargs["function_call"] is None, "function_call is not None"
-    print(kwargs["parsed_outputs"])
+
     assert "response" in kwargs["parsed_outputs"], "response not in parsed_outputs"
     assert len(list(set(kwargs["parsed_outputs"].keys()))) == 1
     create_run_log_mock.reset_mock()

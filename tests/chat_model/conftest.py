@@ -38,7 +38,7 @@ def mock_fetch_chat_model():
         {"role": "system", "content": "You are a helpful assistant.", "step": 1},
     ]
     mock_version_details = {
-        "model": "gpt-3.5-turbo",
+        "model": "gpt-4-1106-preview",
         "uuid": "testuuid",
     }
     mock_fetch_chat_model.return_value = (mock_instruction, mock_version_details)

@@ -465,9 +465,9 @@ class DevWebsocketClient:
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_RUN.value,
                                 "status": "running",
-                                "function_call": item.function_call,
+                                "function_call": item.function_call.model_dump(),
                             }
-                            function_call = item.function_call
+                            function_call = item.function_call.model_dump()
 
                         if item.error and parsing_success is True:
                             parsing_success = not item.error
@@ -811,12 +811,12 @@ class DevWebsocketClient:
                     function_call = None
                     function_call_log = None
                     # get function schemas from register & send to LLM
-                    tool_names: List[str] = message["functions"]
-                    logger.debug(f"tool_names : {tool_names}")
+                    function_names: List[str] = message["functions"]
+                    logger.debug(f"function_names : {function_names}")
                     try:
                         function_schemas: List[
-                            str
-                        ] = self._devapp._get_function_schemas(tool_names)
+                            Dict
+                        ] = self._devapp._get_function_schemas(function_names)
                     except Exception as error:
                         data = {
                             "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
@@ -828,15 +828,14 @@ class DevWebsocketClient:
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                         return
 
-                    logger.debug(f"functions : {function_schemas}")
-
                     res: AsyncGenerator[
                         LLMStreamResponse, None
                     ] = chat_model_dev.dev_chat(
                         messages=messages_for_run,
-                        tools=function_schemas,
+                        functions=function_schemas,
                         model=message["model"],
                     )
+
                     raw_output = ""
                     async for chunk in res:
                         if chunk.raw_output is not None:
@@ -850,12 +849,12 @@ class DevWebsocketClient:
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
                                 "status": "running",
-                                "function_call": chunk.function_call,
+                                "function_call": chunk.function_call.model_dump(),
                             }
                             if function_call is None:
                                 function_call = {}
                             function_call = update_dict(
-                                function_call, chunk.function_call
+                                function_call, chunk.function_call.model_dump()
                             )
 
                         if chunk.error:

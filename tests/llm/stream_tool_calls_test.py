@@ -35,21 +35,24 @@ response type=str: (value here)
 
 """
 
+tool_schemas = [{"type": "function", "function": schema} for schema in function_shemas]
 
-def test_stream_with_functions(mocker):
+
+def test_stream_with_tools(mocker):
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
     stream_res: Generator[LLMStreamResponse, None, None] = llm.stream(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
     )
-
+    print("HELLO")
     error_count = 0
     api_responses: List[ModelResponse] = []
     final_response: Optional[LLMStreamResponse] = None
     chunks: List[LLMStreamResponse] = []
     for res in stream_res:
+        print(res)
         chunks.append(res)
         if res.error:
             error_count += 1
@@ -59,19 +62,18 @@ def test_stream_with_functions(mocker):
         ):
             api_responses.append(res.api_response)
             final_response = res
-
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        getattr(final_response.api_response.choices[0].message, "tool_calls", None)
         is not None
-    ), "function_call is None"
+    ), "tool_calls is None"
     assert isinstance(
-        final_response.api_response.choices[0].message.function_call, FunctionCall
+        final_response.api_response.choices[0].message.tool_calls[0],
+        ChatCompletionMessageToolCall,
     )
-
-    assert len([c for c in chunks if c.function_call is not None]) > 0
-    assert isinstance(chunks[1].function_call, ChoiceDeltaFunctionCall) is True
+    assert len([c for c in chunks if c.tool_calls is not None]) > 0
+    assert isinstance(chunks[1].tool_calls[0], ChoiceDeltaToolCall)
 
     assert api_responses[0].choices[0].message.content is None, "content is not None"
     assert api_responses[0]._response_ms is not None, "response_ms is None"
@@ -108,13 +110,13 @@ def test_stream_with_functions(mocker):
 
 
 @pytest.mark.asyncio
-async def test_astream_with_functions(mocker):
+async def test_astream_with_tools(mocker):
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
     stream_res: AsyncGenerator[LLMStreamResponse, None] = llm.astream(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
     )
 
     error_count = 0
@@ -135,14 +137,15 @@ async def test_astream_with_functions(mocker):
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        getattr(final_response.api_response.choices[0].message, "tool_calls", None)
         is not None
-    ), "function_call is None"
+    ), "tool_calls is None"
     assert isinstance(
-        final_response.api_response.choices[0].message.function_call, FunctionCall
+        final_response.api_response.choices[0].message.tool_calls[0],
+        ChatCompletionMessageToolCall,
     )
-    assert len([c for c in chunks if c.function_call is not None]) > 0
-    assert isinstance(chunks[1].function_call, ChoiceDeltaFunctionCall)
+    assert len([c for c in chunks if c.tool_calls is not None]) > 0
+    assert isinstance(chunks[1].tool_calls[0], ChoiceDeltaToolCall)
 
     assert api_responses[0].choices[0].message.content is None, "content is not None"
     assert api_responses[0]._response_ms is not None, "response_ms is None"
@@ -157,6 +160,7 @@ async def test_astream_with_functions(mocker):
     mock_response.status_code = 200
     mock_execute.return_value = mock_response
     mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
+
     nest_asyncio.apply()
     await llm_proxy._async_log_to_cloud(
         version_uuid="test",
@@ -176,13 +180,13 @@ async def test_astream_with_functions(mocker):
     ), "api_response is not equal"
 
 
-def test_stream_and_parse_with_functions(mocker):
+def test_stream_and_parse_with_tools(mocker):
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
     stream_res: Generator[LLMStreamResponse, None, None] = llm.stream_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=None,
     )
 
@@ -207,14 +211,15 @@ def test_stream_and_parse_with_functions(mocker):
     assert error_count == 0, "error_count is not 0"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        getattr(final_response.api_response.choices[0].message, "tool_calls", None)
         is not None
-    ), "function_call is None"
+    ), "tool_calls is None"
     assert isinstance(
-        final_response.api_response.choices[0].message.function_call, FunctionCall
+        final_response.api_response.choices[0].message.tool_calls[0],
+        ChatCompletionMessageToolCall,
     )
-    assert len([c for c in chunks if c.function_call is not None]) > 0
-    assert isinstance(chunks[1].function_call, ChoiceDeltaFunctionCall)
+    assert len([c for c in chunks if c.tool_calls is not None]) > 0
+    assert isinstance(chunks[1].tool_calls[0], ChoiceDeltaToolCall)
 
     assert api_responses[0].choices[0].message.content is None, "content is not None"
 
@@ -227,7 +232,7 @@ def test_stream_and_parse_with_functions(mocker):
     ]
     stream_res: Generator[LLMStreamResponse, None, None] = llm.stream_and_parse(
         messages=messages,
-        functions=function_shemas,
+        tools=tool_schemas,
         model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
@@ -259,22 +264,22 @@ def test_stream_and_parse_with_functions(mocker):
         assert final_response.parsed_outputs is not None, "parsed_outputs is None"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        getattr(final_response.api_response.choices[0].message, "tool_calls", None)
         is None
-    ), "function_call is not None"
-    assert len([c for c in chunks if c.function_call is not None]) == 0
+    ), "tool_calls is not None"
+    assert len([c for c in chunks if c.tool_calls is not None]) == 0
 
     assert api_responses[0].choices[0].message.content is not None, "content is None"
 
 
 @pytest.mark.asyncio
-async def test_astream_and_parse_with_functions(mocker):
+async def test_astream_and_parse_with_tools(mocker):
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
     stream_res: AsyncGenerator[LLMStreamResponse, None] = llm.astream_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=None,
     )
 
@@ -299,14 +304,15 @@ async def test_astream_and_parse_with_functions(mocker):
 
     assert api_responses[0].choices[0].message.content is None, "content is not None"
     assert (
-        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        getattr(final_response.api_response.choices[0].message, "tool_calls", None)
         is not None
-    ), "function_call is None"
+    ), "tool_calls is None"
     assert isinstance(
-        final_response.api_response.choices[0].message.function_call, FunctionCall
+        final_response.api_response.choices[0].message.tool_calls[0],
+        ChatCompletionMessageToolCall,
     )
-    assert len([c for c in chunks if c.function_call is not None]) > 0
-    assert isinstance(chunks[1].function_call, ChoiceDeltaFunctionCall)
+    assert len([c for c in chunks if c.tool_calls is not None]) > 0
+    assert isinstance(chunks[1].tool_calls[0], ChoiceDeltaToolCall)
 
     # Not call function, parsing case
     messages = [
@@ -317,8 +323,8 @@ async def test_astream_and_parse_with_functions(mocker):
     ]
     stream_res: AsyncGenerator[LLMStreamResponse, None] = llm.astream_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
@@ -349,10 +355,10 @@ async def test_astream_and_parse_with_functions(mocker):
         assert final_response.parsed_outputs is not None, "parsed_outputs is None"
     assert len(api_responses) == 1, "api_count is not 1"
     assert (
-        getattr(final_response.api_response.choices[0].message, "function_call", None)
+        getattr(final_response.api_response.choices[0].message, "tool_calls", None)
         is None
-    ), "function_call is not None"
+    ), "tool_calls is not None"
 
-    assert len([c for c in chunks if c.function_call is not None]) == 0
+    assert len([c for c in chunks if c.tool_calls is not None]) == 0
 
     assert api_responses[0].choices[0].message.content is not None, "content is None"

@@ -145,13 +145,14 @@ class ChatModel(metaclass=RegisteringMeta):
 
     def run(
         self,
-        function_list: Optional[List[Dict[str, Any]]] = None,
+        functions: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         stream: Optional[bool] = False,
     ) -> LLMResponse:
         """Run PromptModel. It does not raise error.
 
         Args:
-            function_list (List[Dict[str, Any]], optional): list of functions to run. Defaults to None.
+            functions (List[Dict[str, Any]], optional): list of functions to run. Defaults to None.
 
         Returns:
             LLMResponse: response from the promptmodel. you can find raw output in response.raw_output or response.api_response['choices'][0]['message']['content'].
@@ -163,24 +164,25 @@ class ChatModel(metaclass=RegisteringMeta):
 
             def gen():
                 for item in self.llm_proxy.chat_stream(
-                    self.session_uuid, function_list
+                    self.session_uuid, functions, tools
                 ):
                     yield item
 
             return gen()
         else:
-            return self.llm_proxy.chat_run(self.session_uuid, function_list)
-        # return self.llm_proxy.chat_run(self.session_uuid, function_list, self.api_key)
+            return self.llm_proxy.chat_run(self.session_uuid, functions, tools)
+        # return self.llm_proxy.chat_run(self.session_uuid, functions, self.api_key)
 
     async def arun(
         self,
-        function_list: Optional[List[Dict[str, Any]]] = None,
+        functions: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         stream: Optional[bool] = False,
     ) -> LLMResponse:
         """Async run PromptModel. It does not raise error.
 
         Args:
-            function_list (List[Dict[str, Any]], optional): list of functions to run. Defaults to None.
+            functions (List[Dict[str, Any]], optional): list of functions to run. Defaults to None.
 
         Returns:
             LLMResponse: response from the promptmodel. you can find raw output in response.raw_output or response.api_response['choices'][0]['message']['content'].
@@ -192,13 +194,13 @@ class ChatModel(metaclass=RegisteringMeta):
 
             async def async_gen():
                 async for item in self.llm_proxy.chat_astream(
-                    self.session_uuid, function_list
+                    self.session_uuid, functions, tools
                 ):
                     yield item
 
             return async_gen()
         else:
-            return await self.llm_proxy.chat_arun(self.session_uuid, function_list)
+            return await self.llm_proxy.chat_arun(self.session_uuid, functions)
         # return await self.llm_proxy.chat_arun(
-        #     self.session_uuid, function_list, self.api_key
+        #     self.session_uuid, functions, self.api_key
         # )

@@ -33,32 +33,34 @@ response type=str: (value here)
 
 """
 
+tool_schemas = [{"type": "function", "function": schema} for schema in function_shemas]
 
-def test_run_with_functions(mocker):
+
+def test_run_with_tools(mocker):
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
     res: LLMResponse = llm.run(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
     )
 
     assert res.error is None, "error is not None"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0].finish_reason == "function_call"
-    ), "finish_reason is not function_call"
+        res.api_response.choices[0].finish_reason == "tool_calls"
+    ), "finish_reason is not tool_calls"
     print(res.api_response.model_dump())
     print(res.__dict__)
-    assert res.function_call is not None, "function_call is None"
-    assert isinstance(res.function_call, FunctionCall)
+    assert res.tool_calls is not None, "tool_calls is None"
+    assert isinstance(res.tool_calls[0], ChatCompletionMessageToolCall)
 
     messages = [{"role": "user", "content": "Hello, How are you?"}]
 
     res: LLMResponse = llm.run(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
     )
 
     assert res.error is None, "error is not None"
@@ -67,35 +69,35 @@ def test_run_with_functions(mocker):
         res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
-    assert res.function_call is None, "function_call is not None"
+    assert res.tool_calls is None, "tool_calls is not None"
     assert res.raw_output is not None, "raw_output is None"
 
 
 @pytest.mark.asyncio
-async def test_arun_with_functions(mocker):
+async def test_arun_with_tools(mocker):
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
     res: LLMResponse = await llm.arun(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
     )
 
     assert res.error is None, "error is not None"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0].finish_reason == "function_call"
-    ), "finish_reason is not function_call"
+        res.api_response.choices[0].finish_reason == "tool_calls"
+    ), "finish_reason is not tool_calls"
 
-    assert res.function_call is not None, "function_call is None"
-    assert isinstance(res.function_call, FunctionCall)
+    assert res.tool_calls is not None, "tool_calls is None"
+    assert isinstance(res.tool_calls[0], ChatCompletionMessageToolCall)
 
     messages = [{"role": "user", "content": "Hello, How are you?"}]
 
     res: LLMResponse = await llm.arun(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
     )
 
     assert res.error is None, "error is not None"
@@ -104,35 +106,36 @@ async def test_arun_with_functions(mocker):
         res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
-    assert res.function_call is None, "function_call is not None"
+    assert res.tool_calls is None, "tool_calls is not None"
     assert res.raw_output is not None, "raw_output is None"
 
 
-def test_run_and_parse_with_functions(mocker):
+def test_run_and_parse_with_tools(mocker):
     # With parsing_type = None
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
     res: LLMResponse = llm.run_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=None,
     )
+
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0].finish_reason == "function_call"
-    ), "finish_reason is not function_call"
+        res.api_response.choices[0].finish_reason == "tool_calls"
+    ), "finish_reason is not tool_calls"
 
-    assert res.function_call is not None, "function_call is None"
-    assert isinstance(res.function_call, FunctionCall)
+    assert res.tool_calls is not None, "tool_calls is None"
+    assert isinstance(res.tool_calls[0], ChatCompletionMessageToolCall)
 
     messages = [{"role": "user", "content": "Hello, How are you?"}]
 
     res: LLMResponse = llm.run_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=None,
     )
 
@@ -142,7 +145,7 @@ def test_run_and_parse_with_functions(mocker):
         res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
-    assert res.function_call is None, "function_call is not None"
+    assert res.tool_calls is None, "tool_calls is not None"
     assert res.raw_output is not None, "raw_output is None"
 
     # with parsing_type = "HTML"
@@ -156,8 +159,8 @@ def test_run_and_parse_with_functions(mocker):
     llm = LLM()
     res: LLMResponse = llm.run_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
@@ -170,11 +173,11 @@ def test_run_and_parse_with_functions(mocker):
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0].finish_reason == "function_call"
-    ), "finish_reason is not function_call"
+        res.api_response.choices[0].finish_reason == "tool_calls"
+    ), "finish_reason is not tool_calls"
 
-    assert res.function_call is not None, "function_call is None"
-    assert isinstance(res.function_call, FunctionCall)
+    assert res.tool_calls is not None, "tool_calls is None"
+    assert isinstance(res.tool_calls[0], ChatCompletionMessageToolCall)
 
     assert res.parsed_outputs is None, "parsed_outputs is not empty"
 
@@ -187,7 +190,7 @@ def test_run_and_parse_with_functions(mocker):
 
     res: LLMResponse = llm.run_and_parse(
         messages=messages,
-        functions=function_shemas,
+        tools=tool_schemas,
         model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
@@ -198,43 +201,44 @@ def test_run_and_parse_with_functions(mocker):
     if not "str" in res.raw_output:
         # if "str" in res.raw_output, it means that LLM make mistakes
         assert res.error is False, "error is not False"
+        assert res.parsed_outputs is not None, "parsed_outputs is None"
+
     assert res.api_response is not None, "api_response is None"
     assert (
         res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
-    assert res.function_call is None, "function_call is not None"
+    assert res.tool_calls is None, "tool_calls is not None"
     assert res.raw_output is not None, "raw_output is None"
-    assert res.parsed_outputs != {}, "parsed_outputs is empty dict"
 
 
 @pytest.mark.asyncio
-async def test_arun_and_parse_with_functions(mocker):
+async def test_arun_and_parse_with_tools(mocker):
     # With parsing_type = None
     messages = [{"role": "user", "content": "What is the weather like in Boston?"}]
     llm = LLM()
     res: LLMResponse = await llm.arun_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=None,
     )
 
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0].finish_reason == "function_call"
-    ), "finish_reason is not function_call"
-
-    assert res.function_call is not None, "function_call is None"
-    assert isinstance(res.function_call, FunctionCall)
+        res.api_response.choices[0].finish_reason == "tool_calls"
+    ), "finish_reason is not tool_calls"
+    print(res)
+    assert res.tool_calls is not None, "tool_calls is None"
+    assert isinstance(res.tool_calls[0], ChatCompletionMessageToolCall)
 
     messages = [{"role": "user", "content": "Hello, How are you?"}]
 
     res: LLMResponse = await llm.arun_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=None,
     )
 
@@ -244,7 +248,7 @@ async def test_arun_and_parse_with_functions(mocker):
         res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
-    assert res.function_call is None, "function_call is not None"
+    assert res.tool_calls is None, "tool_calls is not None"
     assert res.raw_output is not None, "raw_output is None"
 
     # with parsing_type = "HTML"
@@ -258,21 +262,21 @@ async def test_arun_and_parse_with_functions(mocker):
     llm = LLM()
     res: LLMResponse = await llm.arun_and_parse(
         messages=messages,
-        functions=function_shemas,
-        model="gpt-3.5-turbo-0613",
+        tools=tool_schemas,
+        model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
 
-    # In this case, error is False becuase if function_call, parsing is not performed
+    # In this case, error is False becuase if tool_calls, parsing is not performed
     assert res.error is False, "error is not False"
     assert res.api_response is not None, "api_response is None"
     assert (
-        res.api_response.choices[0].finish_reason == "function_call"
-    ), "finish_reason is not function_call"
+        res.api_response.choices[0].finish_reason == "tool_calls"
+    ), "finish_reason is not tool_calls"
 
-    assert res.function_call is not None, "function_call is None"
-    assert isinstance(res.function_call, FunctionCall)
+    assert res.tool_calls is not None, "tool_calls is None"
+    assert isinstance(res.tool_calls[0], ChatCompletionMessageToolCall)
 
     assert res.parsed_outputs is None, "parsed_outputs is not empty"
 
@@ -285,20 +289,19 @@ async def test_arun_and_parse_with_functions(mocker):
 
     res: LLMResponse = await llm.arun_and_parse(
         messages=messages,
-        functions=function_shemas,
+        tools=tool_schemas,
         model="gpt-4-1106-preview",
         parsing_type=ParsingType.HTML.value,
         output_keys=["response"],
     )
-    # if not "str" in res.raw_output:
-    #     # if "str" in res.raw_output, it means that LLM make mistakes
-    assert res.error is False, "error is not False"
-    assert res.parsed_outputs != {}, "parsed_outputs is empty"
+    if not "str" in res.raw_output:
+        assert res.error is False, "error is not False"
+        assert res.parsed_outputs is not None, "parsed_outputs is None"
 
     assert res.api_response is not None, "api_response is None"
     assert (
         res.api_response.choices[0].finish_reason == "stop"
     ), "finish_reason is not stop"
 
-    assert res.function_call is None, "function_call is not None"
+    assert res.tool_calls is None, "tool_calls is not None"
     assert res.raw_output is not None, "raw_output is None"

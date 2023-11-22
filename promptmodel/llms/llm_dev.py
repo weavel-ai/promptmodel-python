@@ -7,7 +7,7 @@ from litellm import acompletion, get_max_tokens
 
 from promptmodel.types.enums import ParsingType, get_pattern_by_type
 from promptmodel.utils import logger
-from promptmodel.utils.output_utils import convert_str_to_type
+from promptmodel.utils.output_utils import convert_str_to_type, update_dict
 from promptmodel.utils.token_counting import (
     num_tokens_for_messages_for_each,
     num_tokens_from_functions_input,
@@ -89,7 +89,8 @@ class LLMDev:
     async def dev_chat(
         self,
         messages: List[Dict[str, Any]],
-        tools: List[Any] = [],
+        functions: List[Any] = [],
+        tools: Optional[List[Any]] = None,
         model: Optional[str] = None,
     ) -> AsyncGenerator[Any, None]:
         """Parse & stream output from openai chat completion."""
@@ -97,11 +98,13 @@ class LLMDev:
         raw_output = ""
         # Truncate the output if it is too long
         # truncate messages to make length <= model's max length
-        token_per_tools = num_tokens_from_functions_input(functions=tools, model=model)
+        token_per_functions = num_tokens_from_functions_input(
+            functions=functions, model=model
+        )
         model_max_tokens = get_max_tokens(model=model)
         token_per_messages = num_tokens_for_messages_for_each(messages, model)
         token_limit_exceeded = (
-            sum(token_per_messages) + token_per_tools
+            sum(token_per_messages) + token_per_functions
         ) - model_max_tokens
         if token_limit_exceeded > 0:
             while token_limit_exceeded > 0:
@@ -112,6 +115,7 @@ class LLMDev:
                 token_limit_exceeded -= token_per_messages[1]
                 del messages[1]
                 del token_per_messages[1]
+
         response: AsyncGenerator[ModelResponse, None] = await acompletion(
             model=_model,
             messages=[
@@ -119,23 +123,23 @@ class LLMDev:
                 for message in self.__validate_openai_messages(messages)
             ],
             stream=True,
-            functions=tools,
+            functions=functions,
+            tools=tools,
         )
-
-        function_call = {"name": "", "arguments": ""}
 
         async for chunk in response:
             yield_api_response_with_fc = False
             if getattr(chunk.choices[0].delta, "function_call", None) is not None:
-                for key, value in (
-                    chunk.choices[0].delta.function_call.model_dump().items()
-                ):
-                    if value is not None:
-                        function_call[key] += value
-
                 yield LLMStreamResponse(
                     api_response=chunk,
-                    function_call=chunk.choices[0].delta.function_call.model_dump(),
+                    function_call=chunk.choices[0].delta.function_call,
+                )
+                yield_api_response_with_fc = True
+
+            if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
+                yield LLMStreamResponse(
+                    api_response=chunk,
+                    tool_calls=chunk.choices[0].delta.tool_calls,
                 )
                 yield_api_response_with_fc = True
 
