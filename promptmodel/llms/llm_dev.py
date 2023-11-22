@@ -117,18 +117,25 @@ class LLMDev:
                 token_limit_exceeded -= token_per_messages[1]
                 del messages[1]
                 del token_per_messages[1]
-        stream = False if model == "HCX-002" else True
+        
         response: AsyncGenerator[ModelResponse, None] = await acompletion(
+
+        args = dict(
             model=_model,
             messages=[
                 message.model_dump(exclude_none=True)
                 for message in self.__validate_openai_messages(messages)
             ],
-            stream=stream,
             functions=functions,
             tools=tools,
         )
-        if not stream:
+
+        is_stream_unsupported = model in ["HCX-002"]
+        if not is_stream_unsupported:
+            args["stream"] = True
+        response: ModelResponse = await acompletion(**args)
+        if is_stream_unsupported:
+            print(response)
             yield LLMStreamResponse(
                 raw_output=response.choices[0].message.content
             )
