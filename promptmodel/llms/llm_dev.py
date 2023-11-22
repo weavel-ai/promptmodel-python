@@ -98,16 +98,18 @@ class LLMDev:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
-        stream = False if model == "HCX-002" else True
-        response: ModelResponse = await acompletion(
+        args = dict(
             model=_model,
             messages=[
                 message.model_dump(exclude_none=True)
                 for message in self.__validate_openai_messages(messages)
             ],
-            stream=stream,
         )
-        if not stream:
+        is_stream_unsupported = model in ["HCX-002"]
+        if not is_stream_unsupported:
+            args["stream"] = True
+        response: ModelResponse = await acompletion(**args)
+        if is_stream_unsupported:
             print(response)
             yield LLMStreamResponse(
                 raw_output=response["choices"][0]["message"]["content"]
