@@ -97,7 +97,7 @@ class LLMDev:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
-        
+
         # Truncate the output if it is too long
         # truncate messages to make length <= model's max length
         token_per_functions = num_tokens_from_functions_input(
@@ -117,8 +117,6 @@ class LLMDev:
                 token_limit_exceeded -= token_per_messages[1]
                 del messages[1]
                 del token_per_messages[1]
-        
-        response: AsyncGenerator[ModelResponse, None] = await acompletion(
 
         args = dict(
             model=_model,
@@ -133,12 +131,10 @@ class LLMDev:
         is_stream_unsupported = model in ["HCX-002"]
         if not is_stream_unsupported:
             args["stream"] = True
-        response: ModelResponse = await acompletion(**args)
+        response: AsyncGenerator[ModelResponse, None] = await acompletion(**args)
         if is_stream_unsupported:
             print(response)
-            yield LLMStreamResponse(
-                raw_output=response.choices[0].message.content
-            )
+            yield LLMStreamResponse(raw_output=response.choices[0].message.content)
         else:
             async for chunk in response:
                 yield_api_response_with_fc = False
@@ -162,4 +158,3 @@ class LLMDev:
                         api_response=chunk if not yield_api_response_with_fc else None,
                         raw_output=chunk.choices[0].delta.content,
                     )
-
