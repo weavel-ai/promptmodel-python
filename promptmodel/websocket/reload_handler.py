@@ -16,6 +16,7 @@ from promptmodel.database.crud import (
     update_samples,
     update_prompt_model_uuid,
     update_chat_model_uuid,
+    delete_fake_sessions,
 )
 from promptmodel.types.enums import (
     ModelVersionStatus,
@@ -124,17 +125,18 @@ class CodeReloadHandler(FileSystemEventHandler):
             local_code_chat_model_name_list=new_chat_model_name_list,
         )
 
+        # set used_in_code = True for models appeared in code newly and already in local DB
         PromptModel.update(used_in_code=True).where(
-            PromptModel.name.not_in(old_prompt_model_name_list)
+            PromptModel.name.in_(new_prompt_model_name_list)
         ).execute()
 
         ChatModel.update(used_in_code=True).where(
-            ChatModel.name.not_in(old_chat_model_name_list)
+            ChatModel.name.in_(new_chat_model_name_list)
         ).execute()
 
         # create prompt_models in local DB
         db_prompt_model_list = [
-            model_to_dict(x, recurse=False) for x in [PromptModel.select()]
+            model_to_dict(x, recurse=False) for x in list(PromptModel.select())
         ]
         db_prompt_model_name_list = [x["name"] for x in db_prompt_model_list]
         only_in_local_names = list(
@@ -147,7 +149,7 @@ class CodeReloadHandler(FileSystemEventHandler):
 
         # create chat_models in local DB
         db_chat_model_list = [
-            model_to_dict(x, recurse=False) for x in [ChatModel.select()]
+            model_to_dict(x, recurse=False) for x in list(ChatModel.select())
         ]
         db_chat_model_name_list = [x["name"] for x in db_chat_model_list]
         only_in_local_names = list(
@@ -157,6 +159,9 @@ class CodeReloadHandler(FileSystemEventHandler):
             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local_names
         ]
         ChatModel.insert_many(only_in_local_chat_models).execute()
+
+        # Delete every ChatLogSession with len(Chatlog) = 1 where ChatLog.session_uuid = ChatLogSession.uuid
+        delete_fake_sessions()
 
         # update samples in local DB
         update_samples(new_devapp_instance.samples)
@@ -171,10 +176,10 @@ def update_by_changelog_for_reload(
 ):
     """Update Local DB by changelog"""
     local_db_prompt_model_list: list = [
-        model_to_dict(x, recurse=False) for x in [PromptModel.select()]
+        model_to_dict(x, recurse=False) for x in list(PromptModel.select())
     ]  # {"name", "uuid"}
     local_db_chat_model_list: list = [
-        model_to_dict(x, recurse=False) for x in [ChatModel.select()]
+        model_to_dict(x, recurse=False) for x in list(ChatModel.select())
     ]  # {"name", "uuid"}
 
     for changelog in changelogs:
@@ -309,7 +314,7 @@ def update_prompt_model_changelog(
                 update_prompt_model_uuid(local_uuid, prompt_model["uuid"])
 
                 local_db_prompt_model_list: list = [
-                    model_to_dict(x, recurse=False) for x in [PromptModel.select()]
+                    model_to_dict(x, recurse=False) for x in list(PromptModel.select())
                 ]
     else:
         # TODO: add code DELETE, CHANGE, FIX later
@@ -409,7 +414,7 @@ def update_chat_model_changelog(
                 update_chat_model_uuid(local_uuid, chat_model["uuid"])
 
                 local_db_chat_model_list: list = [
-                    model_to_dict(x, recurse=False) for x in [ChatModel.select()]
+                    model_to_dict(x, recurse=False) for x in list(ChatModel.select())
                 ]
     else:
         # TODO: add code DELETE, CHANGE, FIX later

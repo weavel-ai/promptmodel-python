@@ -216,7 +216,9 @@ def dev():
         # Save new prompt_model in code to local DB
         local_db_prompt_model_names = [
             x["name"]
-            for x in [model_to_dict(x, recurse=False) for x in [PromptModel.select()]]
+            for x in [
+                model_to_dict(x, recurse=False) for x in list(PromptModel.select())
+            ]
         ]
         only_in_local = list(
             set(local_code_prompt_model_name_list) - set(local_db_prompt_model_names)
@@ -229,7 +231,7 @@ def dev():
         # Save new chat_model in code to local DB
         local_db_chat_model_names = [
             x["name"]
-            for x in [model_to_dict(x, recurse=False) for x in [ChatModel.select()]]
+            for x in [model_to_dict(x, recurse=False) for x in list(ChatModel.select())]
         ]
         only_in_local = list(
             set(local_code_chat_model_name_list) - set(local_db_chat_model_names)
@@ -305,10 +307,10 @@ def update_by_changelog(
 ):
     """Update Local DB by changelog"""
     local_db_prompt_model_list: List = [
-        model_to_dict(x, recurse=False) for x in [PromptModel.select()]
+        model_to_dict(x, recurse=False) for x in list(PromptModel.select())
     ]  # {"name", "uuid"}
     local_db_chat_model_list: List = [
-        model_to_dict(x, recurse=False) for x in [ChatModel.select()]
+        model_to_dict(x, recurse=False) for x in list(ChatModel.select())
     ]  # {"name", "uuid"}
 
     for changelog in changelogs:
@@ -490,7 +492,8 @@ def update_prompt_model_changelog(
                         local_db_prompt_model["uuid"], prompt_model["uuid"]
                     )
                     local_db_prompt_model_list: list = [
-                        model_to_dict(x, recurse=False) for x in [PromptModel.select()]
+                        model_to_dict(x, recurse=False)
+                        for x in list(PromptModel.select())
                     ]
     else:
         # TODO: add code DELETE, CHANGE, FIX later
@@ -618,7 +621,8 @@ def update_chat_model_changelog(
                         local_db_chat_model["uuid"], chat_model["uuid"]
                     )
                     local_db_chat_model_list: list = [
-                        model_to_dict(x, recurse=False) for x in [ChatModel.select()]
+                        model_to_dict(x, recurse=False)
+                        for x in list(ChatModel.select())
                     ]
     else:
         # TODO: add code DELETE, CHANGE, FIX later

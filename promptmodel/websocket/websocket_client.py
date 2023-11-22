@@ -115,7 +115,7 @@ class DevWebsocketClient:
                 data = {"prompt_model_versions": prompt_model_version_list}
 
             elif message["type"] == LocalTask.LIST_SAMPLES:
-                sample_inputs_rows = [SampleInputs.select()]
+                sample_inputs_rows = list(SampleInputs.select())
                 sample_inputs_list = [
                     model_to_dict(model, recurse=False) for model in sample_inputs_rows
                 ]

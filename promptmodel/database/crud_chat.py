@@ -1,14 +1,38 @@
 from typing import Dict, List, Optional, Tuple, Any
 from uuid import UUID
+from playhouse.shortcuts import model_to_dict
+from peewee import fn, JOIN
+
 from promptmodel.database.models import (
     ChatModel,
     ChatModelVersion,
     ChatLog,
+    ChatLogSession,
 )
-from playhouse.shortcuts import model_to_dict
 from promptmodel.types.enums import ModelVersionStatus
 from promptmodel.utils import logger
 from promptmodel.database.config import db
+
+
+def delete_fake_sessions():
+    """Delete ChatLogSession which len(ChatLog) == 1 where ChatLog.session_uuid == ChatLogSession.uuid"""
+    with db.atomic():
+        sessions_to_delete: List[ChatLogSession] = list(
+            ChatLogSession.select()
+            .join(ChatLog, JOIN.LEFT_OUTER)
+            .group_by(ChatLogSession)
+            .having(fn.COUNT(ChatLog.id) <= 1)
+        )
+        (
+            (
+                ChatLogSession.delete().where(
+                    ChatLogSession.uuid.in_(
+                        [session.uuid for session in sessions_to_delete]
+                    )
+                )
+            ).execute()
+        )
+    return
 
 
 def hide_chat_model_not_in_code(local_chat_model_list: List):
@@ -105,37 +129,57 @@ def get_latest_version_chat_model(
 ) -> Tuple[List[Dict[str, Any]], str]:
     try:
         if session_uuid:
-            chat_logs: List[ChatLog] = (
-                ChatLog.select()
-                .where(ChatLog.session_uuid == UUID(session_uuid))
-                .order_by(ChatLog.created_at.desc())
-                .get()
+            if type(session_uuid) == str:
+                session_uuid = UUID(session_uuid)
+            session: ChatLogSession = ChatLogSession.get(
+                ChatLogSession.uuid == session_uuid
             )
-            chat_model_uuid = chat_logs[0].version_uuid.uuid
 
             version: ChatModelVersion = ChatModelVersion.get(
-                ChatModelVersion.uuid == chat_model_uuid
+                ChatModelVersion.uuid == session.version_uuid
             )
 
             instruction: List[Dict[str, Any]] = [version["system_prompt"]]
         else:
             with db.atomic():
-                latest_chat_log: ChatLog = (
-                    ChatLog.select()
-                    .join(ChatModelVersion)
-                    .where(
-                        ChatModelVersion.chat_model_uuid
-                        == ChatModel.get(ChatModel.name == chat_model_name).uuid
+                try:
+                    sessions_with_version: List[ChatLogSession] = (
+                        ChatLogSession.select()
+                        .join(ChatModelVersion)
+                        .where(
+                            ChatModelVersion.chat_model_uuid
+                            == ChatModel.get(ChatModel.name == chat_model_name).uuid
+                        )
+                        .get()
                     )
-                    .order_by(ChatLog.created_at.desc())
-                    .get()
-                )
+                    session_uuids = [x.uuid for x in sessions_with_version]
 
-                version: ChatModelVersion = (
-                    ChatModelVersion.select()
-                    .where(ChatModelVersion.uuid == latest_chat_log.version_uuid.uuid)
-                    .get()
-                )
+                    latest_chat_log: List[ChatLog] = (
+                        ChatLog.select()
+                        .where(ChatLog.session_uuid.in_(session_uuids))
+                        .order_by(ChatLog.created_at.desc())
+                        .get()
+                    )
+
+                    latest_chat_log: ChatLog = latest_chat_log[0]
+                    latest_session: ChatLogSession = ChatLogSession.get(
+                        ChatLogSession.uuid == latest_chat_log.session_uuid
+                    )
+
+                    version: ChatModelVersion = (
+                        ChatModelVersion.select()
+                        .where(ChatModelVersion.uuid == latest_session.uuid)
+                        .get()
+                    )
+                except:
+                    version: List[ChatModelVersion] = (
+                        ChatModelVersion.select()
+                        .join(ChatModel)
+                        .where(ChatModel.name == chat_model_name)
+                        .order_by(ChatModelVersion.created_at.desc())
+                        .get()
+                    )
+                    version: ChatModelVersion = version[0]
 
                 instruction: List[Dict[str, Any]] = [version["system_prompt"]]
 

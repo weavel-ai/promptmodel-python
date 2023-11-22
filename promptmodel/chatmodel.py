@@ -52,29 +52,30 @@ class ChatModel(metaclass=RegisteringMeta):
                 pass
             elif "dev_branch" in config and config["dev_branch"]["online"] == True:
                 # if dev online=True, save in Local DB
-                session: ChatLogSession = ChatLogSession.create(
-                    {
-                        "uuid": self.session_uuid,
-                        "version_uuid": version_details["uuid"],
-                        "run_from_deployment": False,
-                    }
-                )
+                if "uuid" in version_details:
+                    session: ChatLogSession = ChatLogSession.create(
+                        {
+                            "uuid": self.session_uuid,
+                            "version_uuid": version_details["uuid"],
+                            "run_from_deployment": False,
+                        }
+                    )
 
-                if session is None:
-                    raise Exception("Failed to create session")
+                    if session is None:
+                        raise Exception("Failed to create session")
 
-                ChatLog.create(
-                    {
-                        "session_uuid": self.session_uuid,
-                        "role": instruction[0]["role"],
-                        "content": instruction[0]["content"],
-                        "tool_calls": None,
-                        "token_usage": None,
-                        "latency": None,
-                        "cost": None,
-                        "metadata": None,
-                    }
-                )
+                    ChatLog.create(
+                        {
+                            "session_uuid": self.session_uuid,
+                            "role": instruction[0]["role"],
+                            "content": instruction[0]["content"],
+                            "tool_calls": None,
+                            "token_usage": None,
+                            "latency": None,
+                            "cost": None,
+                            "metadata": None,
+                        }
+                    )
             else:
                 run_async_in_sync(
                     self.llm_proxy._async_chat_log_to_cloud(
