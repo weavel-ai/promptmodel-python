@@ -14,6 +14,7 @@ from promptmodel.utils.token_counting import (
 )
 from promptmodel.types.response import LLMStreamResponse, ModelResponse
 
+
 load_dotenv()
 
 
@@ -92,10 +93,11 @@ class LLMDev:
         functions: List[Any] = [],
         tools: Optional[List[Any]] = None,
         model: Optional[str] = None,
-    ) -> AsyncGenerator[Any, None]:
+    ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
+        
         # Truncate the output if it is too long
         # truncate messages to make length <= model's max length
         token_per_functions = num_tokens_from_functions_input(
@@ -115,37 +117,42 @@ class LLMDev:
                 token_limit_exceeded -= token_per_messages[1]
                 del messages[1]
                 del token_per_messages[1]
-
+        stream = False if model == "HCX-002" else True
         response: AsyncGenerator[ModelResponse, None] = await acompletion(
             model=_model,
             messages=[
                 message.model_dump(exclude_none=True)
                 for message in self.__validate_openai_messages(messages)
             ],
-            stream=True,
+            stream=stream,
             functions=functions,
             tools=tools,
         )
+        if not stream:
+            yield LLMStreamResponse(
+                raw_output=response.choices[0].message.content
+            )
+        else:
+            async for chunk in response:
+                yield_api_response_with_fc = False
+                if getattr(chunk.choices[0].delta, "function_call", None) is not None:
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        function_call=chunk.choices[0].delta.function_call,
+                    )
+                    yield_api_response_with_fc = True
 
-        async for chunk in response:
-            yield_api_response_with_fc = False
-            if getattr(chunk.choices[0].delta, "function_call", None) is not None:
-                yield LLMStreamResponse(
-                    api_response=chunk,
-                    function_call=chunk.choices[0].delta.function_call,
-                )
-                yield_api_response_with_fc = True
+                if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
+                    yield LLMStreamResponse(
+                        api_response=chunk,
+                        tool_calls=chunk.choices[0].delta.tool_calls,
+                    )
+                    yield_api_response_with_fc = True
 
-            if getattr(chunk.choices[0].delta, "tool_calls", None) is not None:
-                yield LLMStreamResponse(
-                    api_response=chunk,
-                    tool_calls=chunk.choices[0].delta.tool_calls,
-                )
-                yield_api_response_with_fc = True
+                if getattr(chunk.choices[0].delta, "content", None) is not None:
+                    raw_output += chunk.choices[0].delta.content
+                    yield LLMStreamResponse(
+                        api_response=chunk if not yield_api_response_with_fc else None,
+                        raw_output=chunk.choices[0].delta.content,
+                    )
 
-            if getattr(chunk.choices[0].delta, "content", None) is not None:
-                raw_output += chunk.choices[0].delta.content
-                yield LLMStreamResponse(
-                    api_response=chunk if not yield_api_response_with_fc else None,
-                    raw_output=chunk.choices[0].delta.content,
-                )
