@@ -27,7 +27,7 @@ from promptmodel.promptmodel_init import CacheManager
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.utils.random_utils import select_version_by_ratio
 from promptmodel.utils import logger
-from promptmodel.utils.async_util import run_async_in_sync
+from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.utils.token_counting import (
     num_tokens_for_messages_for_each,
     num_tokens_from_functions_input,

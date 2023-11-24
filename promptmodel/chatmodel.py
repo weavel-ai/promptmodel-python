@@ -12,7 +12,7 @@ from promptmodel.utils.config_utils import (
     upsert_config,
     check_connection_status_decorator,
 )
-from promptmodel.utils.async_util import run_async_in_sync
+from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.types.response import LLMStreamResponse, LLMResponse, ChatModelConfig
 
 

@@ -10,7 +10,7 @@ from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.types.response import *
 from promptmodel.types.enums import ParsingType
-from promptmodel.utils.async_util import run_async_in_sync
+from promptmodel.utils.async_utils import run_async_in_sync
 
 html_output_format = """\
 You must follow the provided output format. Keep the string between <> as it is.
