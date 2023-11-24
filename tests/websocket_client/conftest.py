@@ -30,6 +30,14 @@ def mock_websocket():
     mock_websocket.__aenter__ = aenter
     mock_websocket.__aexit__ = aexit
     mock_websocket.recv = AsyncMock(return_value='{"key" : "value"}')
-    mock_websocket.send = AsyncMock(side_effect=echo_coroutine)
+    mock_websocket.send = AsyncMock()
 
     return mock_websocket
+
+
+@pytest.fixture
+def mock_json_dumps():
+    mock_json_dumps = MagicMock()
+    # it should return exactly the same as the input
+    mock_json_dumps.side_effect = lambda data, *args, **kwargs: data
+    return mock_json_dumps

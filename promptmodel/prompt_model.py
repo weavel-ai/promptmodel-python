@@ -15,6 +15,7 @@ from typing import (
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.async_utils import run_async_in_sync
+from promptmodel.utils.config_utils import check_connection_status_decorator
 from promptmodel.types.response import LLMStreamResponse, LLMResponse, PromptModelConfig
 from promptmodel import DevClient
 
@@ -71,7 +72,8 @@ class PromptModel(metaclass=RegisteringMeta):
         self.llm_proxy = LLMProxy(name, version)
         self.version = version
 
-    def get_config(self) -> List[Dict[str, str]]:
+    @check_connection_status_decorator
+    def get_config(self) -> PromptModelConfig:
         """Get config for the promptmodel.
         It will fetch the prompt and version you specified from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
         - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
@@ -87,6 +89,7 @@ class PromptModel(metaclass=RegisteringMeta):
         )
         return PromptModelConfig(prompt, version_detail)
 
+    @check_connection_status_decorator
     def run(
         self,
         inputs: Dict[str, Any] = {},
@@ -106,6 +109,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         return self.llm_proxy.run(inputs, functions, tools, self.api_key)
 
+    @check_connection_status_decorator
     async def arun(
         self,
         inputs: Dict[str, Any] = {},
@@ -125,6 +129,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         return await self.llm_proxy.arun(inputs, functions, tools, self.api_key)
 
+    @check_connection_status_decorator
     def stream(
         self,
         inputs: Dict[str, Any] = {},
@@ -145,6 +150,7 @@ class PromptModel(metaclass=RegisteringMeta):
         for item in self.llm_proxy.stream(inputs, functions, tools, self.api_key):
             yield item
 
+    @check_connection_status_decorator
     async def astream(
         self,
         inputs: Optional[Dict[str, Any]] = {},
@@ -169,6 +175,7 @@ class PromptModel(metaclass=RegisteringMeta):
             )
         )
 
+    @check_connection_status_decorator
     def run_and_parse(
         self,
         inputs: Dict[str, Any] = {},
@@ -188,6 +195,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         return self.llm_proxy.run_and_parse(inputs, functions, tools, self.api_key)
 
+    @check_connection_status_decorator
     async def arun_and_parse(
         self,
         inputs: Dict[str, Any] = {},
@@ -209,6 +217,7 @@ class PromptModel(metaclass=RegisteringMeta):
             inputs, functions, tools, self.api_key
         )
 
+    @check_connection_status_decorator
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
@@ -231,6 +240,7 @@ class PromptModel(metaclass=RegisteringMeta):
         ):
             yield item
 
+    @check_connection_status_decorator
     async def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},

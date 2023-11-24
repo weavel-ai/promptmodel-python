@@ -63,7 +63,7 @@ class ChatModel(metaclass=RegisteringMeta):
 
         if session_uuid is None:
             self.session_uuid = uuid4()
-            instruction, version_details = run_async_in_sync(
+            instruction, version_details, chat_logs = run_async_in_sync(
                 LLMProxy.fetch_chat_model(self.name, version)
             )
             config = read_config()
@@ -81,7 +81,7 @@ class ChatModel(metaclass=RegisteringMeta):
         else:
             self.session_uuid = session_uuid
 
-    def get_config(self) -> List[Dict[str, str]]:
+    def get_config(self) -> ChatModelConfig:
         """Get config for the ChatModel.
         It will fetch the published prompt and version config from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
         - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.

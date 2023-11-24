@@ -53,11 +53,14 @@ class PromptModelConfig:
 
 class ChatModelConfig:
     def __init__(
-        self, prompts, version_detail, message_logs: Optional[Dict] = None
+        self,
+        system_prompt: str,
+        version_detail: Dict,
+        message_logs: Optional[Dict] = [],
     ) -> None:
-        self.prompts = prompts
+        self.system_prompt = system_prompt
         self.version_detail = version_detail
-        self.message_logs = message_logs if message_logs else prompts
+        self.message_logs = message_logs
 
 
 class FunctionSchema(BaseModel):

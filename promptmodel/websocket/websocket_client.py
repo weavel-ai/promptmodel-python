@@ -124,7 +124,6 @@ class DevWebsocketClient:
                     function_schemas: List[Dict] = message[
                         "function_schemas"
                     ]  # this has a mock_response which should not be sent to LLM
-                    function_names: List[str] = message["functions"]
                     function_mock_responses = {}
                     for function_schema in function_schemas:
                         function_mock_responses[
@@ -232,7 +231,9 @@ class DevWebsocketClient:
                                 "function_response": {
                                     "name": function_call["name"],
                                     "response": "FAKE RESPONSE : "
-                                    + function_mock_responses[function_call["name"]],
+                                    + str(
+                                        function_mock_responses[function_call["name"]]
+                                    ),
                                 },
                             }
                             data.update(response)
@@ -440,10 +441,10 @@ class DevWebsocketClient:
                             # logger.debug(f"Sent response: {data}")
                             await ws.send(json.dumps(data, cls=CustomJSONEncoder))
 
-                        data = {
-                            "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
-                            "status": "completed",
-                        }
+                    data = {
+                        "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                        "status": "completed",
+                    }
 
                 except Exception as error:
                     logger.error(f"Error running service: {error}")
