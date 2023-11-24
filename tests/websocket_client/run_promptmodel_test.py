@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from websockets.exceptions import ConnectionClosedOK
 from promptmodel.websocket.websocket_client import DevWebsocketClient
 from promptmodel.types.enums import LocalTask, ParsingType
-from promptmodel.database.models import PromptModelVersion, PromptModel, SampleInputs
 from promptmodel.types.response import FunctionSchema
 
 

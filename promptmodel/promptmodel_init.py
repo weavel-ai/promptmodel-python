@@ -21,15 +21,15 @@ def init(use_cache: Optional[bool] = True):
     config = read_config()
     if (
         config
-        and "dev_branch" in config
+        and "connection" in config
         and (
             (
-                "online" in config["dev_branch"]
-                and config["dev_branch"]["online"] == True
+                "online" in config["connection"]
+                and config["connection"]["online"] == True
             )
             or (
-                "initializing" in config["dev_branch"]
-                and config["dev_branch"]["initializing"] == True
+                "initializing" in config["connection"]
+                and config["connection"]["initializing"] == True
             )
         )
     ):
@@ -115,9 +115,9 @@ class CacheManager:
 
 async def update_deployed_db(config):
     if "project" not in config or "version" not in config["project"]:
-        cached_project_version = "0.0.0"
+        cached_project_version = 0
     else:
-        cached_project_version = config["project"]["version"]
+        cached_project_version = int(config["project"]["version"])
     try:
         res = await AsyncAPIClient.execute(
             method="GET",

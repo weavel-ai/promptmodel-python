@@ -8,12 +8,6 @@ from dataclasses import dataclass
 from websockets.exceptions import ConnectionClosedOK
 from promptmodel.websocket.websocket_client import DevWebsocketClient
 from promptmodel.types.enums import LocalTask, ParsingType
-from promptmodel.database.models import (
-    ChatModelVersion,
-    ChatModel,
-    ChatLog,
-    ChatLogSession,
-)
 from promptmodel.types.response import FunctionSchema
 
 
