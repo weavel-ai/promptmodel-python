@@ -10,7 +10,7 @@ from promptmodel.types.response import LLMResponse, LLMStreamResponse
 from promptmodel.types.enums import ParsingType
 from promptmodel import PromptModel, DevClient
 from promptmodel.dev_app import PromptModelInterface
-from promptmodel.promptmodel import RegisteringMeta
+from promptmodel.prompt_model import RegisteringMeta
 
 client = DevClient()
 

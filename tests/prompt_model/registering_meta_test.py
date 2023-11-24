@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from promptmodel.promptmodel import RegisteringMeta
+from promptmodel.prompt_model import RegisteringMeta
 
 
 def test_registering_meta(mocker):
