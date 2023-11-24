@@ -14,13 +14,9 @@ proxy = LLMProxy(name="test")
 
 def test_chat_run(
     mocker,
-    mock_fetch_chat_log: AsyncMock,
     mock_fetch_chat_model: AsyncMock,
     mock_async_chat_log_to_cloud: AsyncMock,
 ):
-    fetch_chat_log = mocker.patch(
-        "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_log", mock_fetch_chat_log
-    )
     fetch_chat_model = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_model", mock_fetch_chat_model
     )
@@ -32,7 +28,6 @@ def test_chat_run(
 
     res: LLMResponse = proxy.chat_run(session_uuid="testuuid")
 
-    fetch_chat_log.assert_called_once()
     fetch_chat_model.assert_called_once()
     async_chat_log_to_cloud.assert_called_once()
 
@@ -51,13 +46,9 @@ def test_chat_run(
 @pytest.mark.asyncio
 async def test_chat_arun(
     mocker,
-    mock_fetch_chat_log: AsyncMock,
     mock_fetch_chat_model: AsyncMock,
     mock_async_chat_log_to_cloud: AsyncMock,
 ):
-    fetch_chat_log = mocker.patch(
-        "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_log", mock_fetch_chat_log
-    )
     fetch_chat_model = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_model", mock_fetch_chat_model
     )
@@ -69,7 +60,6 @@ async def test_chat_arun(
 
     res: LLMResponse = await proxy.chat_arun(session_uuid="testuuid")
 
-    fetch_chat_log.assert_called_once()
     fetch_chat_model.assert_called_once()
     async_chat_log_to_cloud.assert_called_once()
 
@@ -81,13 +71,9 @@ async def test_chat_arun(
 
 def test_chat_stream(
     mocker,
-    mock_fetch_chat_log: AsyncMock,
     mock_fetch_chat_model: AsyncMock,
     mock_async_chat_log_to_cloud: AsyncMock,
 ):
-    fetch_chat_log = mocker.patch(
-        "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_log", mock_fetch_chat_log
-    )
     fetch_chat_model = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_model", mock_fetch_chat_model
     )
@@ -104,7 +90,6 @@ def test_chat_stream(
     for chunk in res:
         chunks.append(chunk)
 
-    fetch_chat_log.assert_called_once()
     fetch_chat_model.assert_called_once()
     async_chat_log_to_cloud.assert_called_once()
 
@@ -117,13 +102,9 @@ def test_chat_stream(
 @pytest.mark.asyncio
 async def test_chat_astream(
     mocker,
-    mock_fetch_chat_log: AsyncMock,
     mock_fetch_chat_model: AsyncMock,
     mock_async_chat_log_to_cloud: AsyncMock,
 ):
-    fetch_chat_log = mocker.patch(
-        "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_log", mock_fetch_chat_log
-    )
     fetch_chat_model = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_model", mock_fetch_chat_model
     )
@@ -140,7 +121,6 @@ async def test_chat_astream(
     async for chunk in res:
         chunks.append(chunk)
 
-    fetch_chat_log.assert_called_once()
     fetch_chat_model.assert_called_once()
     async_chat_log_to_cloud.assert_called_once()
 
@@ -152,15 +132,11 @@ async def test_chat_astream(
 
 def test_chat_run_extra_long_input(
     mocker,
-    mock_fetch_chat_log: AsyncMock,
     mock_fetch_chat_model: AsyncMock,
     mock_async_chat_log_to_cloud: AsyncMock,
 ):
     mocker.patch("promptmodel.llms.llm_proxy.get_max_tokens", return_value=10)
 
-    fetch_chat_log = mocker.patch(
-        "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_log", mock_fetch_chat_log
-    )
     fetch_chat_model = mocker.patch(
         "promptmodel.llms.llm_proxy.LLMProxy.fetch_chat_model", mock_fetch_chat_model
     )
@@ -172,7 +148,6 @@ def test_chat_run_extra_long_input(
 
     res: LLMResponse = proxy.chat_run(session_uuid="testuuid")
 
-    fetch_chat_log.assert_called_once()
     fetch_chat_model.assert_called_once()
     async_chat_log_to_cloud.assert_called_once()
 
