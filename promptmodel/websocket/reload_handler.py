@@ -82,7 +82,7 @@ class CodeReloadHandler(FileSystemEventHandler):
         res = run_async_in_sync(
             self.dev_websocket_client.request(
                 ServerTask.SYNC_CODE,
-                data={
+                message={
                     "new_prompt_model": new_prompt_model_name_list,
                     "new_chat_model": new_chat_model_name_list,
                     "new_samples": new_samples,

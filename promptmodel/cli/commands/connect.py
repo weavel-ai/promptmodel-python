@@ -92,22 +92,27 @@ def connect():
     print(
         f"\nIf browser doesn't open automatically, please visit [link={dev_url}]{dev_url}[/link]"
     )
-    webbrowser.open(dev_url)
+    # webbrowser.open(dev_url)
 
     upsert_config({"online": True, "initializing": False}, section="connection")
 
     # save samples, FunctionSchema, PromptModel, ChatModel to cloud server in dev_websocket_client.connect_to_gateway
+    print(devapp_instance._get_prompt_model_name_list())
+    print(devapp_instance._get_chat_model_name_list())
+    print(devapp_instance._get_function_schemas())
+    print(devapp_instance.samples)
 
     res = APIClient.execute(
         method="POST",
         path="/save_instances_in_code",
         params={"project_uuid": project["uuid"]},
-        data={
+        json={
             "prompt_models": devapp_instance._get_prompt_model_name_list(),
             "chat_models": devapp_instance._get_chat_model_name_list(),
             "function_schemas": devapp_instance._get_function_schemas(),
             "samples": devapp_instance.samples,
         },
+        use_cli_key=False,
     )
     if res.status_code != 200:
         print(f"Error: {res.json()['detail']}")
