@@ -1,5 +1,5 @@
 import typer
-
+import os
 from promptmodel.utils.config_utils import read_config, upsert_config
 from promptmodel.database.orm import initialize_db
 
@@ -15,8 +15,11 @@ def fix():
             upsert_config({"online": False}, "connection")
         if "reloading" in connection and connection["reloading"] == True:
             upsert_config({"reloading": False}, "connection")
-
-    initialize_db()
+    # delete .promptmodel/promptmodel.db
+    # if .promptmodel/promptmodel.db exist, delete it
+    if os.path.exists(".promptmodel/promptmodel.db"):
+        os.remove(".promptmodel/promptmodel.db")
+    # initialize_db()
 
     return
 

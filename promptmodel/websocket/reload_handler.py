@@ -77,7 +77,7 @@ class CodeReloadHandler(FileSystemEventHandler):
         new_prompt_model_name_list = new_devapp_instance._get_prompt_model_name_list()
         new_chat_model_name_list = new_devapp_instance._get_chat_model_name_list()
         new_samples = new_devapp_instance.samples
-        new_function_schemas = new_devapp_instance._get_function_schemas()
+        new_function_schemas = new_devapp_instance._get_function_schema_list()
 
         res = run_async_in_sync(
             self.dev_websocket_client.request(

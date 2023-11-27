@@ -120,6 +120,12 @@ class DevApp:
     def _get_function_name_list(self) -> List[str]:
         return list(self.functions.keys())
 
+    def _get_function_schema_list(self) -> List[Dict]:
+        return [
+            self.functions[function_name]["schema"].model_dump()
+            for function_name in self._get_function_name_list()
+        ]
+
     def _get_function_schemas(self, function_names: List[str] = []):
         try:
             function_schemas = [

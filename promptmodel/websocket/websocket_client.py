@@ -141,6 +141,7 @@ class DevWebsocketClient:
                         functions=function_schemas,
                         model=model,
                     )
+
                     async for item in res:
                         # send item to backend
                         # save item & parse
@@ -295,7 +296,6 @@ class DevWebsocketClient:
                     function_schemas: List[Dict] = message[
                         "function_schemas"
                     ]  # this has a mock_response which should not be sent to LLM
-                    function_names: List[str] = message["functions"]
                     function_mock_responses = {}
                     for function_schema in function_schemas:
                         function_mock_responses[

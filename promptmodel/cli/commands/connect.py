@@ -97,10 +97,6 @@ def connect():
     upsert_config({"online": True, "initializing": False}, section="connection")
 
     # save samples, FunctionSchema, PromptModel, ChatModel to cloud server in dev_websocket_client.connect_to_gateway
-    print(devapp_instance._get_prompt_model_name_list())
-    print(devapp_instance._get_chat_model_name_list())
-    print(devapp_instance._get_function_schemas())
-    print(devapp_instance.samples)
 
     res = APIClient.execute(
         method="POST",
@@ -109,7 +105,7 @@ def connect():
         json={
             "prompt_models": devapp_instance._get_prompt_model_name_list(),
             "chat_models": devapp_instance._get_chat_model_name_list(),
-            "function_schemas": devapp_instance._get_function_schemas(),
+            "function_schemas": devapp_instance._get_function_schema_list(),
             "samples": devapp_instance.samples,
         },
         use_cli_key=False,
