@@ -1,4 +1,5 @@
 import os
+import asyncio
 from typing import Any, Dict
 import yaml
 
@@ -53,3 +54,44 @@ def upsert_config(new_config: Dict[str, Any], section: str = None):
 
     with open(CONFIG_FILE, "w") as file:
         yaml.safe_dump(config, file, default_flow_style=False)
+
+
+def check_connection_status_decorator(method):
+    if asyncio.iscoroutinefunction(method):
+
+        async def async_wrapper(self, *args, **kwargs):
+            config = read_config()
+            if "connection" in config and (
+                (
+                    "initializing" in config["connection"]
+                    and config["connection"]["initializing"]
+                )
+                or (
+                    "reloading" in config["connection"]
+                    and config["connection"]["reloading"]
+                )
+            ):
+                return
+            else:
+                return await method(self, *args, **kwargs)
+
+        return async_wrapper
+    else:
+
+        def wrapper(self, *args, **kwargs):
+            config = read_config()
+            if "connection" in config and (
+                (
+                    "initializing" in config["connection"]
+                    and config["connection"]["initializing"]
+                )
+                or (
+                    "reloading" in config["connection"]
+                    and config["connection"]["reloading"]
+                )
+            ):
+                return
+            else:
+                return method(self, *args, **kwargs)
+
+        return wrapper

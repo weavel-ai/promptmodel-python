@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Coroutine
+from typing import Any, Dict, List, Optional, Coroutine, Union
 from uuid import uuid4
 from promptmodel import DevClient
 
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.database.models import ChatLog, ChatLogSession
 from promptmodel.utils import logger
-from promptmodel.utils.config_utils import read_config, upsert_config
-from promptmodel.utils.async_util import run_async_in_sync
-from promptmodel.types.response import LLMStreamResponse, LLMResponse
+from promptmodel.utils.config_utils import (
+    read_config,
+    upsert_config,
+    check_connection_status_decorator,
+)
+from promptmodel.utils.async_utils import run_async_in_sync
+from promptmodel.types.response import LLMStreamResponse, LLMResponse, ChatModelConfig
 
 
 class RegisteringMeta(type):
@@ -38,71 +41,61 @@ class RegisteringMeta(type):
 
 
 class ChatModel(metaclass=RegisteringMeta):
-    def __init__(self, name, session_uuid: str = None, api_key: Optional[str] = None):
+    """
+
+    Args:
+        name (_type_): _description_
+        version (Optional[ Union[str, int] ], optional): Choose which PromptModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
+        api_key (Optional[str], optional): API key for the LLM. Defaults to None. If None, use api_key in .env file.
+    """
+
+    def __init__(
+        self,
+        name,
+        session_uuid: str = None,
+        version: Optional[Union[str, int]] = "deploy",
+        api_key: Optional[str] = None,
+    ):
         self.name = name
         self.api_key = api_key
-        self.llm_proxy = LLMProxy(name)
+        self.llm_proxy = LLMProxy(name, version)
+        self.version = version
+
         if session_uuid is None:
             self.session_uuid = uuid4()
-            instruction, version_details = run_async_in_sync(
-                LLMProxy.fetch_chat_model(self.name)
+            instruction, version_details, chat_logs = run_async_in_sync(
+                LLMProxy.fetch_chat_model(self.name, version)
             )
             config = read_config()
-            if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+            if "connection" in config and config["connection"]["initializing"] == True:
                 pass
-            elif "dev_branch" in config and config["dev_branch"]["online"] == True:
-                # if dev online=True, save in Local DB
-                if "uuid" in version_details:
-                    session: ChatLogSession = ChatLogSession.create(
-                        {
-                            "uuid": self.session_uuid,
-                            "version_uuid": version_details["uuid"],
-                            "run_from_deployment": False,
-                        }
-                    )
-
-                    if session is None:
-                        raise Exception("Failed to create session")
-
-                    ChatLog.create(
-                        {
-                            "session_uuid": self.session_uuid,
-                            "role": instruction[0]["role"],
-                            "content": instruction[0]["content"],
-                            "tool_calls": None,
-                            "token_usage": None,
-                            "latency": None,
-                            "cost": None,
-                            "metadata": None,
-                        }
-                    )
+            elif "connection" in config and config["connection"]["reloading"] == True:
+                pass
             else:
                 run_async_in_sync(
-                    self.llm_proxy._async_chat_log_to_cloud(
+                    self.llm_proxy._async_make_session_cloud(
                         self.session_uuid,
-                        instruction,
                         version_details["uuid"],
-                        [{}],
                     )
                 )
         else:
             self.session_uuid = session_uuid
 
-    def get_prompts(self) -> List[Dict[str, str]]:
-        """Get prompt for the promptmodel.
-        If dev mode is running(if .promptmodel/config['dev_branch']['online'] = True), it will fetch the latest tested prompt in the dev branch local DB.
-        If dev mode is not running, it will fetch the published prompt from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
+    def get_config(self) -> ChatModelConfig:
+        """Get config for the ChatModel.
+        It will fetch the published prompt and version config from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
         - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
-        If dev mode is initializing, it will return {}.
+        If dev mode is initializing, it will return None
 
         Returns:
-            List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
+            ChatModelConfig: config for the ChatModel, which contains prompts and version_detail, message_logs
         """
-        instruction, detail = run_async_in_sync(
-            LLMProxy.fetch_chat_model(self.name, self.session_uuid)
+        prompt, version_detail, message_logs = run_async_in_sync(
+            LLMProxy.fetch_chat_model(self.name, self.session_uuid, self.version)
         )
-        return instruction
+        return ChatModelConfig(prompt, version_detail, message_logs)
 
+    @check_connection_status_decorator
     def add_messages(
         self, new_messages: List[Dict[str, Any]], metadata_list: List[Optional[Dict]]
     ) -> None:
@@ -113,23 +106,10 @@ class ChatModel(metaclass=RegisteringMeta):
         """
         # Save messages to Cloud DB
         config = read_config()
-        if "dev_branch" in config and config["dev_branch"]["initializing"] == True:
+        if "connection" in config and config["connection"]["initializing"] == True:
             pass
-        elif "dev_branch" in config and config["dev_branch"]["online"] == True:
-            # if dev online=True, add to Local DB
-            chat_logs = [
-                {
-                    "session_uuid": self.session_uuid,
-                    "role": message["role"],
-                    "content": message["content"],
-                    "latency": metadata["latency"]
-                    if metadata and "latency" in metadata
-                    else 0,
-                    "metadata": metadata,
-                }
-                for message, metadata in zip(new_messages, metadata_list)
-            ]
-            ChatLog.insert_many(chat_logs).execute()
+        elif "connection" in config and config["connection"]["reloading"] == True:
+            pass
         else:
             run_async_in_sync(
                 self.llm_proxy._async_chat_log_to_cloud(
@@ -140,10 +120,7 @@ class ChatModel(metaclass=RegisteringMeta):
                 )
             )
 
-    def get_messages(self) -> List[Dict[str, Any]]:
-        message_logs = run_async_in_sync(LLMProxy.fetch_chat_log(self.session_uuid))
-        return message_logs
-
+    @check_connection_status_decorator
     def run(
         self,
         functions: Optional[List[Dict[str, Any]]] = None,
@@ -174,6 +151,7 @@ class ChatModel(metaclass=RegisteringMeta):
             return self.llm_proxy.chat_run(self.session_uuid, functions, tools)
         # return self.llm_proxy.chat_run(self.session_uuid, functions, self.api_key)
 
+    @check_connection_status_decorator
     async def arun(
         self,
         functions: Optional[List[Dict[str, Any]]] = None,

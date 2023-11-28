@@ -45,6 +45,24 @@ class LLMStreamResponse(OpenAIObject):
     tool_calls: Optional[List[ChoiceDeltaToolCall]] = None
 
 
+class PromptModelConfig:
+    def __init__(self, prompts, version_detail) -> None:
+        self.prompts = prompts
+        self.version_detail = version_detail
+
+
+class ChatModelConfig:
+    def __init__(
+        self,
+        system_prompt: str,
+        version_detail: Dict,
+        message_logs: Optional[Dict] = [],
+    ) -> None:
+        self.system_prompt = system_prompt
+        self.version_detail = version_detail
+        self.message_logs = message_logs
+
+
 class FunctionSchema(BaseModel):
     """
     {

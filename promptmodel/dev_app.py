@@ -120,6 +120,12 @@ class DevApp:
     def _get_function_name_list(self) -> List[str]:
         return list(self.functions.keys())
 
+    def _get_function_schema_list(self) -> List[Dict]:
+        return [
+            self.functions[function_name]["schema"].model_dump()
+            for function_name in self._get_function_name_list()
+        ]
+
     def _get_function_schemas(self, function_names: List[str] = []):
         try:
             function_schemas = [
@@ -131,7 +137,7 @@ class DevApp:
             raise e
 
     def register_sample(self, name: str, content: Dict[str, Any]):
-        self.samples.append({"name": name, "contents": content})
+        self.samples.append({"name": name, "content": content})
 
     def _get_prompt_model_name_list(self) -> List[str]:
         return [prompt_model.name for prompt_model in self.prompt_models]

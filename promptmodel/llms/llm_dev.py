@@ -139,6 +139,7 @@ class LLMDev:
         else:
             async for chunk in response:
                 yield_api_response_with_fc = False
+                logger.debug(chunk)
                 if getattr(chunk.choices[0].delta, "function_call", None) is not None:
                     yield LLMStreamResponse(
                         api_response=chunk,
