@@ -13,3 +13,9 @@ def run_async_in_sync(coro: Coroutine):
         return result
 
     return loop.run_until_complete(coro)
+
+
+def run_async_in_sync_threadsafe(coro: Coroutine, main_loop: asyncio.AbstractEventLoop):
+    future = asyncio.run_coroutine_threadsafe(coro, main_loop)
+    res = future.result()
+    return res

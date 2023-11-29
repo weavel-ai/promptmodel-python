@@ -1,6 +1,7 @@
 import os
 import sys
 import importlib
+import asyncio
 from typing import Any, Dict, List
 from threading import Timer
 from rich import print
@@ -9,7 +10,7 @@ from playhouse.shortcuts import model_to_dict
 
 from promptmodel.apis.base import APIClient
 from promptmodel.utils.config_utils import read_config, upsert_config
-from promptmodel.utils.async_utils import run_async_in_sync
+from promptmodel.utils.async_utils import run_async_in_sync_threadsafe
 from promptmodel.utils import logger
 from promptmodel import DevApp
 from promptmodel.database.models import (
@@ -28,6 +29,7 @@ class CodeReloadHandler(FileSystemEventHandler):
         _devapp_filename: str,
         _instance_name: str,
         dev_websocket_client: DevWebsocketClient,
+        main_loop: asyncio.AbstractEventLoop,
     ):
         self._devapp_filename: str = _devapp_filename
         self.devapp_instance_name: str = _instance_name
@@ -35,6 +37,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             dev_websocket_client  # save dev_websocket_client instance
         )
         self.timer = None
+        self.main_loop = main_loop
 
     def on_modified(self, event):
         """Called when a file or directory is modified."""
@@ -79,7 +82,7 @@ class CodeReloadHandler(FileSystemEventHandler):
         new_samples = new_devapp_instance.samples
         new_function_schemas = new_devapp_instance._get_function_schema_list()
 
-        res = run_async_in_sync(
+        res = run_async_in_sync_threadsafe(
             self.dev_websocket_client.request(
                 ServerTask.SYNC_CODE,
                 message={
@@ -88,7 +91,8 @@ class CodeReloadHandler(FileSystemEventHandler):
                     "new_samples": new_samples,
                     "new_schemas": new_function_schemas,
                 },
-            )
+            ),
+            main_loop=self.main_loop,
         )
 
         # update_samples(new_devapp_instance.samples)

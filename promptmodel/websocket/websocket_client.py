@@ -494,7 +494,6 @@ class DevWebsocketClient:
                         message = await ws.recv()
                         data = json.loads(message)
                         correlation_id = data.get("correlation_id")
-                        # print("Received", data)
 
                         if correlation_id and correlation_id in self.pending_requests:
                             await self.responses[correlation_id].put(data)
@@ -538,6 +537,7 @@ class DevWebsocketClient:
 
                 await asyncio.wait_for(event.wait(), timeout=120)  # 2 minutes timeout
                 response = await self.responses[correlation_id].get()
+                logger.debug(response)
                 return response
             except Exception as error:
                 logger.error(

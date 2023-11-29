@@ -77,9 +77,15 @@ def connect():
 
     import threading
 
+    try:
+        main_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        main_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(main_loop)
+
     reloader_thread = threading.Thread(
         target=start_code_reloader,
-        args=(_devapp_filename, devapp_instance_name, dev_websocket_client),
+        args=(_devapp_filename, devapp_instance_name, dev_websocket_client, main_loop),
     )
     reloader_thread.daemon = True  # Set the thread as a daemon
     reloader_thread.start()
@@ -127,9 +133,11 @@ def connect():
 app = typer.Typer(invoke_without_command=True, callback=connect)
 
 
-def start_code_reloader(_devapp_filename, devapp_instance_name, dev_websocket_client):
+def start_code_reloader(
+    _devapp_filename, devapp_instance_name, dev_websocket_client, main_loop
+):
     event_handler = CodeReloadHandler(
-        _devapp_filename, devapp_instance_name, dev_websocket_client
+        _devapp_filename, devapp_instance_name, dev_websocket_client, main_loop
     )
     observer = Observer()
     observer.schedule(event_handler, path=".", recursive=True)

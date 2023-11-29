@@ -46,6 +46,13 @@ class LLMStreamResponse(OpenAIObject):
 
 
 class PromptModelConfig:
+    """Response Class for PromptModel.get_config()
+    prompts: List[Dict[str, Any]] = []
+        each prompt can have role, content, name, function_call, and tool_calls
+    version_detail: Dict[str, Any] = {}
+        version_detail has "model", "uuid", "parsing_type" and "output_keys".
+    """
+
     def __init__(self, prompts, version_detail) -> None:
         self.prompts = prompts
         self.version_detail = version_detail

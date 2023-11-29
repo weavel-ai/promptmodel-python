@@ -105,20 +105,15 @@ class ChatModel(metaclass=RegisteringMeta):
             new_messages (List[Dict[str, Any]]): list of messages. Each message is a dict with 'role', 'content', and 'function_call'.
         """
         # Save messages to Cloud DB
-        config = read_config()
-        if "connection" in config and config["connection"]["initializing"] == True:
-            pass
-        elif "connection" in config and config["connection"]["reloading"] == True:
-            pass
-        else:
-            run_async_in_sync(
-                self.llm_proxy._async_chat_log_to_cloud(
-                    self.session_uuid,
-                    new_messages,
-                    None,
-                    [{} for _ in range(len(new_messages))],
-                )
+
+        run_async_in_sync(
+            self.llm_proxy._async_chat_log_to_cloud(
+                self.session_uuid,
+                new_messages,
+                None,
+                [{} for _ in range(len(new_messages))],
             )
+        )
 
     @check_connection_status_decorator
     def run(
