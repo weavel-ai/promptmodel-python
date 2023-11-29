@@ -83,15 +83,15 @@ class CacheManager:
         current_time = time.time()
         config = read_config()
         if not config:
-            upsert_config({"version": "0.0.0"}, section="project")
-            config = {"project": {"version": "0.0.0"}}
+            upsert_config({"version": 0}, section="project")
+            config = {"project": {"version": 0}}
         if "project" not in config:
-            upsert_config({"version": "0.0.0"}, section="project")
-            config = {"project": {"version": "0.0.0"}}
+            upsert_config({"version": 0}, section="project")
+            config = {"project": {"version": 0}}
 
         if "version" not in config["project"]:
-            upsert_config({"version": "0.0.0"}, section="project")
-            config = {"project": {"version": "0.0.0"}}
+            upsert_config({"version": 0}, section="project")
+            config = {"project": {"version": 0}}
 
         # Check if we need to update the cache
         if current_time - self.last_update_time > self.update_interval:

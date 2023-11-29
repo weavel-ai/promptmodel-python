@@ -270,7 +270,7 @@ class LLMProxy(LLM):
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
                     session_uuid,
-                    [llm_response.api_response.choices[0].message],
+                    [llm_response.api_response.choices[0].message.model_dump()],
                     version_details["uuid"],
                     [metadata],
                 )
@@ -317,7 +317,7 @@ class LLMProxy(LLM):
 
             await self._async_chat_log_to_cloud(
                 session_uuid,
-                [llm_response.api_response.choices[0].message],
+                [llm_response.api_response.choices[0].message.model_dump()],
                 version_details["uuid"],
                 [metadata],
             )
@@ -372,7 +372,7 @@ class LLMProxy(LLM):
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
                     session_uuid,
-                    [api_response.choices[0].message],
+                    [api_response.choices[0].message.model_dump()],
                     version_details["uuid"],
                     [metadata],
                 )
@@ -423,7 +423,7 @@ class LLMProxy(LLM):
             }
             await self._async_chat_log_to_cloud(
                 session_uuid,
-                [api_response.choices[0].message],
+                [api_response.choices[0].message.model_dump()],
                 version_details["uuid"],
                 [metadata],
             )
@@ -529,7 +529,7 @@ class LLMProxy(LLM):
         # Perform the logging asynchronously
         if api_response:
             api_response_dict = api_response.model_dump()
-            api_response_dict.update({"response_ms": api_response._response_ms})
+            api_response_dict["response_ms"] = api_response._response_ms
         else:
             api_response_dict = None
         res = await AsyncAPIClient.execute(
@@ -736,9 +736,17 @@ class LLMProxy(LLM):
         """
         # Check connection activate
         config = read_config()
-        if "connection" in config and config["connection"]["initializing"] == True:
+        if (
+            "connection" in config
+            and "initializing" in config["connection"]
+            and config["connection"]["initializing"] == True
+        ):
             return [], {}
-        elif "connection" in config and config["connection"]["reloading"] == True:
+        elif (
+            "connection" in config
+            and "reloading" in config["connection"]
+            and config["connection"]["reloading"] == True
+        ):
             return [], {}
         else:
             if (
@@ -828,10 +836,18 @@ class LLMProxy(LLM):
         """
         # Check connection activate
         config = read_config()
-        if "connection" in config and config["connection"]["initializing"] == True:
-            return "", {}, []
-        elif "connection" in config and config["connection"]["reloading"] == True:
-            return "", {}, []
+        if (
+            "connection" in config
+            and "initializing" in config["connection"]
+            and config["connection"]["initializing"] == True
+        ):
+            return [], {}
+        elif (
+            "connection" in config
+            and "reloading" in config["connection"]
+            and config["connection"]["reloading"] == True
+        ):
+            return [], {}
         else:
             try:
                 res_data = await AsyncAPIClient.execute(
@@ -869,10 +885,16 @@ class LLMProxy(LLM):
                 "uuid": selected_version["uuid"],
             }
             if session_uuid:
-                chat_logs = res_data["chat_logs"]
+                chat_logs: List[Dict] = res_data["chat_logs"]
                 chat_logs = [{"role": "system", "content": instruction}] + chat_logs
             else:
                 chat_logs = []
+
+            # delete columns which value is None in each chat log
+            for chat_log in chat_logs:
+                for key in list(chat_log.keys()):
+                    if chat_log[key] is None:
+                        del chat_log[key]
 
             return instruction, version_detail, chat_logs
 

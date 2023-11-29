@@ -35,7 +35,7 @@ class DeployedPromptModel(BaseModel):
 
 class DeployedPromptModelVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
-    from_uuid = UUIDField(null=True)
+    from_version = IntegerField(null=True)
     prompt_model_uuid = ForeignKeyField(
         DeployedPromptModel,
         field=DeployedPromptModel.uuid,

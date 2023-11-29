@@ -50,7 +50,6 @@ def num_tokens_for_messages_for_each(
         else message
         for message in messages
     ]
-    print(processed_messages)
     return [
         token_counter(model=model, messages=[message]) for message in processed_messages
     ]

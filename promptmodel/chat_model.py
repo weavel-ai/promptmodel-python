@@ -64,13 +64,21 @@ class ChatModel(metaclass=RegisteringMeta):
         if session_uuid is None:
             self.session_uuid = uuid4()
             instruction, version_details, chat_logs = run_async_in_sync(
-                LLMProxy.fetch_chat_model(self.name, version)
+                LLMProxy.fetch_chat_model(self.name, None, version)
             )
             config = read_config()
-            if "connection" in config and config["connection"]["initializing"] == True:
-                pass
-            elif "connection" in config and config["connection"]["reloading"] == True:
-                pass
+            if (
+                "connection" in config
+                and "initializing" in config["connection"]
+                and config["connection"]["initializing"] == True
+            ):
+                return
+            elif (
+                "connection" in config
+                and "reloading" in config["connection"]
+                and config["connection"]["reloading"] == True
+            ):
+                return
             else:
                 run_async_in_sync(
                     self.llm_proxy._async_make_session_cloud(
@@ -97,7 +105,9 @@ class ChatModel(metaclass=RegisteringMeta):
 
     @check_connection_status_decorator
     def add_messages(
-        self, new_messages: List[Dict[str, Any]], metadata_list: List[Optional[Dict]]
+        self,
+        new_messages: List[Dict[str, Any]],
+        metadata_list: List[Optional[Dict]] = [],
     ) -> None:
         """Add messages to the chat model.
 
