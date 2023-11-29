@@ -314,14 +314,18 @@ class DevWebsocketClient:
                     )
 
                     raw_output = ""
+                    logger.debug(f"Mock responses: {function_mock_responses}")
+                    logger.debug(f"Res: {res}")
                     async for chunk in res:
                         if chunk.raw_output is not None:
+                            logger.debug(f"Chunk: {chunk}")
                             raw_output += chunk.raw_output
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
                                 "status": "running",
                                 "raw_output": chunk.raw_output,
                             }
+                        logger.debug(f"Chunk: {chunk}")
                         if chunk.function_call is not None:
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
@@ -336,11 +340,12 @@ class DevWebsocketClient:
 
                         if chunk.error:
                             error_log = chunk.error_log
-
+                        logger.debug(f"Response: {response}")
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
                     # IF function_call in response -> call function -> call LLM once more
+                    logger.debug(f"Function call: {function_call}")
 
                     if function_call is not None:
                         if (
@@ -368,8 +373,8 @@ class DevWebsocketClient:
                                     },
                                 }
                                 data.update(response)
-                                # logger.debug(f"Sent response: {data}")
                                 await ws.send(json.dumps(data, cls=CustomJSONEncoder))
+                                logger.debug(f"Sent response: {data}")
                             except Exception as error:
                                 logger.error(f"{error}")
 
