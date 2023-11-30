@@ -784,7 +784,6 @@ class LLMProxy(LLM):
                     prompts_data = prompts_data.json()
                 except Exception as e:
                     raise e
-                print(prompts_data)
                 prompt_model_versions = prompts_data["prompt_model_versions"]
                 prompts = prompts_data["prompts"]
                 if version == "deploy":
