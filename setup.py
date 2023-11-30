@@ -9,7 +9,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="promptmodel",
-    version="0.1.0",
+    version="0.1.1",
     packages=find_namespace_packages(),
     entry_points={
         "console_scripts": [
@@ -29,7 +29,7 @@ setup(
         "cryptography",
         "pyyaml",
         "InquirerPy",
-        "litellm==1.7.0",
+        "litellm>=1.7.1",
         # "litellm@git+https://github.com/weavel-ai/litellm.git@llms_add_clova_support",
         "python-dotenv",
         "websockets",
