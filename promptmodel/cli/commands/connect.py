@@ -98,7 +98,7 @@ def connect():
     print(
         f"\nIf browser doesn't open automatically, please visit [link={dev_url}]{dev_url}[/link]"
     )
-    # webbrowser.open(dev_url)
+    webbrowser.open(dev_url)
 
     upsert_config({"online": True, "initializing": False}, section="connection")
 
