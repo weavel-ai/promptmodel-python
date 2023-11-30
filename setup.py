@@ -29,8 +29,8 @@ setup(
         "cryptography",
         "pyyaml",
         "InquirerPy",
-        # "litellm==0.13.2",
-        "litellm@git+https://github.com/weavel-ai/litellm.git@llms_add_clova_support",
+        "litellm==1.7.0",
+        # "litellm@git+https://github.com/weavel-ai/litellm.git@llms_add_clova_support",
         "python-dotenv",
         "websockets",
         "termcolor",
@@ -50,5 +50,6 @@ setup(
         "versioning",
         "eval",
         "evaluation",
+        "collaborative",
     ],
 )
