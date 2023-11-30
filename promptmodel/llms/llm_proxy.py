@@ -841,13 +841,13 @@ class LLMProxy(LLM):
             and "initializing" in config["connection"]
             and config["connection"]["initializing"] == True
         ):
-            return [], {}
+            return "", {}, []
         elif (
             "connection" in config
             and "reloading" in config["connection"]
             and config["connection"]["reloading"] == True
         ):
-            return [], {}
+            return "", {}, []
         else:
             try:
                 res_data = await AsyncAPIClient.execute(
