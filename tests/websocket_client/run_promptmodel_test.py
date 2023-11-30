@@ -7,8 +7,7 @@ from uuid import uuid4
 from dataclasses import dataclass
 from websockets.exceptions import ConnectionClosedOK
 from promptmodel.websocket.websocket_client import DevWebsocketClient
-from promptmodel.types.enums import LocalTask, ParsingType
-from promptmodel.database.models import PromptModelVersion, PromptModel, SampleInputs
+from promptmodel.types.enums import LocalTask, ParsingType, LocalTaskErrorType
 from promptmodel.types.response import FunctionSchema
 
 
@@ -41,93 +40,65 @@ get_current_weather_desc = {
 
 @pytest.mark.asyncio
 async def test_run_model_function_call(
-    mocker, websocket_client: DevWebsocketClient, mock_websocket: AsyncMock
+    mocker,
+    websocket_client: DevWebsocketClient,
+    mock_websocket: AsyncMock,
+    mock_json_dumps: MagicMock,
 ):
     websocket_client._devapp.prompt_models = [PromptModelInterface("test_module")]
-    websocket_client._devapp.samples = {
-        "sample_1": {"user_message": "What is the weather like in Boston?"}
-    }
+
     websocket_client._devapp.functions = {
         "get_current_weather": {
             "schema": FunctionSchema(**get_current_weather_desc),
             "function": get_current_weather,
         }
     }
-    prompt_model_uuid = uuid4()
-    param = {
-        "prompt_model_uuid": prompt_model_uuid,
-        "uuid": uuid4(),
-        "status": "broken",
-        "from_uuid": None,
-        "model": "gpt-3.5-turbo",
-        "parsing_type": None,
-        "output_keys": None,
-        "functions": [],
-    }
-    mock_version = PromptModelVersion(**param)
-    mocker.patch(
-        "promptmodel.websocket.websocket_client.SampleInputs.get",
-        new_callable=MagicMock,
-        return_value=SampleInputs(
-            **{
-                "name": "sample_1",
-                "contents": {"user_message": "What is the weather like in Boston?"},
-            }
-        ),
-    )
-    mocker.patch(
-        "promptmodel.websocket.websocket_client.PromptModel.get",
-        new_callable=MagicMock,
-        return_value=PromptModel(**{"uuid": prompt_model_uuid}),
-    )
-    mocker.patch(
-        "promptmodel.websocket.websocket_client.PromptModelVersion.create",
-        new_callable=MagicMock,
-        return_value=mock_version,
-    )
-    mocker.patch(
-        "promptmodel.websocket.websocket_client.Prompt.insert_many",
-        new_callable=MagicMock,
-    )
-    mocker.patch(
-        "promptmodel.websocket.websocket_client.PromptModelVersion.update",
-        new_callable=MagicMock,
-    )
-    create_run_log_mock = mocker.patch(
-        "promptmodel.websocket.websocket_client.RunLog.create", new_callable=MagicMock
-    )
+
+    function_schemas_in_db = [FunctionSchema(**get_current_weather_desc).model_dump()]
+
+    function_schemas_in_db[0]["mock_response"] = "13"
+
+    mocker.patch("promptmodel.websocket.websocket_client.json.dumps", mock_json_dumps)
 
     # success case
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_PROMPT_MODEL,
-            "prompt_model_name": "test_module",
-            "sample_name": "sample_1",
-            "prompts": [
+            "messages_for_run": [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                     "step": 1,
                 },
-                {"role": "user", "content": "{user_message}", "step": 2},
+                {
+                    "role": "user",
+                    "content": "What is the weather like in Boston?",
+                    "step": 2,
+                },
             ],
             "model": "gpt-3.5-turbo",
-            "uuid": None,
-            "from_uuid": None,
             "parsing_type": None,
             "output_keys": None,
             "functions": ["get_current_weather"],
+            "function_schemas": function_schemas_in_db,
         },
         ws=mock_websocket,
     )
-    create_run_log_mock.assert_called_once()
-    _, kwargs = create_run_log_mock.call_args
-    print("KWARGS")
-    print(kwargs)
-    assert kwargs["function_call"] is not None, "function_call is None"
-    assert isinstance(kwargs["function_call"], dict)
+    call_args_list = mock_websocket.send.call_args_list
+    # print(call_args_list)
+    data = [arg.args[0] for arg in call_args_list]
 
-    create_run_log_mock.reset_mock()
+    assert len([d for d in data if d["status"] == "failed"]) == 0
+    assert len([d for d in data if d["status"] == "completed"]) == 1
+    assert len([d for d in data if "function_response" in d]) == 1
+    assert [d for d in data if "function_response" in d][0]["function_response"][
+        "name"
+    ] == "get_current_weather"
+    assert len([d for d in data if "function_call" in d]) == 1
+    assert len([d for d in data if "raw_output" in d]) == 0
+    mock_websocket.send.reset_mock()
+    function_schemas_in_db[0]["mock_response"] = "13"
+
     print(
         "======================================================================================="
     )
@@ -136,44 +107,150 @@ async def test_run_model_function_call(
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_PROMPT_MODEL,
-            "prompt_model_name": "test_module",
-            "sample_name": "sample_1",
-            "prompts": [
+            "messages_for_run": [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                     "step": 1,
                 },
-                {"role": "user", "content": "{user_message}", "step": 2},
+                {
+                    "role": "user",
+                    "content": "What is the weather like in Boston?",
+                    "step": 2,
+                },
             ],
             "model": "gpt-3.5-turbo",
-            "uuid": None,
-            "from_uuid": None,
             "parsing_type": None,
             "output_keys": None,
             "functions": [],
+            "function_schemas": [],
         },
         ws=mock_websocket,
     )
-    create_run_log_mock.assert_called_once()
-    _, kwargs = create_run_log_mock.call_args
-    assert kwargs["function_call"] is None, "function_call is not None"
-    create_run_log_mock.reset_mock()
+    call_args_list = mock_websocket.send.call_args_list
+    # print(call_args_list)
+    data = [arg.args[0] for arg in call_args_list]
+
+    assert len([d for d in data if "function_call" in d]) == 0
+    assert len([d for d in data if "raw_output" in d]) > 0
+    assert len([d for d in data if d["status"] == "failed"]) == 0
+    assert len([d for d in data if d["status"] == "completed"]) == 1
+    mock_websocket.send.reset_mock()
+
     print(
         "======================================================================================="
     )
 
-    # success case with parsing
-    mocker.patch(
-        "promptmodel.websocket.websocket_client.SampleInputs.get",
-        new_callable=MagicMock,
-        return_value=SampleInputs(
-            **{
-                "name": "sample_2",
-                "contents": {"user_message": "Nice to Meet you!"},
-            }
-        ),
+    #     system_prompt_with_format = """
+    # You are a helpful assistant.
+
+    # This is your output format. Keep the string between "[" and "]" as same as given below. You should response content first before call functions. You MUST FOLLOW this output format.
+    # Output Format:
+    # [response type=str]
+    # (value here)
+    # [/response]
+    #     """
+    #     await websocket_client._DevWebsocketClient__handle_message(
+    #         message={
+    #             "type": LocalTask.RUN_PROMPT_MODEL,
+    #             "messages_for_run": [
+    #                 {"role": "system", "content": system_prompt_with_format, "step": 1},
+    #                 {
+    #                     "role": "user",
+    #                     "content": "What is the weather like in Boston?",
+    #                     "step": 2,
+    #                 },
+    #             ],
+    #             "model": "gpt-4-1106-preview",
+    #             "uuid": None,
+    #             "from_uuid": None,
+    #             "parsing_type": ParsingType.SQUARE_BRACKET.value,
+    #             "output_keys": ["response"],
+    #             "functions": ["get_current_weather"],
+    #             "function_schemas": function_schemas_in_db,
+    #         },
+    #         ws=mock_websocket,
+    #     )
+    #     call_args_list = mock_websocket.send.call_args_list
+    #     print(call_args_list)
+    #     data = [arg.args[0] for arg in call_args_list]
+
+    #     assert len([d for d in data if d["status"] == "failed"]) == 0
+    #     assert len([d for d in data if d["status"] == "completed"]) == 1
+    #     assert len([d for d in data if "function_response" in d]) == 1
+    #     assert [d for d in data if "function_response" in d][0]["function_response"][
+    #         "name"
+    #     ] == "get_current_weather"
+    #     assert len([d for d in data if "function_call" in d]) == 1
+    #     assert len([d for d in data if "raw_output" in d]) > 0
+    #     assert len([d for d in data if "parsed_outputs" in d]) > 0
+    #     assert (
+    #         len(
+    #             list(
+    #                 set([d["parsed_outputs"].keys() for d in data if "parsed_outputs" in d])
+    #             )
+    #         )
+    #         == 1
+    #     )
+    #     mock_websocket.send.reset_mock()
+    #     function_schemas_in_db[0]["mock_response"] = "13"
+
+    print(
+        "======================================================================================="
     )
+
+    # FUNCTION_CALL_FAILED_ERROR case
+    def error_raise_function(*args, **kwargs):
+        raise Exception("error")
+
+    websocket_client._devapp.functions = {
+        "get_current_weather": {
+            "schema": FunctionSchema(**get_current_weather_desc),
+            "function": error_raise_function,
+        }
+    }
+
+    # success case
+    await websocket_client._DevWebsocketClient__handle_message(
+        message={
+            "type": LocalTask.RUN_PROMPT_MODEL,
+            "messages_for_run": [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                    "step": 1,
+                },
+                {
+                    "role": "user",
+                    "content": "What is the weather like in Boston?",
+                    "step": 2,
+                },
+            ],
+            "model": "gpt-3.5-turbo",
+            "parsing_type": None,
+            "output_keys": None,
+            "functions": ["get_current_weather"],
+            "function_schemas": function_schemas_in_db,
+        },
+        ws=mock_websocket,
+    )
+    call_args_list = mock_websocket.send.call_args_list
+    # print(call_args_list)
+    data = [arg.args[0] for arg in call_args_list]
+
+    assert len([d for d in data if d["status"] == "failed"]) == 1
+    assert [d for d in data if d["status"] == "failed"][0][
+        "error_type"
+    ] == LocalTaskErrorType.FUNCTION_CALL_FAILED_ERROR.value
+    assert len([d for d in data if d["status"] == "completed"]) == 0
+    assert len([d for d in data if "function_response" in d]) == 0
+    assert len([d for d in data if "function_call" in d]) == 1
+    assert len([d for d in data if "raw_output" in d]) == 0
+    mock_websocket.send.reset_mock()
+    function_schemas_in_db[0]["mock_response"] = "13"
+
+    # PARSING_FAILED_ERROR case
+
     system_prompt_with_format = """
 You are a helpful assistant.
 
@@ -186,53 +263,77 @@ Output Format:
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_PROMPT_MODEL,
-            "prompt_model_name": "test_module",
-            "sample_name": "sample_2",
-            "prompts": [
+            "messages_for_run": [
                 {"role": "system", "content": system_prompt_with_format, "step": 1},
-                {"role": "user", "content": "{user_message}", "step": 2},
+                {
+                    "role": "user",
+                    "content": "Hello!",
+                    "step": 2,
+                },
             ],
             "model": "gpt-4-1106-preview",
-            "uuid": None,
-            "from_uuid": None,
             "parsing_type": ParsingType.SQUARE_BRACKET.value,
-            "output_keys": ["response"],
+            "output_keys": ["respond"],
             "functions": ["get_current_weather"],
+            "function_schemas": function_schemas_in_db,
         },
         ws=mock_websocket,
     )
-    create_run_log_mock.assert_called_once()
-    _, kwargs = create_run_log_mock.call_args
-    assert kwargs["function_call"] is None, "function_call is not None"
+    call_args_list = mock_websocket.send.call_args_list
+    # print(call_args_list)
+    data = [arg.args[0] for arg in call_args_list]
 
-    assert "response" in kwargs["parsed_outputs"], "response not in parsed_outputs"
-    assert len(list(set(kwargs["parsed_outputs"].keys()))) == 1
-    create_run_log_mock.reset_mock()
-    print(
-        "======================================================================================="
-    )
+    assert len([d for d in data if d["status"] == "failed"]) == 1
+    assert [d for d in data if d["status"] == "failed"][0][
+        "error_type"
+    ] == LocalTaskErrorType.PARSING_FAILED_ERROR.value
+    assert len([d for d in data if d["status"] == "completed"]) == 0
+    assert len([d for d in data if "function_response" in d]) == 0
+    assert len([d for d in data if "function_call" in d]) == 0
+    assert len([d for d in data if "raw_output" in d]) > 0
+    assert len([d for d in data if "parsed_outputs" in d]) > 0
 
-    # early failed case due to function not existing
+    mock_websocket.send.reset_mock()
+    function_schemas_in_db[0]["mock_response"] = "13"
+
+    # function not in code case, should use mock_response
+    websocket_client._devapp.functions = {}
     await websocket_client._DevWebsocketClient__handle_message(
         message={
             "type": LocalTask.RUN_PROMPT_MODEL,
-            "prompt_model_name": "test_module",
-            "sample_name": "sample_1",
-            "prompts": [
+            "messages_for_run": [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                     "step": 1,
                 },
-                {"role": "user", "content": "{user_message}", "step": 2},
+                {
+                    "role": "user",
+                    "content": "What is the weather like in Boston?",
+                    "step": 2,
+                },
             ],
             "model": "gpt-3.5-turbo",
-            "uuid": None,
-            "from_uuid": None,
             "parsing_type": None,
             "output_keys": None,
             "functions": ["get_weather"],
+            "function_schemas": function_schemas_in_db,
         },
         ws=mock_websocket,
     )
-    create_run_log_mock.assert_not_called()
+    call_args_list = mock_websocket.send.call_args_list
+    print(call_args_list)
+    data = [arg.args[0] for arg in call_args_list]
+
+    assert len([d for d in data if d["status"] == "failed"]) == 0
+    assert len([d for d in data if d["status"] == "completed"]) == 1
+
+    assert len([d for d in data if "function_response" in d]) == 1
+    assert (
+        "FAKE RESPONSE"
+        in [d for d in data if "function_response" in d][0]["function_response"][
+            "response"
+        ]
+    )
+    assert len([d for d in data if "function_call" in d]) == 1
+    assert len([d for d in data if "raw_output" in d]) == 0

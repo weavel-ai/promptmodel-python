@@ -1,18 +1,9 @@
 import os
 
 from .models import (
-    PromptModel,
-    PromptModelVersion,
-    Prompt,
-    RunLog,
-    SampleInputs,
     DeployedPromptModel,
     DeployedPromptModelVersion,
     DeployedPrompt,
-    ChatModel,
-    ChatModelVersion,
-    ChatLogSession,
-    ChatLog,
 )
 from .config import db
 
@@ -24,21 +15,21 @@ def initialize_db():
     if db.is_closed():
         db.connect()
         with db.atomic():
-            if not PromptModel.table_exists():
+            if not DeployedPromptModel.table_exists():
                 db.create_tables(
                     [
-                        PromptModel,
-                        PromptModelVersion,
-                        Prompt,
-                        RunLog,
-                        SampleInputs,
+                        # PromptModel,
+                        # PromptModelVersion,
+                        # Prompt,
+                        # RunLog,
+                        # SampleInputs,
                         DeployedPromptModel,
                         DeployedPromptModelVersion,
                         DeployedPrompt,
-                        ChatModel,
-                        ChatModelVersion,
-                        ChatLogSession,
-                        ChatLog,
+                        # ChatModel,
+                        # ChatModelVersion,
+                        # ChatLogSession,
+                        # ChatLog,
                     ]
                 )
         db.close()

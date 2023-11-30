@@ -45,6 +45,31 @@ class LLMStreamResponse(OpenAIObject):
     tool_calls: Optional[List[ChoiceDeltaToolCall]] = None
 
 
+class PromptModelConfig:
+    """Response Class for PromptModel.get_config()
+    prompts: List[Dict[str, Any]] = []
+        each prompt can have role, content, name, function_call, and tool_calls
+    version_detail: Dict[str, Any] = {}
+        version_detail has "model", "uuid", "parsing_type" and "output_keys".
+    """
+
+    def __init__(self, prompts, version_detail) -> None:
+        self.prompts = prompts
+        self.version_detail = version_detail
+
+
+class ChatModelConfig:
+    def __init__(
+        self,
+        system_prompt: str,
+        version_detail: Dict,
+        message_logs: Optional[Dict] = [],
+    ) -> None:
+        self.system_prompt = system_prompt
+        self.version_detail = version_detail
+        self.message_logs = message_logs
+
+
 class FunctionSchema(BaseModel):
     """
     {

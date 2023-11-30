@@ -9,12 +9,14 @@ from typing import (
     List,
     Optional,
     Coroutine,
+    Union,
 )
 
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.utils.async_util import run_async_in_sync
-from promptmodel.types.response import LLMStreamResponse, LLMResponse
+from promptmodel.utils.async_utils import run_async_in_sync
+from promptmodel.utils.config_utils import check_connection_status_decorator
+from promptmodel.types.response import LLMStreamResponse, LLMResponse, PromptModelConfig
 from promptmodel import DevClient
 
 
@@ -49,26 +51,45 @@ class RegisteringMeta(type):
 
 
 class PromptModel(metaclass=RegisteringMeta):
-    def __init__(self, name, api_key: Optional[str] = None):
+    """
+
+    Args:
+        name (_type_): _description_
+        version (Optional[ Union[str, int] ], optional): Choose which PromptModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
+        api_key (Optional[str], optional): API key for the LLM. Defaults to None. If None, use api_key in .env file.
+    """
+
+    def __init__(
+        self,
+        name,
+        version: Optional[
+            Union[str, int]
+        ] = "deploy",  # "deploy" or "latest" or version number
+        api_key: Optional[str] = None,
+    ):
         self.name = name
         self.api_key = api_key
-        self.llm_proxy = LLMProxy(name)
+        self.llm_proxy = LLMProxy(name, version)
+        self.version = version
 
-    def get_prompts(self) -> List[Dict[str, str]]:
-        """Get prompt for the promptmodel.
-        If dev mode is running(if .promptmodel/config['dev_branch']['online'] = True), it will fetch the latest tested prompt in the dev branch local DB.
-        If dev mode is not running, it will fetch the published prompt from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
+    @check_connection_status_decorator
+    def get_config(self) -> PromptModelConfig:
+        """Get config for the promptmodel.
+        It will fetch the prompt and version you specified from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
         - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
-        If dev mode is initializing, it will return {}.
+        If dev mode is initializing, it will return None
 
         Returns:
-            List[Dict[str, str]]: list of prompts. Each prompt is a dict with 'role' and 'content'.
+            PromptModelConfig: config for the promptmodel. It contains prompts and version_detail.
         """
         # add name to the list of prompt_models
 
-        prompts, _ = run_async_in_sync(LLMProxy.fetch_prompts(self.name))
-        return prompts
+        prompt, version_detail = run_async_in_sync(
+            LLMProxy.fetch_prompts(self.name, self.version)
+        )
+        return PromptModelConfig(prompt, version_detail)
 
+    @check_connection_status_decorator
     def run(
         self,
         inputs: Dict[str, Any] = {},
@@ -88,6 +109,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         return self.llm_proxy.run(inputs, functions, tools, self.api_key)
 
+    @check_connection_status_decorator
     async def arun(
         self,
         inputs: Dict[str, Any] = {},
@@ -107,6 +129,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         return await self.llm_proxy.arun(inputs, functions, tools, self.api_key)
 
+    @check_connection_status_decorator
     def stream(
         self,
         inputs: Dict[str, Any] = {},
@@ -127,6 +150,7 @@ class PromptModel(metaclass=RegisteringMeta):
         for item in self.llm_proxy.stream(inputs, functions, tools, self.api_key):
             yield item
 
+    @check_connection_status_decorator
     async def astream(
         self,
         inputs: Optional[Dict[str, Any]] = {},
@@ -151,6 +175,7 @@ class PromptModel(metaclass=RegisteringMeta):
             )
         )
 
+    @check_connection_status_decorator
     def run_and_parse(
         self,
         inputs: Dict[str, Any] = {},
@@ -170,6 +195,7 @@ class PromptModel(metaclass=RegisteringMeta):
         """
         return self.llm_proxy.run_and_parse(inputs, functions, tools, self.api_key)
 
+    @check_connection_status_decorator
     async def arun_and_parse(
         self,
         inputs: Dict[str, Any] = {},
@@ -191,6 +217,7 @@ class PromptModel(metaclass=RegisteringMeta):
             inputs, functions, tools, self.api_key
         )
 
+    @check_connection_status_decorator
     def stream_and_parse(
         self,
         inputs: Dict[str, Any] = {},
@@ -213,6 +240,7 @@ class PromptModel(metaclass=RegisteringMeta):
         ):
             yield item
 
+    @check_connection_status_decorator
     async def astream_and_parse(
         self,
         inputs: Dict[str, Any] = {},

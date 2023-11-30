@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from promptmodel.chatmodel import RegisteringMeta
+from promptmodel.chat_model import RegisteringMeta
 
 
 def test_registering_meta(mocker):

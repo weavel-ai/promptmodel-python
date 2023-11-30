@@ -134,11 +134,11 @@ class LLMDev:
             args["stream"] = True
         response: AsyncGenerator[ModelResponse, None] = await acompletion(**args)
         if is_stream_unsupported:
-            print(response)
             yield LLMStreamResponse(raw_output=response.choices[0].message.content)
         else:
             async for chunk in response:
                 yield_api_response_with_fc = False
+                logger.debug(chunk)
                 if getattr(chunk.choices[0].delta, "function_call", None) is not None:
                     yield LLMStreamResponse(
                         api_response=chunk,

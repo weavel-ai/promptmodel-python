@@ -28,9 +28,14 @@ def mock_fetch_prompts():
 
 
 @pytest.fixture
-def mock_fetch_chat_log():
-    mock_fetch_chat_log = AsyncMock()
-    mock_chat_log = [
+def mock_fetch_chat_model():
+    mock_fetch_chat_model = AsyncMock()
+    mock_instruction = "You are a helpful assistant."
+    mock_version_details = {
+        "model": "gpt-4-1106-preview",
+        "uuid": "testuuid",
+    }
+    mock_message_logs = [
         {
             "role": "system",
             "content": "You are a helpful assistant.",
@@ -44,22 +49,11 @@ def mock_fetch_chat_log():
         },
     ]
 
-    mock_fetch_chat_log.return_value = mock_chat_log
-
-    return mock_fetch_chat_log
-
-
-@pytest.fixture
-def mock_fetch_chat_model():
-    mock_fetch_chat_model = AsyncMock()
-    mock_instruction = [
-        {"role": "system", "content": "You are a helpful assistant.", "step": 1},
-    ]
-    mock_version_details = {
-        "model": "gpt-3.5-turbo",
-        "uuid": "testuuid",
-    }
-    mock_fetch_chat_model.return_value = (mock_instruction, mock_version_details)
+    mock_fetch_chat_model.return_value = (
+        mock_instruction,
+        mock_version_details,
+        mock_message_logs,
+    )
 
     return mock_fetch_chat_model
 
@@ -84,3 +78,14 @@ def mock_async_chat_log_to_cloud():
     mock_async_chat_log_to_cloud.return_value = mock_response
 
     return mock_async_chat_log_to_cloud
+
+
+@pytest.fixture
+def mock_async_make_session_cloud():
+    mock_async_make_session_cloud = AsyncMock()
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_async_make_session_cloud.return_value = mock_response
+
+    return mock_async_make_session_cloud

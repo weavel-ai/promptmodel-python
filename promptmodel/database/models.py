@@ -17,7 +17,7 @@ from peewee import (
 
 from promptmodel.database.config import BaseModel
 from promptmodel.database.models_chat import *
-from promptmodel.types.enums import ModelVersionStatus, ParsingType
+from promptmodel.types.enums import ParsingType
 
 
 class JSONField(TextField):
@@ -28,88 +28,6 @@ class JSONField(TextField):
         return json.loads(value)
 
 
-class PromptModel(BaseModel):
-    uuid = UUIDField(unique=True, default=uuid4)
-    created_at = DateTimeField(default=datetime.datetime.now)
-    project_uuid = UUIDField()
-    name = CharField()
-    used_in_code = BooleanField(default=True)
-    is_deployed = BooleanField(
-        default=False
-    )  # mark if the module is pushed to the cloud
-
-
-class PromptModelVersion(BaseModel):
-    uuid = UUIDField(unique=True, default=uuid4)
-    created_at = DateTimeField(default=datetime.datetime.now)
-    from_uuid = UUIDField(null=True)
-    prompt_model_uuid = ForeignKeyField(
-        PromptModel,
-        field=PromptModel.uuid,
-        backref="versions",
-        on_delete="CASCADE",
-    )
-    status = CharField(
-        constraints=[
-            Check(
-                f"status IN ('{ModelVersionStatus.BROKEN.value}', '{ModelVersionStatus.WORKING.value}', '{ModelVersionStatus.CANDIDATE.value}')"
-            )
-        ]
-    )
-    model = CharField()
-    version = IntegerField(null=True)
-    is_published = BooleanField(default=False)
-    is_deployed = BooleanField(default=False)
-    parsing_type = CharField(
-        null=True,
-        default=None,
-        constraints=[
-            Check(
-                f"parsing_type IN ('{ParsingType.COLON.value}', '{ParsingType.SQUARE_BRACKET.value}', '{ParsingType.DOUBLE_SQUARE_BRACKET.value}')"
-            )
-        ],
-    )
-    output_keys = JSONField(null=True, default=None)
-    functions = JSONField(default=[])
-
-
-class Prompt(BaseModel):
-    id = AutoField()
-    created_at = DateTimeField(default=datetime.datetime.now)
-    version_uuid = ForeignKeyField(
-        PromptModelVersion,
-        field=PromptModelVersion.uuid,
-        backref="prompts",
-        on_delete="CASCADE",
-    )
-    role = CharField()
-    step = IntegerField()
-    content = TextField()
-
-
-class RunLog(BaseModel):
-    id = AutoField()
-    created_at = DateTimeField(default=datetime.datetime.now)
-    version_uuid = ForeignKeyField(
-        PromptModelVersion,
-        field=PromptModelVersion.uuid,
-        backref="run_logs",
-        on_delete="CASCADE",
-    )
-    inputs = JSONField(null=True, default={})
-    raw_output = TextField()
-    parsed_outputs = JSONField(null=True, default={})
-    run_from_deployment = BooleanField(default=False)
-    function_call = JSONField(null=True, default={})
-
-
-class SampleInputs(BaseModel):
-    id = AutoField()
-    created_at = DateTimeField(default=datetime.datetime.now)
-    name = TextField(unique=True)
-    contents = JSONField()
-
-
 class DeployedPromptModel(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     name = CharField()
@@ -117,7 +35,7 @@ class DeployedPromptModel(BaseModel):
 
 class DeployedPromptModelVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
-    from_uuid = UUIDField(null=True)
+    from_version = IntegerField(null=True)
     prompt_model_uuid = ForeignKeyField(
         DeployedPromptModel,
         field=DeployedPromptModel.uuid,
