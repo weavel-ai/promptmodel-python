@@ -73,6 +73,8 @@ def check_connection_status_decorator(method):
             ):
                 return
             else:
+                if "config" not in kwargs:
+                    kwargs["config"] = config
                 return await method(self, *args, **kwargs)
 
         return async_wrapper

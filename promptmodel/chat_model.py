@@ -14,6 +14,8 @@ from promptmodel.utils.config_utils import (
 )
 from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.types.response import LLMStreamResponse, LLMResponse, ChatModelConfig
+from promptmodel.types.enums import InstanceType
+from promptmodel.apis.base import AsyncAPIClient
 
 
 class RegisteringMeta(type):
@@ -60,9 +62,10 @@ class ChatModel(metaclass=RegisteringMeta):
         self.api_key = api_key
         self.llm_proxy = LLMProxy(name, version)
         self.version = version
+        self.recent_log_uuid = None
 
         if session_uuid is None:
-            self.session_uuid = uuid4()
+            self.session_uuid = str(uuid4())
             instruction, version_details, chat_logs = run_async_in_sync(
                 LLMProxy.fetch_chat_model(self.name, None, version)
             )
@@ -108,6 +111,8 @@ class ChatModel(metaclass=RegisteringMeta):
         self,
         new_messages: List[Dict[str, Any]],
         metadata_list: List[Optional[Dict]] = [],
+        *args,
+        **kwargs,
     ) -> None:
         """Add messages to the chat model.
 
@@ -115,15 +120,18 @@ class ChatModel(metaclass=RegisteringMeta):
             new_messages (List[Dict[str, Any]]): list of messages. Each message is a dict with 'role', 'content', and 'function_call'.
         """
         # Save messages to Cloud DB
-
+        log_uuid_list = [str(uuid4()) for _ in range(len(new_messages))]
         run_async_in_sync(
             self.llm_proxy._async_chat_log_to_cloud(
-                self.session_uuid,
-                new_messages,
-                None,
-                [{} for _ in range(len(new_messages))],
+                log_uuid_list=log_uuid_list,
+                session_uuid=str(self.session_uuid),
+                messages=new_messages,
+                version_uuid=None,
+                metadata=[{} for _ in range(len(new_messages))],
             )
         )
+
+        self.recent_log_uuid = log_uuid_list[-1]
 
     @check_connection_status_decorator
     def run(
@@ -131,6 +139,8 @@ class ChatModel(metaclass=RegisteringMeta):
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         stream: Optional[bool] = False,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Run PromptModel. It does not raise error.
 
@@ -146,14 +156,21 @@ class ChatModel(metaclass=RegisteringMeta):
         if stream:
 
             def gen():
+                cache: Optional[LLMStreamResponse] = None
+
                 for item in self.llm_proxy.chat_stream(
                     self.session_uuid, functions, tools
                 ):
                     yield item
+                    cache: LLMStreamResponse = item
+                if cache:
+                    self.recent_log_uuid = cache.pm_log_uuid
 
             return gen()
         else:
-            return self.llm_proxy.chat_run(self.session_uuid, functions, tools)
+            res = self.llm_proxy.chat_run(self.session_uuid, functions, tools)
+            self.recent_log_uuid = res.pm_log_uuid
+            return res
         # return self.llm_proxy.chat_run(self.session_uuid, functions, self.api_key)
 
     @check_connection_status_decorator
@@ -162,6 +179,8 @@ class ChatModel(metaclass=RegisteringMeta):
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         stream: Optional[bool] = False,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Async run PromptModel. It does not raise error.
 
@@ -177,14 +196,67 @@ class ChatModel(metaclass=RegisteringMeta):
         if stream:
 
             async def async_gen():
+                cache: Optional[LLMStreamResponse] = None
+
                 async for item in self.llm_proxy.chat_astream(
                     self.session_uuid, functions, tools
                 ):
                     yield item
+                    cache: LLMStreamResponse = item
+                if cache:
+                    self.recent_log_uuid = cache.pm_log_uuid
 
             return async_gen()
         else:
-            return await self.llm_proxy.chat_arun(self.session_uuid, functions)
+            res: LLMResponse = await self.llm_proxy.chat_arun(
+                self.session_uuid, functions
+            )
+            self.recent_log_uuid = res.pm_log_uuid
+            return res
         # return await self.llm_proxy.chat_arun(
         #     self.session_uuid, functions, self.api_key
         # )
+
+    @check_connection_status_decorator
+    async def log_metadata_to_session(
+        self, metadata: Optional[Dict[str, Any]] = {}, *args, **kwargs
+    ):
+        try:
+            res = await AsyncAPIClient.execute(
+                method="POST",
+                path="/log_general",
+                params={
+                    "type": InstanceType.ChatLogSession.value,
+                    "identifier": self.session_uuid,
+                },
+                json={"content": {}, "metadata": metadata},
+                use_cli_key=False,
+            )
+            if res.status_code != 200:
+                logger.error(f"Logging error: {res}")
+        except Exception as exception:
+            logger.error(f"Logging error: {exception}")
+
+    @check_connection_status_decorator
+    async def log(
+        self,
+        log_uuid: Optional[str] = None,
+        content: Optional[Dict[str, Any]] = {},
+        metadata: Optional[Dict[str, Any]] = {},
+        *args,
+        **kwargs,
+    ):
+        try:
+            if not log_uuid and self.recent_log_uuid:
+                log_uuid = self.recent_log_uuid
+            res = await AsyncAPIClient.execute(
+                method="POST",
+                path="/log_general",
+                params={"type": InstanceType.ChatLog.value, "identifier": log_uuid},
+                json={"content": content, "metadata": metadata},
+                use_cli_key=False,
+            )
+            if res.status_code != 200:
+                logger.error(f"Logging error: {res}")
+        except Exception as exception:
+            logger.error(f"Logging error: {exception}")

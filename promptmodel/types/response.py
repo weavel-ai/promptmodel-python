@@ -26,6 +26,7 @@ from openai.types.chat.chat_completion_chunk import (
 
 
 class LLMResponse(OpenAIObject):
+    pm_log_uuid: Optional[str] = None
     api_response: Optional[ModelResponse] = None
     raw_output: Optional[str] = None
     parsed_outputs: Optional[Dict[str, Any]] = None
@@ -36,6 +37,7 @@ class LLMResponse(OpenAIObject):
 
 
 class LLMStreamResponse(OpenAIObject):
+    pm_log_uuid: Optional[str] = None
     api_response: Optional[ModelResponse] = None
     raw_output: Optional[str] = None
     parsed_outputs: Optional[Dict[str, Any]] = None

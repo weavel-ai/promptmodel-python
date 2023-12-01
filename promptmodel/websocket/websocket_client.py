@@ -65,12 +65,6 @@ class DevWebsocketClient:
     def update_devapp_instance(self, new_devapp):
         with self.rwlock.gen_wlock():
             self._devapp = new_devapp
-            if self.ws:
-                asyncio.run(
-                    self.ws.send(
-                        json.dumps({"type": ServerTask.LOCAL_UPDATE_ALERT.value})
-                    )
-                )
 
     async def __handle_message(
         self, message: Dict[str, Any], ws: WebSocketClientProtocol

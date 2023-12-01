@@ -4,9 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 testmode: str = os.environ.get("TESTMODE", "false")
 if testmode == "true":
-    # ENDPOINT_URL = "https://2051-124-49-14-184.ngrok-free.app/api/cli"
+    ENDPOINT_URL = "https://5175-124-49-14-184.ngrok-free.app/api/cli"
     # ENDPOINT_URL = "https://weavel.serveo.net/api/cli"
-    ENDPOINT_URL = "https://promptmodel-colab.up.railway.app/api/cli"
+    # ENDPOINT_URL = "https://promptmodel-colab.up.railway.app/api/cli"
 
     # WEB_CLIENT_URL = "http://localhost:3000"
     # WEB_CLIENT_URL = "https://promptmodel.serveo.net"

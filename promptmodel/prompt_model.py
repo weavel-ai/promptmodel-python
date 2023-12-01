@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import uuid4
 from typing import (
     Any,
     AsyncGenerator,
@@ -17,6 +18,8 @@ from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.utils.config_utils import check_connection_status_decorator
 from promptmodel.types.response import LLMStreamResponse, LLMResponse, PromptModelConfig
+from promptmodel.types.enums import InstanceType
+from promptmodel.apis.base import AsyncAPIClient
 from promptmodel import DevClient
 
 
@@ -71,9 +74,10 @@ class PromptModel(metaclass=RegisteringMeta):
         self.api_key = api_key
         self.llm_proxy = LLMProxy(name, version)
         self.version = version
+        self.recent_log_uuid = None
 
     @check_connection_status_decorator
-    def get_config(self) -> PromptModelConfig:
+    def get_config(self, *args, **kwargs) -> PromptModelConfig:
         """Get config for the promptmodel.
         It will fetch the prompt and version you specified from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
         - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
@@ -95,6 +99,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Run PromptModel. It does not raise error.
 
@@ -107,7 +113,9 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return self.llm_proxy.run(inputs, functions, tools, self.api_key)
+        res: LLMResponse = self.llm_proxy.run(inputs, functions, tools, self.api_key)
+        self.recent_log_uuid = res.pm_log_uuid
+        return res
 
     @check_connection_status_decorator
     async def arun(
@@ -115,6 +123,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Async run PromptModel. It does not raise error.
 
@@ -127,7 +137,11 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return await self.llm_proxy.arun(inputs, functions, tools, self.api_key)
+        res: LLMResponse = await self.llm_proxy.arun(
+            inputs, functions, tools, self.api_key
+        )
+        self.recent_log_uuid = res.pm_log_uuid
+        return res
 
     @check_connection_status_decorator
     def stream(
@@ -135,6 +149,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True. It does not raise error.
 
@@ -147,8 +163,13 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
+        cache: Optional[LLMStreamResponse] = None
         for item in self.llm_proxy.stream(inputs, functions, tools, self.api_key):
             yield item
+            cache = item
+
+        if cache:
+            self.recent_log_uuid = cache.pm_log_uuid
 
     @check_connection_status_decorator
     async def astream(
@@ -156,6 +177,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Optional[Dict[str, Any]] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> Coroutine[AsyncGenerator[LLMStreamResponse, None]]:
         """Async Run PromptModel with stream=True. It does not raise error.
 
@@ -168,12 +191,18 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return (
-            item
+
+        async def async_gen():
+            cache: Optional[LLMStreamResponse] = None
             async for item in self.llm_proxy.astream(
                 inputs, functions, tools, self.api_key
-            )
-        )
+            ):
+                yield item
+                cache = item
+            if cache:
+                self.recent_log_uuid = cache.pm_log_uuid
+
+        return async_gen()
 
     @check_connection_status_decorator
     def run_and_parse(
@@ -181,6 +210,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Run PromptModel and make parsed outputs. It does not raise error.
 
@@ -193,7 +224,11 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return self.llm_proxy.run_and_parse(inputs, functions, tools, self.api_key)
+        res: LLMResponse = self.llm_proxy.run_and_parse(
+            inputs, functions, tools, self.api_key
+        )
+        self.recent_log_uuid = res.pm_log_uuid
+        return res
 
     @check_connection_status_decorator
     async def arun_and_parse(
@@ -201,6 +236,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Async Run PromptModel and make parsed outputs. It does not raise error.
 
@@ -213,9 +250,11 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
-        return await self.llm_proxy.arun_and_parse(
+        res: LLMResponse = await self.llm_proxy.arun_and_parse(
             inputs, functions, tools, self.api_key
         )
+        self.recent_log_uuid = res.pm_log_uuid
+        return res
 
     @check_connection_status_decorator
     def stream_and_parse(
@@ -223,6 +262,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
@@ -235,10 +276,15 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
         """
+        cache: Optional[LLMStreamResponse] = None
         for item in self.llm_proxy.stream_and_parse(
             inputs, functions, tools, self.api_key
         ):
             yield item
+            cache = item
+
+        if cache:
+            self.recent_log_uuid = cache.pm_log_uuid
 
     @check_connection_status_decorator
     async def astream_and_parse(
@@ -246,6 +292,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> Coroutine[AsyncGenerator[LLMStreamResponse, None]]:
         """Async Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
@@ -258,9 +306,49 @@ class PromptModel(metaclass=RegisteringMeta):
         Error:
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log
         """
-        return (
-            item
+
+        async def async_gen():
+            cache: Optional[LLMStreamResponse] = None
             async for item in self.llm_proxy.astream_and_parse(
                 inputs, functions, tools, self.api_key
+            ):
+                yield item
+                cache = item
+            if cache:
+                self.recent_log_uuid = cache.pm_log_uuid
+
+        return async_gen()
+
+    @check_connection_status_decorator
+    async def log(
+        self,
+        log_uuid: Optional[str] = None,
+        content: Optional[Dict[str, Any]] = {},
+        metadata: Optional[Dict[str, Any]] = {},
+        *args,
+        **kwargs,
+    ):
+        try:
+            if not log_uuid and self.recent_log_uuid is not None:
+                log_uuid = self.recent_log_uuid
+            config = kwargs["config"]
+            if (
+                "private_logging" in config["project"]
+                and config["project"]["private_logging"] is True
+            ):
+                if "inputs" in content:
+                    content["inputs"] = {
+                        key: "PRIVATE LOGGING"
+                        for key, value in content["inputs"].items()
+                    }
+            res = await AsyncAPIClient.execute(
+                method="POST",
+                path="/log_general",
+                params={"type": InstanceType.RunLog.value, "identifier": log_uuid},
+                json={"content": content, "metadata": metadata},
+                use_cli_key=False,
             )
-        )
+            if res.status_code != 200:
+                logger.error(f"Logging error: {res}")
+        except Exception as exception:
+            logger.error(f"Logging error: {exception}")
