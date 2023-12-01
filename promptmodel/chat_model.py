@@ -111,6 +111,8 @@ class ChatModel(metaclass=RegisteringMeta):
         self,
         new_messages: List[Dict[str, Any]],
         metadata_list: List[Optional[Dict]] = [],
+        *args,
+        **kwargs,
     ) -> None:
         """Add messages to the chat model.
 
@@ -121,11 +123,11 @@ class ChatModel(metaclass=RegisteringMeta):
         log_uuid_list = [str(uuid4()) for _ in range(len(new_messages))]
         run_async_in_sync(
             self.llm_proxy._async_chat_log_to_cloud(
-                log_uuid_list,
-                self.session_uuid,
-                new_messages,
-                None,
-                [{} for _ in range(len(new_messages))],
+                log_uuid_list=log_uuid_list,
+                session_uuid=str(self.session_uuid),
+                messages=new_messages,
+                version_uuid=None,
+                metadata=[{} for _ in range(len(new_messages))],
             )
         )
 
@@ -137,6 +139,8 @@ class ChatModel(metaclass=RegisteringMeta):
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         stream: Optional[bool] = False,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Run PromptModel. It does not raise error.
 
@@ -175,6 +179,8 @@ class ChatModel(metaclass=RegisteringMeta):
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         stream: Optional[bool] = False,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Async run PromptModel. It does not raise error.
 
@@ -213,15 +219,14 @@ class ChatModel(metaclass=RegisteringMeta):
 
     @check_connection_status_decorator
     async def log_metadata_to_session(
-        self,
-        metadata: Optional[Dict[str, Any]] = {},
+        self, metadata: Optional[Dict[str, Any]] = {}, *args, **kwargs
     ):
         try:
             res = await AsyncAPIClient.execute(
                 method="POST",
                 path="/log_general",
                 params={
-                    "type": InstanceType.Session.value,
+                    "type": InstanceType.ChatLogSession.value,
                     "identifier": self.session_uuid,
                 },
                 json={"content": {}, "metadata": metadata},
@@ -238,6 +243,8 @@ class ChatModel(metaclass=RegisteringMeta):
         log_uuid: Optional[str] = None,
         content: Optional[Dict[str, Any]] = {},
         metadata: Optional[Dict[str, Any]] = {},
+        *args,
+        **kwargs,
     ):
         try:
             if not log_uuid and self.recent_log_uuid:

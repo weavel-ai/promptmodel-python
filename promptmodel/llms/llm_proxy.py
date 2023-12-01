@@ -571,9 +571,13 @@ class LLMProxy(LLM):
         metadata: Optional[Dict] = None,
     ):
         config = read_config()
-        if "project" in config and "private_logging" in config["project"] and config["project"]["private_logging"] == True:
+        if (
+            "project" in config
+            and "private_logging" in config["project"]
+            and config["project"]["private_logging"] == True
+        ):
             inputs = {key: "PRIVATE LOGGING" for key, value in inputs.items()}
-            
+
         # Perform the logging asynchronously
         if api_response:
             api_response_dict = api_response.model_dump()
@@ -613,10 +617,10 @@ class LLMProxy(LLM):
             path="/log_deployment_chat",
             params={
                 "session_uuid": session_uuid,
-                "log_uuid_list": log_uuid_list,
                 "version_uuid": version_uuid,
             },
             json={
+                "log_uuid_list": log_uuid_list,
                 "messages": messages,
                 "metadata": metadata,
             },

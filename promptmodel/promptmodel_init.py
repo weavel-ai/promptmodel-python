@@ -167,6 +167,16 @@ async def promptmodel_logging(
         pass
     else:
         try:
+            if (
+                "private_logging" in config["project"]
+                and config["project"]["private_logging"] is True
+            ):
+                if "inputs" in content:
+                    content["inputs"] = {
+                        key: "PRIVATE LOGGING"
+                        for key, value in content["inputs"].items()
+                    }
+
             res = await AsyncAPIClient.execute(
                 method="POST",
                 path="/log_general",

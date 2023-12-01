@@ -4,7 +4,7 @@ from enum import Enum
 class InstanceType(str, Enum):
     ChatLog = "ChatLog"
     RunLog = "RunLog"
-    Session = "Session"
+    ChatLogSession = "ChatLogSession"
 
 
 class LocalTask(str, Enum):
@@ -27,7 +27,6 @@ class LocalTaskErrorType(str, Enum):
 class ServerTask(str, Enum):
     UPDATE_RESULT_RUN = "UPDATE_RESULT_RUN"
     UPDATE_RESULT_CHAT_RUN = "UPDATE_RESULT_CHAT_RUN"
-    LOCAL_UPDATE_ALERT = "LOCAL_UPDATE_ALERT"
 
     SYNC_CODE = "SYNC_CODE"
 

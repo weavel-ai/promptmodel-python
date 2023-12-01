@@ -77,7 +77,7 @@ class PromptModel(metaclass=RegisteringMeta):
         self.recent_log_uuid = None
 
     @check_connection_status_decorator
-    def get_config(self) -> PromptModelConfig:
+    def get_config(self, *args, **kwargs) -> PromptModelConfig:
         """Get config for the promptmodel.
         It will fetch the prompt and version you specified from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
         - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
@@ -99,6 +99,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Run PromptModel. It does not raise error.
 
@@ -121,6 +123,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Async run PromptModel. It does not raise error.
 
@@ -145,6 +149,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True. It does not raise error.
 
@@ -171,6 +177,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Optional[Dict[str, Any]] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> Coroutine[AsyncGenerator[LLMStreamResponse, None]]:
         """Async Run PromptModel with stream=True. It does not raise error.
 
@@ -202,6 +210,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Run PromptModel and make parsed outputs. It does not raise error.
 
@@ -226,6 +236,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> LLMResponse:
         """Async Run PromptModel and make parsed outputs. It does not raise error.
 
@@ -250,6 +262,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
@@ -278,6 +292,8 @@ class PromptModel(metaclass=RegisteringMeta):
         inputs: Dict[str, Any] = {},
         functions: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        *args,
+        **kwargs,
     ) -> Coroutine[AsyncGenerator[LLMStreamResponse, None]]:
         """Async Run PromptModel with stream=True and make parsed outputs. It does not raise error.
 
@@ -309,10 +325,22 @@ class PromptModel(metaclass=RegisteringMeta):
         log_uuid: Optional[str] = None,
         content: Optional[Dict[str, Any]] = {},
         metadata: Optional[Dict[str, Any]] = {},
+        *args,
+        **kwargs,
     ):
         try:
-            if not log_uuid and self.recent_log_uuid:
+            if not log_uuid and self.recent_log_uuid is not None:
                 log_uuid = self.recent_log_uuid
+            config = kwargs["config"]
+            if (
+                "private_logging" in config["project"]
+                and config["project"]["private_logging"] is True
+            ):
+                if "inputs" in content:
+                    content["inputs"] = {
+                        key: "PRIVATE LOGGING"
+                        for key, value in content["inputs"].items()
+                    }
             res = await AsyncAPIClient.execute(
                 method="POST",
                 path="/log_general",
