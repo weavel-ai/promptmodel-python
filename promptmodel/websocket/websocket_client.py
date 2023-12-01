@@ -282,7 +282,15 @@ class DevWebsocketClient:
             elif message["type"] == LocalTask.RUN_CHAT_MODEL:
                 old_messages = message["old_messages"]
                 new_messages = message["new_messages"]
-                messages_for_run = old_messages + new_messages
+                # move tool_calls in old_messages into new_messages
+                for old_message in old_messages:
+                    if "tool_calls" in old_message:
+                        if type(old_message["tool_calls"]) == List:
+                            old_message["function_call"] = old_message["tool_calls"][0]
+                        elif type(old_message["tool_calls"]) == Dict:
+                            old_message["function_call"] = old_message["tool_calls"]
+                        del old_message["tool_calls"]
+
                 # Start ChatModel Running
                 try:
                     logger.info("Started ChatModel")
@@ -314,18 +322,15 @@ class DevWebsocketClient:
                     )
 
                     raw_output = ""
-                    logger.debug(f"Mock responses: {function_mock_responses}")
-                    logger.debug(f"Res: {res}")
                     async for chunk in res:
+                        logger.debug(f"Chunk: {chunk}")
                         if chunk.raw_output is not None:
-                            logger.debug(f"Chunk: {chunk}")
                             raw_output += chunk.raw_output
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
                                 "status": "running",
                                 "raw_output": chunk.raw_output,
                             }
-                        logger.debug(f"Chunk: {chunk}")
                         if chunk.function_call is not None:
                             data = {
                                 "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
@@ -340,7 +345,7 @@ class DevWebsocketClient:
 
                         if chunk.error:
                             error_log = chunk.error_log
-                        logger.debug(f"Response: {response}")
+
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
