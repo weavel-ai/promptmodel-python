@@ -13,6 +13,8 @@ from typing import (
 from uuid import UUID
 from threading import Thread
 from rich import print
+from uuid import uuid4
+
 from litellm.utils import ModelResponse, get_max_tokens
 from promptmodel.llms.llm import LLM
 from promptmodel.database.models import (
@@ -56,6 +58,9 @@ class LLMProxy(LLM):
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
+
+            log_uuid = str(uuid4())
+
             # Call the generator with the arguments
             stream_response: Generator[LLMStreamResponse, None, None] = gen(**call_args)
 
@@ -82,15 +87,22 @@ class LLMProxy(LLM):
                     item.raw_output = None
                     item.parsed_outputs = None
                     item.function_call = None
+                item.pm_log_uuid = log_uuid
                 yield item
 
             metadata = {
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
+
             run_async_in_sync(
                 self._async_log_to_cloud(
-                    version_details["uuid"], inputs, api_response, dict_cache, metadata
+                    log_uuid=log_uuid,
+                    version_uuid=version_details["uuid"],
+                    inputs=inputs,
+                    api_response=api_response,
+                    parsed_outputs=dict_cache,
+                    metadata=metadata,
                 )
             )
 
@@ -110,6 +122,8 @@ class LLMProxy(LLM):
                 **call_args
             )
 
+            log_uuid = str(uuid4())
+
             api_response = None
             dict_cache = {}  # to store aggregated dictionary values
             string_cache = ""  # to store aggregated string values
@@ -128,6 +142,7 @@ class LLMProxy(LLM):
                 if item.error and not error_occurs:
                     error_occurs = True
                     error_log = item.error_log
+                item.pm_log_uuid = log_uuid
                 yield item
 
             # # add string_cache in model_response
@@ -143,7 +158,12 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             await self._async_log_to_cloud(
-                version_details["uuid"], inputs, api_response, dict_cache, metadata
+                log_uuid=log_uuid,
+                version_uuid=version_details["uuid"],
+                inputs=inputs,
+                api_response=api_response,
+                parsed_outputs=dict_cache,
+                metadata=metadata,
             )
 
             # raise Exception("error_log")
@@ -167,24 +187,27 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
+            log_uuid = str(uuid4())
             if llm_response.parsed_outputs:
                 run_async_in_sync(
                     self._async_log_to_cloud(
-                        version_details["uuid"],
-                        inputs,
-                        llm_response.api_response,
-                        llm_response.parsed_outputs,
-                        metadata,
+                        log_uuid=log_uuid,
+                        version_uuid=version_details["uuid"],
+                        inputs=inputs,
+                        api_response=llm_response.api_response,
+                        parsed_outputs=llm_response.parsed_outputs,
+                        metadata=metadata,
                     )
                 )
             else:
                 run_async_in_sync(
                     self._async_log_to_cloud(
-                        version_details["uuid"],
-                        inputs,
-                        llm_response.api_response,
-                        {},
-                        metadata,
+                        log_uuid=log_uuid,
+                        version_uuid=version_details["uuid"],
+                        inputs=inputs,
+                        api_response=llm_response.api_response,
+                        parsed_outputs={},
+                        metadata=metadata,
                     )
                 )
             if error_occurs:
@@ -192,6 +215,8 @@ class LLMProxy(LLM):
                 llm_response.raw_output = None
                 llm_response.parsed_outputs = None
                 llm_response.function_call = None
+
+            llm_response.pm_log_uuid = log_uuid
             return llm_response
 
         return wrapper
@@ -213,22 +238,24 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
-
+            log_uuid = str(uuid4())
             if llm_response.parsed_outputs:
                 await self._async_log_to_cloud(
-                    version_details["uuid"],
-                    inputs,
-                    llm_response.api_response,
-                    llm_response.parsed_outputs,
-                    metadata,
+                    log_uuid=log_uuid,
+                    version_uuid=version_details["uuid"],
+                    inputs=inputs,
+                    api_response=llm_response.api_response,
+                    parsed_outputs=llm_response.parsed_outputs,
+                    metadata=metadata,
                 )
             else:
                 await self._async_log_to_cloud(
-                    version_details["uuid"],
-                    inputs,
-                    llm_response.api_response,
-                    {},
-                    metadata,
+                    log_uuid=log_uuid,
+                    version_uuid=version_details["uuid"],
+                    inputs=inputs,
+                    api_response=llm_response.api_response,
+                    parsed_outputs={},
+                    metadata=metadata,
                 )
 
             if error_occurs:
@@ -236,6 +263,8 @@ class LLMProxy(LLM):
                 llm_response.raw_output = None
                 llm_response.parsed_outputs = None
                 llm_response.function_call = None
+
+            llm_response.pm_log_uuid = log_uuid
             return llm_response
 
         return async_wrapper
@@ -267,12 +296,17 @@ class LLMProxy(LLM):
                 )
                 metadata["latency"] = llm_response.api_response._response_ms
 
+            log_uuid = str(uuid4())
+
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
-                    session_uuid,
-                    [llm_response.api_response.choices[0].message.model_dump()],
-                    version_details["uuid"],
-                    [metadata],
+                    log_uuid_list=[log_uuid],
+                    session_uuid=session_uuid,
+                    messages=[
+                        llm_response.api_response.choices[0].message.model_dump()
+                    ],
+                    version_uuid=version_details["uuid"],
+                    metadata=[metadata],
                 )
             )
 
@@ -282,6 +316,7 @@ class LLMProxy(LLM):
                 llm_response.parsed_outputs = None
                 llm_response.function_call = None
 
+            llm_response.pm_log_uuid = log_uuid
             return llm_response
 
         return wrapper
@@ -315,11 +350,13 @@ class LLMProxy(LLM):
                 )
                 metadata["latency"] = llm_response.api_response._response_ms
 
+            log_uuid = str(uuid4())
             await self._async_chat_log_to_cloud(
-                session_uuid,
-                [llm_response.api_response.choices[0].message.model_dump()],
-                version_details["uuid"],
-                [metadata],
+                log_uuid_list=[log_uuid],
+                session_uuid=session_uuid,
+                messages=[llm_response.api_response.choices[0].message.model_dump()],
+                version_uuid=version_details["uuid"],
+                metadata=[metadata],
             )
 
             if error_occurs:
@@ -328,6 +365,7 @@ class LLMProxy(LLM):
                 llm_response.parsed_outputs = None
                 llm_response.function_call = None
 
+            llm_response.pm_log_uuid = log_uuid
             return llm_response
 
         return async_wrapper
@@ -347,6 +385,7 @@ class LLMProxy(LLM):
             api_response = None
             error_occurs = False
             error_log = None
+            log_uuid = str(uuid4())
             for item in stream_response:
                 if (
                     item.api_response and "delta" not in item.api_response.choices[0]
@@ -362,7 +401,7 @@ class LLMProxy(LLM):
                     item.raw_output = None
                     item.parsed_outputs = None
                     item.function_call = None
-
+                item.pm_log_uuid = log_uuid
                 yield item
 
             metadata = {
@@ -371,10 +410,11 @@ class LLMProxy(LLM):
             }
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
-                    session_uuid,
-                    [api_response.choices[0].message.model_dump()],
-                    version_details["uuid"],
-                    [metadata],
+                    log_uuid_list=[log_uuid],
+                    session_uuid=session_uuid,
+                    messages=[api_response.choices[0].message.model_dump()],
+                    version_uuid=version_details["uuid"],
+                    metadata=[metadata],
                 )
             )
 
@@ -399,6 +439,7 @@ class LLMProxy(LLM):
             api_response = None
             error_occurs = False
             error_log = None
+            log_uuid = str(uuid4())
             async for item in stream_response:
                 if (
                     item.api_response and "delta" not in item.api_response.choices[0]
@@ -415,6 +456,7 @@ class LLMProxy(LLM):
                     item.parsed_outputs = None
                     item.function_call = None
 
+                item.pm_log_uuid = log_uuid
                 yield item
 
             metadata = {
@@ -422,10 +464,11 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             await self._async_chat_log_to_cloud(
-                session_uuid,
-                [api_response.choices[0].message.model_dump()],
-                version_details["uuid"],
-                [metadata],
+                log_uuid_list=[log_uuid],
+                session_uuid=session_uuid,
+                messages=[api_response.choices[0].message.model_dump()],
+                version_uuid=version_details["uuid"],
+                metadata=[metadata],
             )
 
         return wrapper
@@ -520,12 +563,17 @@ class LLMProxy(LLM):
 
     async def _async_log_to_cloud(
         self,
+        log_uuid: str,
         version_uuid: str,
         inputs: Optional[Dict] = None,
         api_response: Optional[ModelResponse] = None,
         parsed_outputs: Optional[Dict] = None,
         metadata: Optional[Dict] = None,
     ):
+        config = read_config()
+        if "project" in config and "private_logging" in config["project"] and config["project"]["private_logging"] == True:
+            inputs = {key: "PRIVATE LOGGING" for key, value in inputs.items()}
+            
         # Perform the logging asynchronously
         if api_response:
             api_response_dict = api_response.model_dump()
@@ -536,6 +584,7 @@ class LLMProxy(LLM):
             method="POST",
             path="/log_deployment_run",
             params={
+                "log_uuid": log_uuid,
                 "version_uuid": version_uuid,
             },
             json={
@@ -552,6 +601,7 @@ class LLMProxy(LLM):
 
     async def _async_chat_log_to_cloud(
         self,
+        log_uuid_list: List[str],
         session_uuid: str,
         messages: List[Dict[str, Any]],
         version_uuid: Optional[str] = None,
@@ -563,6 +613,7 @@ class LLMProxy(LLM):
             path="/log_deployment_chat",
             params={
                 "session_uuid": session_uuid,
+                "log_uuid_list": log_uuid_list,
                 "version_uuid": version_uuid,
             },
             json={

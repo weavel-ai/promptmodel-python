@@ -1,6 +1,12 @@
 from enum import Enum
 
 
+class InstanceType(str, Enum):
+    ChatLog = "ChatLog"
+    RunLog = "RunLog"
+    Session = "Session"
+
+
 class LocalTask(str, Enum):
     RUN_PROMPT_MODEL = "RUN_PROMPT_MODEL"
     RUN_CHAT_MODEL = "RUN_CHAT_MODEL"

@@ -5,7 +5,7 @@ import asyncio
 import atexit
 import time
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 
 from promptmodel.utils.config_utils import upsert_config, read_config
@@ -13,9 +13,10 @@ from promptmodel.utils import logger
 from promptmodel.database.orm import initialize_db
 from promptmodel.database.crud import update_deployed_cache
 from promptmodel.apis.base import AsyncAPIClient
+from promptmodel.types.enums import InstanceType
 
 
-def init(use_cache: Optional[bool] = True):
+def init(use_cache: Optional[bool] = True, private_logging: Optional[bool] = False):
     nest_asyncio.apply()
 
     config = read_config()
@@ -42,6 +43,11 @@ def init(use_cache: Optional[bool] = True):
             upsert_config({"use_cache": False}, section="project")
             cache_manager = None
             initialize_db()  # init db for local usage
+
+        if private_logging is True:
+            upsert_config({"private_logging": True}, section="project")
+        else:
+            upsert_config({"private_logging": False}, section="project")
 
 
 class CacheManager:
@@ -135,3 +141,40 @@ async def update_deployed_db(config):
             upsert_config({"version": res["version"]}, section="project")
     except Exception as exception:
         logger.error(f"Deployment cache update error: {exception}")
+
+
+async def promptmodel_logging(
+    type: InstanceType,
+    identifier: str,
+    content: Optional[Dict[str, Any]] = {},
+    metadata: Optional[Dict[str, Any]] = {},
+):
+    config = read_config()
+    if (
+        config
+        and "connection" in config
+        and (
+            (
+                "online" in config["connection"]
+                and config["connection"]["online"] == True
+            )
+            or (
+                "initializing" in config["connection"]
+                and config["connection"]["initializing"] == True
+            )
+        )
+    ):
+        pass
+    else:
+        try:
+            res = await AsyncAPIClient.execute(
+                method="POST",
+                path="/log_general",
+                params={"type": type, "identifier": identifier},
+                json={"content": content, "metadata": metadata},
+                use_cli_key=False,
+            )
+            if res.status_code != 200:
+                logger.error(f"Logging error: {res}")
+        except Exception as exception:
+            logger.error(f"Logging error: {exception}")
