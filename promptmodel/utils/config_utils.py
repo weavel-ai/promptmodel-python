@@ -2,6 +2,7 @@ import os
 import asyncio
 from typing import Any, Dict
 import yaml
+from functools import wraps
 
 CONFIG_FILE = "./.promptmodel/config.yaml"
 
@@ -59,6 +60,7 @@ def upsert_config(new_config: Dict[str, Any], section: str = None):
 def check_connection_status_decorator(method):
     if asyncio.iscoroutinefunction(method):
 
+        @wraps(method)
         async def async_wrapper(self, *args, **kwargs):
             config = read_config()
             if "connection" in config and (
@@ -77,9 +79,12 @@ def check_connection_status_decorator(method):
                     kwargs["config"] = config
                 return await method(self, *args, **kwargs)
 
+        # async_wrapper.__name__ = method.__name__
+        # async_wrapper.__doc__ = method.__doc__
         return async_wrapper
     else:
 
+        @wraps(method)
         def wrapper(self, *args, **kwargs):
             config = read_config()
             if "connection" in config and (
@@ -96,4 +101,6 @@ def check_connection_status_decorator(method):
             else:
                 return method(self, *args, **kwargs)
 
+        # wrapper.__name__ = method.__name__
+        # wrapper.__doc__ = method.__doc__
         return wrapper
