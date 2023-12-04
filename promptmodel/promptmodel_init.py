@@ -16,7 +16,7 @@ from promptmodel.apis.base import AsyncAPIClient
 from promptmodel.types.enums import InstanceType
 
 
-def init(use_cache: Optional[bool] = True, private_logging: Optional[bool] = False):
+def init(use_cache: Optional[bool] = True, mask_inputs: Optional[bool] = False):
     nest_asyncio.apply()
 
     config = read_config()
@@ -44,10 +44,10 @@ def init(use_cache: Optional[bool] = True, private_logging: Optional[bool] = Fal
             cache_manager = None
             initialize_db()  # init db for local usage
 
-        if private_logging is True:
-            upsert_config({"private_logging": True}, section="project")
+        if mask_inputs is True:
+            upsert_config({"mask_inputs": True}, section="project")
         else:
-            upsert_config({"private_logging": False}, section="project")
+            upsert_config({"mask_inputs": False}, section="project")
 
 
 class CacheManager:
@@ -143,7 +143,7 @@ async def update_deployed_db(config):
         logger.error(f"Deployment cache update error: {exception}")
 
 
-async def promptmodel_logging(
+async def log(
     type: InstanceType,
     identifier: str,
     content: Optional[Dict[str, Any]] = {},
@@ -168,13 +168,12 @@ async def promptmodel_logging(
     else:
         try:
             if (
-                "private_logging" in config["project"]
-                and config["project"]["private_logging"] is True
+                "mask_inputs" in config["project"]
+                and config["project"]["mask_inputs"] is True
             ):
                 if "inputs" in content:
                     content["inputs"] = {
-                        key: "PRIVATE LOGGING"
-                        for key, value in content["inputs"].items()
+                        key: "MASKED" for key, value in content["inputs"].items()
                     }
 
             res = await AsyncAPIClient.execute(

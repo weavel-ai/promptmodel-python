@@ -573,8 +573,8 @@ class LLMProxy(LLM):
         config = read_config()
         if (
             "project" in config
-            and "private_logging" in config["project"]
-            and config["project"]["private_logging"] == True
+            and "mask_inputs" in config["project"]
+            and config["project"]["mask_inputs"] == True
         ):
             inputs = {key: "PRIVATE LOGGING" for key, value in inputs.items()}
 

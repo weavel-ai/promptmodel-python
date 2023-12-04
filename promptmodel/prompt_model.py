@@ -333,8 +333,8 @@ class PromptModel(metaclass=RegisteringMeta):
                 log_uuid = self.recent_log_uuid
             config = kwargs["config"]
             if (
-                "private_logging" in config["project"]
-                and config["project"]["private_logging"] is True
+                "mask_inputs" in config["project"]
+                and config["project"]["mask_inputs"] is True
             ):
                 if "inputs" in content:
                     content["inputs"] = {
