@@ -6,7 +6,7 @@ pyyaml
 InquirerPy
 litellm
 python-dotenv
-websockets
+websockets==10.4
 termcolor
 watchdog
 readerwriterlock

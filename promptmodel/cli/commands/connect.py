@@ -83,27 +83,7 @@ def connect():
         main_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(main_loop)
 
-    reloader_thread = threading.Thread(
-        target=start_code_reloader,
-        args=(_devapp_filename, devapp_instance_name, dev_websocket_client, main_loop),
-    )
-    reloader_thread.daemon = True  # Set the thread as a daemon
-    reloader_thread.start()
-
-    print(
-        f"\nOpening [violet]Promptmodel[/violet] prompt engineering environment with the following configuration:\n"
-    )
-    print(f"📌 Organization: [blue]{org['name']}[/blue]")
-    print(f"📌 Project: [blue]{project['name']}[/blue]")
-    print(
-        f"\nIf browser doesn't open automatically, please visit [link={dev_url}]{dev_url}[/link]"
-    )
-    webbrowser.open(dev_url)
-
-    upsert_config({"online": True, "initializing": False}, section="connection")
-
     # save samples, FunctionSchema, PromptModel, ChatModel to cloud server in dev_websocket_client.connect_to_gateway
-
     res = APIClient.execute(
         method="POST",
         path="/save_instances_in_code",
@@ -119,6 +99,25 @@ def connect():
     if res.status_code != 200:
         print(f"Error: {res.json()['detail']}")
         return
+
+    print(
+        f"\nOpening [violet]Promptmodel[/violet] prompt engineering environment with the following configuration:\n"
+    )
+    print(f"📌 Organization: [blue]{org['name']}[/blue]")
+    print(f"📌 Project: [blue]{project['name']}[/blue]")
+    print(
+        f"\nIf browser doesn't open automatically, please visit [link={dev_url}]{dev_url}[/link]"
+    )
+    webbrowser.open(dev_url)
+
+    upsert_config({"online": True, "initializing": False}, section="connection")
+
+    reloader_thread = threading.Thread(
+        target=start_code_reloader,
+        args=(_devapp_filename, devapp_instance_name, dev_websocket_client, main_loop),
+    )
+    reloader_thread.daemon = True  # Set the thread as a daemon
+    reloader_thread.start()
 
     # Open Websocket
     asyncio.run(

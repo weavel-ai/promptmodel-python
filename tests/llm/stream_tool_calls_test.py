@@ -91,6 +91,7 @@ def test_stream_with_tools(mocker):
     nest_asyncio.apply()
     run_async_in_sync(
         llm_proxy._async_log_to_cloud(
+            log_uuid="test",
             version_uuid="test",
             inputs={},
             api_response=api_responses[0],
@@ -163,6 +164,7 @@ async def test_astream_with_tools(mocker):
 
     nest_asyncio.apply()
     await llm_proxy._async_log_to_cloud(
+        log_uuid="test",
         version_uuid="test",
         inputs={},
         api_response=api_responses[0],

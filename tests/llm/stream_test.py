@@ -55,6 +55,7 @@ def test_stream(mocker):
     nest_asyncio.apply()
     run_async_in_sync(
         llm_proxy._async_log_to_cloud(
+            log_uuid="test",
             version_uuid="test",
             inputs={},
             api_response=api_responses[0],
@@ -115,6 +116,7 @@ async def test_astream(mocker):
     mocker.patch("promptmodel.llms.llm_proxy.AsyncAPIClient.execute", new=mock_execute)
 
     await llm_proxy._async_log_to_cloud(
+        log_uuid="test",
         version_uuid="test",
         inputs={},
         api_response=api_responses[0],
