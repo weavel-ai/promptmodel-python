@@ -15,18 +15,36 @@ from promptmodel.chat_model import RegisteringMeta
 client = DevClient()
 
 
-def test_find_client(mocker, mock_fetch_chat_model):
+def test_find_client(
+    mocker,
+    mock_fetch_chat_model,
+    mock_async_chat_log_to_cloud: AsyncMock,
+):
     fetch_chat_model = mocker.patch(
         "promptmodel.chat_model.LLMProxy.fetch_chat_model",
         mock_fetch_chat_model,
+    )
+
+    mocker.patch(
+        "promptmodel.chat_model.LLMProxy._async_make_session_cloud",
+        mock_async_chat_log_to_cloud,
     )
     pm = ChatModel("test")
     assert client.chat_models == [ChatModelInterface(name="test")]
 
 
-def test_get_config(mocker, mock_fetch_chat_model):
+def test_get_config(
+    mocker,
+    mock_fetch_chat_model,
+    mock_async_chat_log_to_cloud: AsyncMock,
+):
     fetch_chat_model = mocker.patch(
         "promptmodel.chat_model.LLMProxy.fetch_chat_model", mock_fetch_chat_model
+    )
+
+    mocker.patch(
+        "promptmodel.chat_model.LLMProxy._async_make_session_cloud",
+        mock_async_chat_log_to_cloud,
     )
     # mock registering_meta
     mocker.patch("promptmodel.chat_model.RegisteringMeta", MagicMock())
