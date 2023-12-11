@@ -19,8 +19,8 @@ from litellm.utils import ModelResponse, get_max_tokens
 from promptmodel.llms.llm import LLM
 from promptmodel.database.models import (
     DeployedPrompt,
-    DeployedPromptModel,
-    DeployedPromptModelVersion,
+    DeployedFunctionModel,
+    DeployedFunctionModelVersion,
 )
 from promptmodel.database.crud import (
     get_deployed_prompts,
@@ -39,9 +39,10 @@ from promptmodel.apis.base import AsyncAPIClient
 from promptmodel.types.response import (
     LLMResponse,
     LLMStreamResponse,
-    PromptModelConfig,
+    FunctionModelConfig,
     ChatModelConfig,
 )
+from promptmodel.types.request import ChatLogRequest
 
 
 class LLMProxy(LLM):
@@ -287,26 +288,26 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
+            api_response = None
             if llm_response.api_response:
-                metadata["api_response"] = llm_response.api_response.model_dump()
-                metadata["token_usage"] = (
-                    llm_response.api_response.usage
-                    if isinstance(llm_response.api_response.usage, dict)
-                    else llm_response.api_response.usage.model_dump()
-                )
-                metadata["latency"] = llm_response.api_response._response_ms
+                api_response = llm_response.api_response
 
             log_uuid = str(uuid4())
 
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
-                    log_uuid_list=[log_uuid],
                     session_uuid=session_uuid,
-                    messages=[
-                        llm_response.api_response.choices[0].message.model_dump()
-                    ],
                     version_uuid=version_details["uuid"],
-                    metadata=[metadata],
+                    chat_log_request_list=[
+                        ChatLogRequest(
+                            message=llm_response.api_response.choices[
+                                0
+                            ].message.model_dump(),
+                            uuid=log_uuid,
+                            metadata=metadata,
+                            api_response=api_response,
+                        )
+                    ],
                 )
             )
 
@@ -341,22 +342,24 @@ class LLMProxy(LLM):
                 "error_occurs": error_occurs,
                 "error_log": error_log,
             }
+            api_response = None
             if llm_response.api_response:
-                metadata["api_response"] = llm_response.api_response.model_dump()
-                metadata["token_usage"] = (
-                    llm_response.api_response.usage
-                    if isinstance(llm_response.api_response.usage, dict)
-                    else llm_response.api_response.usage.model_dump()
-                )
-                metadata["latency"] = llm_response.api_response._response_ms
+                api_response = llm_response.api_response
 
             log_uuid = str(uuid4())
             await self._async_chat_log_to_cloud(
-                log_uuid_list=[log_uuid],
                 session_uuid=session_uuid,
-                messages=[llm_response.api_response.choices[0].message.model_dump()],
                 version_uuid=version_details["uuid"],
-                metadata=[metadata],
+                chat_log_request_list=[
+                    ChatLogRequest(
+                        uuid=log_uuid,
+                        message=llm_response.api_response.choices[
+                            0
+                        ].message.model_dump(),
+                        metadata=metadata,
+                        api_response=api_response,
+                    )
+                ],
             )
 
             if error_occurs:
@@ -410,11 +413,16 @@ class LLMProxy(LLM):
             }
             run_async_in_sync(
                 self._async_chat_log_to_cloud(
-                    log_uuid_list=[log_uuid],
                     session_uuid=session_uuid,
-                    messages=[api_response.choices[0].message.model_dump()],
                     version_uuid=version_details["uuid"],
-                    metadata=[metadata],
+                    chat_log_request_list=[
+                        ChatLogRequest(
+                            uuid=log_uuid,
+                            message=api_response.choices[0].message.model_dump(),
+                            metadata=metadata,
+                            api_response=api_response,
+                        )
+                    ],
                 )
             )
 
@@ -464,11 +472,16 @@ class LLMProxy(LLM):
                 "error_log": error_log,
             }
             await self._async_chat_log_to_cloud(
-                log_uuid_list=[log_uuid],
                 session_uuid=session_uuid,
-                messages=[api_response.choices[0].message.model_dump()],
                 version_uuid=version_details["uuid"],
-                metadata=[metadata],
+                chat_log_request_list=[
+                    ChatLogRequest(
+                        uuid=log_uuid,
+                        message=api_response.choices[0].message.model_dump(),
+                        metadata=metadata,
+                        api_response=api_response,
+                    )
+                ],
             )
 
         return wrapper
@@ -563,8 +576,8 @@ class LLMProxy(LLM):
 
     async def _async_log_to_cloud(
         self,
-        log_uuid: str,
         version_uuid: str,
+        log_uuid: str,
         inputs: Optional[Dict] = None,
         api_response: Optional[ModelResponse] = None,
         parsed_outputs: Optional[Dict] = None,
@@ -605,11 +618,9 @@ class LLMProxy(LLM):
 
     async def _async_chat_log_to_cloud(
         self,
-        log_uuid_list: List[str],
         session_uuid: str,
-        messages: List[Dict[str, Any]],
         version_uuid: Optional[str] = None,
-        metadata: Optional[List[Dict]] = None,
+        chat_log_request_list: List[ChatLogRequest] = [],
     ):
         # Perform the logging asynchronously
         res = await AsyncAPIClient.execute(
@@ -619,11 +630,7 @@ class LLMProxy(LLM):
                 "session_uuid": session_uuid,
                 "version_uuid": version_uuid,
             },
-            json={
-                "log_uuid_list": log_uuid_list,
-                "messages": messages,
-                "metadata": metadata,
-            },
+            json=[r.model_dump() for r in chat_log_request_list],
             use_cli_key=False,
         )
         if res.status_code != 200:
@@ -784,7 +791,7 @@ class LLMProxy(LLM):
         """fetch prompts.
 
         Args:
-            name (str): name of PromptModel
+            name (str): name of FunctionModel
 
         Returns:
             Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
@@ -832,22 +839,22 @@ class LLMProxy(LLM):
                 try:
                     prompts_data = await AsyncAPIClient.execute(
                         method="GET",
-                        path="/fetch_prompt_model_version",
-                        params={"prompt_model_name": name, "version": version},
+                        path="/fetch_function_model_version",
+                        params={"function_model_name": name, "version": version},
                         use_cli_key=False,
                     )
                     prompts_data = prompts_data.json()
                 except Exception as e:
                     raise e
-                prompt_model_versions = prompts_data["prompt_model_versions"]
+                function_model_versions = prompts_data["function_model_versions"]
                 prompts = prompts_data["prompts"]
                 if version == "deploy":
-                    for version in prompt_model_versions:
+                    for version in function_model_versions:
                         if version["is_published"] is True:
                             version["ratio"] = 1.0
-                    selected_version = select_version_by_ratio(prompt_model_versions)
+                    selected_version = select_version_by_ratio(function_model_versions)
                 else:
-                    selected_version = prompt_model_versions[0]
+                    selected_version = function_model_versions[0]
 
                 prompt_rows = list(
                     filter(

@@ -18,8 +18,8 @@ class LocalTask(str, Enum):
 
 class LocalTaskErrorType(str, Enum):
     NO_FUNCTION_NAMED_ERROR = "NO_FUNCTION_NAMED_ERROR"  # no DB update is needed
-    FUNCTION_CALL_FAILED_ERROR = "FUNCTION_CALL_FAILED_ERROR"  # create PromptModelVersion, create Prompt, create RunLog
-    PARSING_FAILED_ERROR = "PARSING_FAILED_ERROR"  # create PromptModelVersion, create Prompt, create RunLog
+    FUNCTION_CALL_FAILED_ERROR = "FUNCTION_CALL_FAILED_ERROR"  # create FunctionModelVersion, create Prompt, create RunLog
+    PARSING_FAILED_ERROR = "PARSING_FAILED_ERROR"  # create FunctionModelVersion, create Prompt, create RunLog
 
     SERVICE_ERROR = "SERVICE_ERROR"  # no DB update is needed
 

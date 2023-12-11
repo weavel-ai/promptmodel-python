@@ -15,6 +15,7 @@ from promptmodel.utils.config_utils import (
 from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.types.response import LLMStreamResponse, LLMResponse, ChatModelConfig
 from promptmodel.types.enums import InstanceType
+from promptmodel.types.request import ChatLogRequest
 from promptmodel.apis.base import AsyncAPIClient
 
 
@@ -47,7 +48,7 @@ class ChatModel(metaclass=RegisteringMeta):
 
     Args:
         name (_type_): _description_
-        version (Optional[ Union[str, int] ], optional): Choose which PromptModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
+        version (Optional[ Union[str, int] ], optional): Choose which FunctionModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
         api_key (Optional[str], optional): API key for the LLM. Defaults to None. If None, use api_key in .env file.
     """
 
@@ -123,11 +124,12 @@ class ChatModel(metaclass=RegisteringMeta):
         log_uuid_list = [str(uuid4()) for _ in range(len(new_messages))]
         run_async_in_sync(
             self.llm_proxy._async_chat_log_to_cloud(
-                log_uuid_list=log_uuid_list,
                 session_uuid=str(self.session_uuid),
-                messages=new_messages,
                 version_uuid=None,
-                metadata=[{} for _ in range(len(new_messages))],
+                chat_log_request_list=[
+                    ChatLogRequest(**{"message": message, "uuid": str(uuid4())})
+                    for message in new_messages
+                ],
             )
         )
 
@@ -142,7 +144,7 @@ class ChatModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> LLMResponse:
-        """Run PromptModel. It does not raise error.
+        """Run FunctionModel. It does not raise error.
 
         Args:
             functions (List[Dict[str, Any]], optional): list of functions to run. Defaults to None.
@@ -182,7 +184,7 @@ class ChatModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> LLMResponse:
-        """Async run PromptModel. It does not raise error.
+        """Async run FunctionModel. It does not raise error.
 
         Args:
             functions (List[Dict[str, Any]], optional): list of functions to run. Defaults to None.
@@ -241,7 +243,7 @@ class ChatModel(metaclass=RegisteringMeta):
     async def log(
         self,
         log_uuid: Optional[str] = None,
-        content: Optional[Dict[str, Any]] = {},
+        content: Optional[Dict[str, Any]] = {},  # TODO: FIX THIS INTO OPENAI OUTPUT
         metadata: Optional[Dict[str, Any]] = {},
         *args,
         **kwargs,

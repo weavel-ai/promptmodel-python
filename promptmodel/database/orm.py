@@ -1,8 +1,8 @@
 import os
 
 from .models import (
-    DeployedPromptModel,
-    DeployedPromptModelVersion,
+    DeployedFunctionModel,
+    DeployedFunctionModelVersion,
     DeployedPrompt,
 )
 from .config import db
@@ -15,16 +15,16 @@ def initialize_db():
     if db.is_closed():
         db.connect()
         with db.atomic():
-            if not DeployedPromptModel.table_exists():
+            if not DeployedFunctionModel.table_exists():
                 db.create_tables(
                     [
-                        # PromptModel,
-                        # PromptModelVersion,
+                        # FunctionModel,
+                        # FunctionModelVersion,
                         # Prompt,
                         # RunLog,
                         # SampleInputs,
-                        DeployedPromptModel,
-                        DeployedPromptModelVersion,
+                        DeployedFunctionModel,
+                        DeployedFunctionModelVersion,
                         DeployedPrompt,
                         # ChatModel,
                         # ChatModelVersion,

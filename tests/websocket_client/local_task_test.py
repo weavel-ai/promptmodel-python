@@ -37,7 +37,7 @@ async def test_connect_to_gateway(
 async def test_local_tasks(
     mocker, websocket_client: DevWebsocketClient, mock_websocket: AsyncMock
 ):
-    websocket_client._devapp.prompt_models = {}
+    websocket_client._devapp.function_models = {}
     websocket_client._devapp.samples = {}
     websocket_client._devapp.functions = {"test_function": "test_function"}
 

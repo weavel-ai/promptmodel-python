@@ -51,7 +51,7 @@ from promptmodel.database.config import db
 #                 used_in_code=local_chat_model.used_in_code,
 #                 is_deployed=True,
 #             )
-#             ChatModelVersion.update(prompt_model_uuid=new_uuid).where(
+#             ChatModelVersion.update(function_model_uuid=new_uuid).where(
 #                 ChatModelVersion.chat_model_uuid == local_uuid
 #             ).execute()
 #             ChatModel.delete().where(ChatModel.uuid == local_uuid).execute()

@@ -8,27 +8,27 @@ from promptmodel.llms.llm import LLM, ParseResult
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.types.response import LLMResponse, LLMStreamResponse
 from promptmodel.types.enums import ParsingType
-from promptmodel import PromptModel, DevClient
-from promptmodel.dev_app import PromptModelInterface
-from promptmodel.prompt_model import RegisteringMeta
+from promptmodel import FunctionModel, DevClient
+from promptmodel.dev_app import FunctionModelInterface
+from promptmodel.function_model import RegisteringMeta
 
 client = DevClient()
 
 
 def test_find_client(mocker):
-    pm = PromptModel("test")
-    assert client.prompt_models == [PromptModelInterface(name="test")]
+    pm = FunctionModel("test")
+    assert client.function_models == [FunctionModelInterface(name="test")]
 
 
 def test_get_config(mocker, mock_fetch_prompts):
     fetch_prompts = mocker.patch(
-        "promptmodel.prompt_model.LLMProxy.fetch_prompts", mock_fetch_prompts
+        "promptmodel.function_model.LLMProxy.fetch_prompts", mock_fetch_prompts
     )
     # mock registering_meta
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
-    assert len(client.prompt_models) == 1
-    config = prompt_model.get_config()
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
+    assert len(client.function_models) == 1
+    config = function_model.get_config()
     assert len(config.prompts) == 2
 
 
@@ -40,9 +40,9 @@ def test_run(mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: Asy
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
         mock_async_log_to_cloud,
     )
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
-    res: LLMResponse = prompt_model.run({})
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
+    res: LLMResponse = function_model.run({})
     fetch_prompts.assert_called_once()
     async_log_to_cloud.assert_called_once()
     assert res.raw_output is not None
@@ -56,7 +56,7 @@ def test_run(mocker, mock_fetch_prompts: AsyncMock, mock_async_log_to_cloud: Asy
         "promptmodel.utils.config_utils.read_config",
         return_value={"connection": {"initializing": True}},
     )
-    res = prompt_model.run()
+    res = function_model.run()
     print(res)
     fetch_prompts.assert_not_called()
     async_log_to_cloud.assert_not_called()
@@ -73,10 +73,10 @@ async def test_arun(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
         mock_async_log_to_cloud,
     )
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
 
-    res: LLMResponse = await prompt_model.arun({})
+    res: LLMResponse = await function_model.arun({})
     fetch_prompts.assert_called_once()
     async_log_to_cloud.assert_called_once()
     assert res.raw_output is not None
@@ -90,7 +90,7 @@ async def test_arun(
         "promptmodel.utils.config_utils.read_config",
         return_value={"connection": {"initializing": True}},
     )
-    res = await prompt_model.arun()
+    res = await function_model.arun()
     print(res)
     fetch_prompts.assert_not_called()
     async_log_to_cloud.assert_not_called()
@@ -106,10 +106,10 @@ def test_stream(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
         mock_async_log_to_cloud,
     )
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
 
-    res: Generator[LLMStreamResponse, None, None] = prompt_model.stream({})
+    res: Generator[LLMStreamResponse, None, None] = function_model.stream({})
     chunks: List[LLMStreamResponse] = []
     for chunk in res:
         chunks.append(chunk)
@@ -127,7 +127,7 @@ def test_stream(
         "promptmodel.utils.config_utils.read_config",
         return_value={"connection": {"initializing": True}},
     )
-    res = prompt_model.stream()
+    res = function_model.stream()
     print(res)
     fetch_prompts.assert_not_called()
     async_log_to_cloud.assert_not_called()
@@ -144,10 +144,10 @@ async def test_astream(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
         mock_async_log_to_cloud,
     )
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
 
-    res: AsyncGenerator[LLMStreamResponse, None] = await prompt_model.astream({})
+    res: AsyncGenerator[LLMStreamResponse, None] = await function_model.astream({})
     chunks: List[LLMStreamResponse] = []
     async for chunk in res:
         chunks.append(chunk)
@@ -165,7 +165,7 @@ async def test_astream(
         "promptmodel.utils.config_utils.read_config",
         return_value={"connection": {"initializing": True}},
     )
-    res = await prompt_model.astream({})
+    res = await function_model.astream({})
     print(res)
     fetch_prompts.assert_not_called()
     async_log_to_cloud.assert_not_called()
@@ -181,9 +181,9 @@ def test_run_and_parse(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
         mock_async_log_to_cloud,
     )
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
-    res: LLMResponse = prompt_model.run_and_parse({})
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
+    res: LLMResponse = function_model.run_and_parse({})
     fetch_prompts.assert_called_once()
     async_log_to_cloud.assert_called_once()
     assert res.raw_output is not None
@@ -197,7 +197,7 @@ def test_run_and_parse(
         "promptmodel.utils.config_utils.read_config",
         return_value={"connection": {"initializing": True}},
     )
-    res = prompt_model.run_and_parse({})
+    res = function_model.run_and_parse({})
     print(res)
     fetch_prompts.assert_not_called()
     async_log_to_cloud.assert_not_called()
@@ -214,10 +214,10 @@ async def test_arun_and_parse(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
         mock_async_log_to_cloud,
     )
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
 
-    res: LLMResponse = await prompt_model.arun_and_parse({})
+    res: LLMResponse = await function_model.arun_and_parse({})
     fetch_prompts.assert_called_once()
     async_log_to_cloud.assert_called_once()
     assert res.raw_output is not None
@@ -231,7 +231,7 @@ async def test_arun_and_parse(
         "promptmodel.utils.config_utils.read_config",
         return_value={"connection": {"initializing": True}},
     )
-    res = await prompt_model.arun_and_parse({})
+    res = await function_model.arun_and_parse({})
     print(res)
     fetch_prompts.assert_not_called()
     async_log_to_cloud.assert_not_called()
@@ -247,10 +247,10 @@ def test_stream_and_parse(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
         mock_async_log_to_cloud,
     )
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
 
-    res: Generator[LLMStreamResponse, None, None] = prompt_model.stream_and_parse({})
+    res: Generator[LLMStreamResponse, None, None] = function_model.stream_and_parse({})
     chunks: List[LLMStreamResponse] = []
     for chunk in res:
         chunks.append(chunk)
@@ -268,7 +268,7 @@ def test_stream_and_parse(
         "promptmodel.utils.config_utils.read_config",
         return_value={"connection": {"initializing": True}},
     )
-    res = prompt_model.stream_and_parse({})
+    res = function_model.stream_and_parse({})
     print(res)
     fetch_prompts.assert_not_called()
     async_log_to_cloud.assert_not_called()
@@ -285,12 +285,12 @@ async def test_astream_and_parse(
         "promptmodel.llms.llm_proxy.LLMProxy._async_log_to_cloud",
         mock_async_log_to_cloud,
     )
-    mocker.patch("promptmodel.prompt_model.RegisteringMeta", MagicMock())
-    prompt_model = PromptModel("test")
+    mocker.patch("promptmodel.function_model.RegisteringMeta", MagicMock())
+    function_model = FunctionModel("test")
 
-    res: AsyncGenerator[LLMStreamResponse, None] = await prompt_model.astream_and_parse(
-        {}
-    )
+    res: AsyncGenerator[
+        LLMStreamResponse, None
+    ] = await function_model.astream_and_parse({})
     chunks: List[LLMStreamResponse] = []
     async for chunk in res:
         chunks.append(chunk)
@@ -308,7 +308,7 @@ async def test_astream_and_parse(
         "promptmodel.utils.config_utils.read_config",
         return_value={"connection": {"initializing": True}},
     )
-    res = await prompt_model.astream_and_parse({})
+    res = await function_model.astream_and_parse({})
     print(res)
     fetch_prompts.assert_not_called()
     async_log_to_cloud.assert_not_called()
