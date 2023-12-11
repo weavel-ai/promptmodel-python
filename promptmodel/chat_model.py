@@ -15,6 +15,7 @@ from promptmodel.utils.config_utils import (
 from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.types.response import LLMStreamResponse, LLMResponse, ChatModelConfig
 from promptmodel.types.enums import InstanceType
+from promptmodel.types.request import ChatLogRequest
 from promptmodel.apis.base import AsyncAPIClient
 
 
@@ -123,11 +124,12 @@ class ChatModel(metaclass=RegisteringMeta):
         log_uuid_list = [str(uuid4()) for _ in range(len(new_messages))]
         run_async_in_sync(
             self.llm_proxy._async_chat_log_to_cloud(
-                log_uuid_list=log_uuid_list,
                 session_uuid=str(self.session_uuid),
-                messages=new_messages,
                 version_uuid=None,
-                metadata=[{} for _ in range(len(new_messages))],
+                chat_log_request_list=[
+                    ChatLogRequest(**{"message": message, "uuid": str(uuid4())})
+                    for message in new_messages
+                ],
             )
         )
 

@@ -7,3 +7,4 @@ from .response import (
     ChatModelConfig,
     FunctionSchema,
 )
+from .request import ChatLogRequest, RunLogRequest
