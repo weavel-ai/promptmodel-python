@@ -83,13 +83,13 @@ def connect():
         main_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(main_loop)
 
-    # save samples, FunctionSchema, PromptModel, ChatModel to cloud server in dev_websocket_client.connect_to_gateway
+    # save samples, FunctionSchema, FunctionModel, ChatModel to cloud server in dev_websocket_client.connect_to_gateway
     res = APIClient.execute(
         method="POST",
         path="/save_instances_in_code",
         params={"project_uuid": project["uuid"]},
         json={
-            "prompt_models": devapp_instance._get_prompt_model_name_list(),
+            "function_models": devapp_instance._get_function_model_name_list(),
             "chat_models": devapp_instance._get_chat_model_name_list(),
             "function_schemas": devapp_instance._get_function_schema_list(),
             "samples": devapp_instance.samples,

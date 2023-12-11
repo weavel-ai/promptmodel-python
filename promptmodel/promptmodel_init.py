@@ -146,7 +146,7 @@ async def update_deployed_db(config):
 async def log(
     type: InstanceType,
     identifier: str,
-    content: Optional[Dict[str, Any]] = {},
+    content: Optional[Dict[str, Any]] = {},  # TODO: FIX THIS INTO OPENAI OUTPUT
     metadata: Optional[Dict[str, Any]] = {},
 ):
     config = read_config()

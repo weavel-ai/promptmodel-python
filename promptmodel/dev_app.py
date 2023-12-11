@@ -8,7 +8,7 @@ from promptmodel.types.response import FunctionSchema
 
 
 @dataclass
-class PromptModelInterface:
+class FunctionModelInterface:
     name: str
 
 
@@ -21,7 +21,7 @@ class DevClient:
     """DevClient main class"""
 
     def __init__(self):
-        self.prompt_models: List[PromptModelInterface] = []
+        self.function_models: List[FunctionModelInterface] = []
         self.chat_models: List[ChatModelInterface] = []
 
     def register(self, func):
@@ -32,7 +32,8 @@ class DevClient:
             instruction = instructions[idx]
             # print(instruction)
             if instruction.opname in ["LOAD_ATTR", "LOAD_METHOD", "LOAD_GLOBAL"] and (
-                instruction.argval == "PromptModel" or instruction.argval == "ChatModel"
+                instruction.argval == "FunctionModel"
+                or instruction.argval == "ChatModel"
             ):
                 next_instruction = instructions[idx + 1]
 
@@ -40,9 +41,9 @@ class DevClient:
                 if next_instruction.opname == "LOAD_CONST" and isinstance(
                     next_instruction.argval, str
                 ):
-                    if instruction.argval == "PromptModel":
-                        self.prompt_models.append(
-                            PromptModelInterface(name=next_instruction.argval)
+                    if instruction.argval == "FunctionModel":
+                        self.function_models.append(
+                            FunctionModelInterface(name=next_instruction.argval)
                         )
                     elif instruction.argval == "ChatModel":
                         self.chat_models.append(
@@ -54,12 +55,12 @@ class DevClient:
 
         return wrapper
 
-    def register_prompt_model(self, name):
-        for prompt_model in self.prompt_models:
-            if prompt_model.name == name:
+    def register_function_model(self, name):
+        for function_model in self.function_models:
+            if function_model.name == name:
                 return
 
-        self.prompt_models.append(PromptModelInterface(name=name))
+        self.function_models.append(FunctionModelInterface(name=name))
 
     def register_chat_model(self, name):
         for chat_model in self.chat_models:
@@ -68,15 +69,15 @@ class DevClient:
 
         self.chat_models.append(ChatModelInterface(name=name))
 
-    def _get_prompt_model_name_list(self) -> List[str]:
-        return [prompt_model.name for prompt_model in self.prompt_models]
+    def _get_function_model_name_list(self) -> List[str]:
+        return [function_model.name for function_model in self.function_models]
 
 
 class DevApp:
     _nest_asyncio_applied = False
 
     def __init__(self):
-        self.prompt_models: List[PromptModelInterface] = []
+        self.function_models: List[FunctionModelInterface] = []
         self.chat_models: List[ChatModelInterface] = []
         self.samples: List[Dict[str, Any]] = []
         self.functions: Dict[
@@ -88,7 +89,7 @@ class DevApp:
             nest_asyncio.apply()
 
     def include_client(self, client: DevClient):
-        self.prompt_models.extend(client.prompt_models)
+        self.function_models.extend(client.function_models)
         self.chat_models.extend(client.chat_models)
 
     def register_function(
@@ -139,8 +140,8 @@ class DevApp:
     def register_sample(self, name: str, content: Dict[str, Any]):
         self.samples.append({"name": name, "content": content})
 
-    def _get_prompt_model_name_list(self) -> List[str]:
-        return [prompt_model.name for prompt_model in self.prompt_models]
+    def _get_function_model_name_list(self) -> List[str]:
+        return [function_model.name for function_model in self.function_models]
 
     def _get_chat_model_name_list(self) -> List[str]:
         return [chat_model.name for chat_model in self.chat_models]

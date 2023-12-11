@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Tuple
 from promptmodel.database.models import (
-    DeployedPromptModel,
-    DeployedPromptModelVersion,
+    DeployedFunctionModel,
+    DeployedFunctionModelVersion,
     DeployedPrompt,
 )
 from playhouse.shortcuts import model_to_dict
@@ -18,16 +18,16 @@ from promptmodel.database.crud_chat import *
 # Select one
 
 
-def get_deployed_prompts(prompt_model_name: str) -> Tuple[List[DeployedPrompt], str]:
+def get_deployed_prompts(function_model_name: str) -> Tuple[List[DeployedPrompt], str]:
     try:
         with db.atomic():
-            versions: List[DeployedPromptModelVersion] = list(
-                DeployedPromptModelVersion.select()
-                .join(DeployedPromptModel)
+            versions: List[DeployedFunctionModelVersion] = list(
+                DeployedFunctionModelVersion.select()
+                .join(DeployedFunctionModel)
                 .where(
-                    DeployedPromptModelVersion.prompt_model_uuid
-                    == DeployedPromptModel.get(
-                        DeployedPromptModel.name == prompt_model_name
+                    DeployedFunctionModelVersion.function_model_uuid
+                    == DeployedFunctionModel.get(
+                        DeployedFunctionModel.name == function_model_name
                     ).uuid
                 )
             )
@@ -72,18 +72,18 @@ async def update_deployed_cache(project_status: dict):
     """Update Deployed Prompts Cache"""
     # TODO: 효율적으로 수정
     # 현재는 delete all & insert all
-    prompt_models = project_status["prompt_models"]
-    prompt_model_versions = project_status["prompt_model_versions"]
-    for version in prompt_model_versions:
+    function_models = project_status["function_models"]
+    function_model_versions = project_status["function_model_versions"]
+    for version in function_model_versions:
         if version["is_published"] is True:
             version["ratio"] = 1.0
     prompts = project_status["prompts"]
 
     with db.atomic():
-        DeployedPromptModel.delete().execute()
-        DeployedPromptModelVersion.delete().execute()
+        DeployedFunctionModel.delete().execute()
+        DeployedFunctionModelVersion.delete().execute()
         DeployedPrompt.delete().execute()
-        DeployedPromptModel.insert_many(prompt_models).execute()
-        DeployedPromptModelVersion.insert_many(prompt_model_versions).execute()
+        DeployedFunctionModel.insert_many(function_models).execute()
+        DeployedFunctionModelVersion.insert_many(function_model_versions).execute()
         DeployedPrompt.insert_many(prompts).execute()
     return

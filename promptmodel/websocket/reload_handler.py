@@ -14,8 +14,8 @@ from promptmodel.utils.async_utils import run_async_in_sync_threadsafe
 from promptmodel.utils import logger
 from promptmodel import DevApp
 from promptmodel.database.models import (
-    DeployedPromptModel,
-    DeployedPromptModelVersion,
+    DeployedFunctionModel,
+    DeployedFunctionModelVersion,
     DeployedPrompt,
 )
 
@@ -76,8 +76,10 @@ class CodeReloadHandler(FileSystemEventHandler):
         org = config["connection"]["org"]
         project = config["connection"]["project"]
 
-        # save samples, FunctionSchema, PromptModel, ChatModel to cloud server by websocket ServerTask request
-        new_prompt_model_name_list = new_devapp_instance._get_prompt_model_name_list()
+        # save samples, FunctionSchema, FunctionModel, ChatModel to cloud server by websocket ServerTask request
+        new_function_model_name_list = (
+            new_devapp_instance._get_function_model_name_list()
+        )
         new_chat_model_name_list = new_devapp_instance._get_chat_model_name_list()
         new_samples = new_devapp_instance.samples
         new_function_schemas = new_devapp_instance._get_function_schema_list()
@@ -86,7 +88,7 @@ class CodeReloadHandler(FileSystemEventHandler):
             self.dev_websocket_client.request(
                 ServerTask.SYNC_CODE,
                 message={
-                    "new_prompt_model": new_prompt_model_name_list,
+                    "new_function_model": new_function_model_name_list,
                     "new_chat_model": new_chat_model_name_list,
                     "new_samples": new_samples,
                     "new_schemas": new_function_schemas,

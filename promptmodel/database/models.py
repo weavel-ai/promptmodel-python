@@ -28,17 +28,17 @@ class JSONField(TextField):
         return json.loads(value)
 
 
-class DeployedPromptModel(BaseModel):
+class DeployedFunctionModel(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     name = CharField()
 
 
-class DeployedPromptModelVersion(BaseModel):
+class DeployedFunctionModelVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
     from_version = IntegerField(null=True)
-    prompt_model_uuid = ForeignKeyField(
-        DeployedPromptModel,
-        field=DeployedPromptModel.uuid,
+    function_model_uuid = ForeignKeyField(
+        DeployedFunctionModel,
+        field=DeployedFunctionModel.uuid,
         backref="versions",
         on_delete="CASCADE",
     )
@@ -62,8 +62,8 @@ class DeployedPromptModelVersion(BaseModel):
 class DeployedPrompt(BaseModel):
     id = AutoField()
     version_uuid = ForeignKeyField(
-        DeployedPromptModelVersion,
-        field=DeployedPromptModelVersion.uuid,
+        DeployedFunctionModelVersion,
+        field=DeployedFunctionModelVersion.uuid,
         backref="prompts",
         on_delete="CASCADE",
     )

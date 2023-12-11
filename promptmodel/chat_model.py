@@ -47,7 +47,7 @@ class ChatModel(metaclass=RegisteringMeta):
 
     Args:
         name (_type_): _description_
-        version (Optional[ Union[str, int] ], optional): Choose which PromptModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
+        version (Optional[ Union[str, int] ], optional): Choose which FunctionModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
         api_key (Optional[str], optional): API key for the LLM. Defaults to None. If None, use api_key in .env file.
     """
 
@@ -142,7 +142,7 @@ class ChatModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> LLMResponse:
-        """Run PromptModel. It does not raise error.
+        """Run FunctionModel. It does not raise error.
 
         Args:
             functions (List[Dict[str, Any]], optional): list of functions to run. Defaults to None.
@@ -182,7 +182,7 @@ class ChatModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> LLMResponse:
-        """Async run PromptModel. It does not raise error.
+        """Async run FunctionModel. It does not raise error.
 
         Args:
             functions (List[Dict[str, Any]], optional): list of functions to run. Defaults to None.
@@ -241,7 +241,7 @@ class ChatModel(metaclass=RegisteringMeta):
     async def log(
         self,
         log_uuid: Optional[str] = None,
-        content: Optional[Dict[str, Any]] = {},
+        content: Optional[Dict[str, Any]] = {},  # TODO: FIX THIS INTO OPENAI OUTPUT
         metadata: Optional[Dict[str, Any]] = {},
         *args,
         **kwargs,

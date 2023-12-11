@@ -17,32 +17,36 @@ import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.utils.config_utils import check_connection_status_decorator
-from promptmodel.types.response import LLMStreamResponse, LLMResponse, PromptModelConfig
+from promptmodel.types.response import (
+    LLMStreamResponse,
+    LLMResponse,
+    FunctionModelConfig,
+)
 from promptmodel.types.enums import InstanceType
 from promptmodel.apis.base import AsyncAPIClient
 from promptmodel import DevClient
 
 
 @dataclass
-class PromptModelInterface:
+class FunctionModelInterface:
     name: str
     default_model: str
 
 
 class RegisteringMeta(type):
     def __call__(cls, *args, **kwargs):
-        instance: "PromptModel" = super().__call__(*args, **kwargs)
+        instance: "FunctionModel" = super().__call__(*args, **kwargs)
         # Find the global client instance in the current context
         client: Optional[DevClient] = cls.find_client_instance()
         if client is not None:
-            client.register_prompt_model(instance.name)
+            client.register_function_model(instance.name)
         return instance
 
     @staticmethod
     def find_client_instance():
         import sys
 
-        # Get the current frame (frame where PromptModel is called)
+        # Get the current frame (frame where FunctionModel is called)
         frame = sys._getframe(2)
         # Get global variables in the current frame
         global_vars = frame.f_globals
@@ -53,12 +57,12 @@ class RegisteringMeta(type):
         return None
 
 
-class PromptModel(metaclass=RegisteringMeta):
+class FunctionModel(metaclass=RegisteringMeta):
     """
 
     Args:
         name (_type_): _description_
-        version (Optional[ Union[str, int] ], optional): Choose which PromptModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
+        version (Optional[ Union[str, int] ], optional): Choose which FunctionModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
         api_key (Optional[str], optional): API key for the LLM. Defaults to None. If None, use api_key in .env file.
     """
 
@@ -77,21 +81,21 @@ class PromptModel(metaclass=RegisteringMeta):
         self.recent_log_uuid = None
 
     @check_connection_status_decorator
-    def get_config(self, *args, **kwargs) -> PromptModelConfig:
+    def get_config(self, *args, **kwargs) -> FunctionModelConfig:
         """Get config for the promptmodel.
         It will fetch the prompt and version you specified from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
         - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
         If dev mode is initializing, it will return None
 
         Returns:
-            PromptModelConfig: config for the promptmodel. It contains prompts and version_detail.
+            FunctionModelConfig: config for the promptmodel. It contains prompts and version_detail.
         """
-        # add name to the list of prompt_models
+        # add name to the list of function_models
 
         prompt, version_detail = run_async_in_sync(
             LLMProxy.fetch_prompts(self.name, self.version)
         )
-        return PromptModelConfig(prompt, version_detail)
+        return FunctionModelConfig(prompt, version_detail)
 
     @check_connection_status_decorator
     def run(
@@ -102,7 +106,7 @@ class PromptModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> LLMResponse:
-        """Run PromptModel. It does not raise error.
+        """Run FunctionModel. It does not raise error.
 
         Args:
             inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
@@ -126,7 +130,7 @@ class PromptModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> LLMResponse:
-        """Async run PromptModel. It does not raise error.
+        """Async run FunctionModel. It does not raise error.
 
         Args:
             inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
@@ -152,7 +156,7 @@ class PromptModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
-        """Run PromptModel with stream=True. It does not raise error.
+        """Run FunctionModel with stream=True. It does not raise error.
 
         Args:
             inputs (Dict[str, Any], optional): _description_. Defaults to {}.
@@ -180,7 +184,7 @@ class PromptModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> Coroutine[AsyncGenerator[LLMStreamResponse, None]]:
-        """Async Run PromptModel with stream=True. It does not raise error.
+        """Async Run FunctionModel with stream=True. It does not raise error.
 
         Args:
             inputs (Dict[str, Any], optional): _description_. Defaults to {}.
@@ -213,7 +217,7 @@ class PromptModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> LLMResponse:
-        """Run PromptModel and make parsed outputs. It does not raise error.
+        """Run FunctionModel and make parsed outputs. It does not raise error.
 
         Args:
             inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
@@ -239,7 +243,7 @@ class PromptModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> LLMResponse:
-        """Async Run PromptModel and make parsed outputs. It does not raise error.
+        """Async Run FunctionModel and make parsed outputs. It does not raise error.
 
         Args:
             inputs (Dict[str, Any], optional): input to the promptmodel. Defaults to {}.
@@ -265,7 +269,7 @@ class PromptModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
-        """Run PromptModel with stream=True and make parsed outputs. It does not raise error.
+        """Run FunctionModel with stream=True and make parsed outputs. It does not raise error.
 
         Args:
             inputs (Dict[str, Any], optional): _description_. Defaults to {}.
@@ -295,7 +299,7 @@ class PromptModel(metaclass=RegisteringMeta):
         *args,
         **kwargs,
     ) -> Coroutine[AsyncGenerator[LLMStreamResponse, None]]:
-        """Async Run PromptModel with stream=True and make parsed outputs. It does not raise error.
+        """Async Run FunctionModel with stream=True and make parsed outputs. It does not raise error.
 
         Args:
             inputs (Dict[str, Any], optional): _description_. Defaults to {}.
@@ -323,7 +327,7 @@ class PromptModel(metaclass=RegisteringMeta):
     async def log(
         self,
         log_uuid: Optional[str] = None,
-        content: Optional[Dict[str, Any]] = {},
+        content: Optional[Dict[str, Any]] = {},  # TODO: FIX THIS INTO OPENAI OUTPUT
         metadata: Optional[Dict[str, Any]] = {},
         *args,
         **kwargs,
@@ -352,3 +356,10 @@ class PromptModel(metaclass=RegisteringMeta):
                 logger.error(f"Logging error: {res}")
         except Exception as exception:
             logger.error(f"Logging error: {exception}")
+
+
+class PromptModel(FunctionModel):
+    """Deprecated"""
+
+    def __init__(self, name, version: Optional[Union[str, int]] = "deploy"):
+        super().__init__(name, version)

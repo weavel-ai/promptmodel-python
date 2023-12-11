@@ -12,7 +12,7 @@ from promptmodel.types.response import FunctionSchema
 
 
 @dataclass
-class PromptModelInterface:
+class FunctionModelInterface:
     name: str
     default_model: str = "gpt-3.5-turbo"
 
@@ -45,7 +45,7 @@ async def test_run_model_function_call(
     mock_websocket: AsyncMock,
     mock_json_dumps: MagicMock,
 ):
-    websocket_client._devapp.prompt_models = [PromptModelInterface("test_module")]
+    websocket_client._devapp.function_models = [FunctionModelInterface("test_module")]
 
     websocket_client._devapp.functions = {
         "get_current_weather": {

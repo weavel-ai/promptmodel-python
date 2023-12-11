@@ -47,8 +47,8 @@ class LLMStreamResponse(OpenAIObject):
     tool_calls: Optional[List[ChoiceDeltaToolCall]] = None
 
 
-class PromptModelConfig:
-    """Response Class for PromptModel.get_config()
+class FunctionModelConfig:
+    """Response Class for FunctionModel.get_config()
     prompts: List[Dict[str, Any]] = []
         each prompt can have role, content, name, function_call, and tool_calls
     version_detail: Dict[str, Any] = {}
@@ -58,6 +58,13 @@ class PromptModelConfig:
     def __init__(self, prompts, version_detail) -> None:
         self.prompts = prompts
         self.version_detail = version_detail
+
+
+class PromptModelConfig(FunctionModelConfig):
+    """Deprecated. Use FunctionModelConfig instead."""
+
+    def __init__(self, prompts, version_detail) -> None:
+        super().__init__(prompts, version_detail)
 
 
 class ChatModelConfig:

@@ -23,12 +23,12 @@
 # from promptmodel.database.orm import initialize_db
 # from promptmodel.database.models import *
 # from promptmodel.database.crud import (
-#     hide_prompt_model_not_in_code,
+#     hide_function_model_not_in_code,
 #     hide_chat_model_not_in_code,
 #     update_samples,
-#     update_prompt_model_uuid,
+#     update_function_model_uuid,
 #     update_chat_model_uuid,
-#     rename_prompt_model,
+#     rename_function_model,
 #     rename_chat_model,
 # )
 
@@ -99,41 +99,41 @@
 #             {"project_version": project_status["project_version"]}, section="connection"
 #         )
 
-#         local_prompt_model_names = devapp_instance._get_prompt_model_name_list()
+#         local_function_model_names = devapp_instance._get_function_model_name_list()
 #         local_chat_model_names = devapp_instance._get_chat_model_name_list()
 
-#         # save prompt_models
-#         for prompt_model in project_status["prompt_models"]:
-#             prompt_model["is_deployed"] = True
-#             if prompt_model["name"] in local_prompt_model_names:
-#                 prompt_model["used_in_code"] = True
+#         # save function_models
+#         for function_model in project_status["function_models"]:
+#             function_model["is_deployed"] = True
+#             if function_model["name"] in local_function_model_names:
+#                 function_model["used_in_code"] = True
 #             else:
-#                 prompt_model["used_in_code"] = False
+#                 function_model["used_in_code"] = False
 
-#         PromptModel.insert_many(project_status["prompt_models"]).execute()
+#         FunctionModel.insert_many(project_status["function_models"]).execute()
 
-#         # save prompt_model_versions
-#         for version in project_status["prompt_model_versions"]:
+#         # save function_model_versions
+#         for version in project_status["function_model_versions"]:
 #             version["status"] = ModelVersionStatus.CANDIDATE.value
-#         PromptModelVersion.insert_many(
-#             project_status["prompt_model_versions"]
+#         FunctionModelVersion.insert_many(
+#             project_status["function_model_versions"]
 #         ).execute()
 #         # save prompts
 #         Prompt.insert_many(project_status["prompts"]).execute()
 #         # save run_logs
 #         RunLog.insert_many(project_status["run_logs"]).execute()
 
-#         # create prompt_models from code in local DB
-#         project_prompt_model_names = [
-#             x["name"] for x in project_status["prompt_models"]
+#         # create function_models from code in local DB
+#         project_function_model_names = [
+#             x["name"] for x in project_status["function_models"]
 #         ]
 #         only_in_local = list(
-#             set(local_prompt_model_names) - set(project_prompt_model_names)
+#             set(local_function_model_names) - set(project_function_model_names)
 #         )
-#         only_in_local_prompt_models = [
+#         only_in_local_function_models = [
 #             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local
 #         ]
-#         PromptModel.insert_many(only_in_local_prompt_models).execute()
+#         FunctionModel.insert_many(only_in_local_function_models).execute()
 
 #         # save chat_models
 #         for chat_model in project_status["chat_models"]:
@@ -191,15 +191,15 @@
 #                 "levels": [1, 2],
 #             },
 #         ).json()
-#         local_code_prompt_model_name_list = (
-#             devapp_instance._get_prompt_model_name_list()
+#         local_code_function_model_name_list = (
+#             devapp_instance._get_function_model_name_list()
 #         )
 #         local_code_chat_model_name_list = devapp_instance._get_chat_model_name_list()
 
 #         res = update_by_changelog(
 #             changelogs,
 #             project_status,
-#             local_code_prompt_model_name_list,
+#             local_code_function_model_name_list,
 #             local_code_chat_model_name_list,
 #         )
 
@@ -208,25 +208,25 @@
 #             upsert_config({"online": False}, section="connection")
 #             return
 
-#         # Make prompt_model.used_in_code=False which is not in local code
-#         hide_prompt_model_not_in_code(local_code_prompt_model_name_list)
+#         # Make function_model.used_in_code=False which is not in local code
+#         hide_function_model_not_in_code(local_code_function_model_name_list)
 #         # Make chat_model.used_in_code=False which is not in local code
 #         hide_chat_model_not_in_code(local_code_chat_model_name_list)
 
-#         # Save new prompt_model in code to local DB
-#         local_db_prompt_model_names = [
+#         # Save new function_model in code to local DB
+#         local_db_function_model_names = [
 #             x["name"]
 #             for x in [
-#                 model_to_dict(x, recurse=False) for x in list(PromptModel.select())
+#                 model_to_dict(x, recurse=False) for x in list(FunctionModel.select())
 #             ]
 #         ]
 #         only_in_local = list(
-#             set(local_code_prompt_model_name_list) - set(local_db_prompt_model_names)
+#             set(local_code_function_model_name_list) - set(local_db_function_model_names)
 #         )
-#         only_in_local_prompt_models = [
+#         only_in_local_function_models = [
 #             {"name": x, "project_uuid": project["uuid"]} for x in only_in_local
 #         ]
-#         PromptModel.insert_many(only_in_local_prompt_models).execute()
+#         FunctionModel.insert_many(only_in_local_function_models).execute()
 
 #         # Save new chat_model in code to local DB
 #         local_db_chat_model_names = [
@@ -302,12 +302,12 @@
 # def update_by_changelog(
 #     changelogs: List[Dict],
 #     project_status: dict,
-#     local_code_prompt_model_name_list: List[str],
+#     local_code_function_model_name_list: List[str],
 #     local_code_chat_model_name_list: List[str],
 # ):
 #     """Update Local DB by changelog"""
-#     local_db_prompt_model_list: List = [
-#         model_to_dict(x, recurse=False) for x in list(PromptModel.select())
+#     local_db_function_model_list: List = [
+#         model_to_dict(x, recurse=False) for x in list(FunctionModel.select())
 #     ]  # {"name", "uuid"}
 #     local_db_chat_model_list: List = [
 #         model_to_dict(x, recurse=False) for x in list(ChatModel.select())
@@ -320,28 +320,28 @@
 #             for log in logs:
 #                 subject = log["subject"]
 #                 action: str = log["action"]
-#                 if subject == "prompt_model":
+#                 if subject == "function_model":
 #                     (
 #                         is_success,
-#                         local_db_prompt_model_list,
-#                     ) = update_prompt_model_changelog(
+#                         local_db_function_model_list,
+#                     ) = update_function_model_changelog(
 #                         action=action,
 #                         project_status=project_status,
 #                         uuid_list=log["identifiers"],
-#                         local_db_prompt_model_list=local_db_prompt_model_list,
-#                         local_code_prompt_model_name_list=local_code_prompt_model_name_list,
+#                         local_db_function_model_list=local_db_function_model_list,
+#                         local_code_function_model_name_list=local_code_function_model_name_list,
 #                     )
 
 #                     if not is_success:
 #                         return False
 
-#                 elif subject == "prompt_model_version":
-#                     local_db_prompt_model_list = update_prompt_model_version_changelog(
+#                 elif subject == "function_model_version":
+#                     local_db_function_model_list = update_function_model_version_changelog(
 #                         action=action,
 #                         project_status=project_status,
 #                         uuid_list=log["identifiers"],
-#                         local_db_prompt_model_list=local_db_prompt_model_list,
-#                         local_code_prompt_model_name_list=local_code_prompt_model_name_list,
+#                         local_db_function_model_list=local_db_function_model_list,
+#                         local_code_function_model_name_list=local_code_function_model_name_list,
 #                     )
 
 #                 elif subject == "chat_model":
@@ -379,13 +379,13 @@
 #                 subject = log["subject"]
 #                 action: str = log["action"]
 #                 uuid_list: list = log["identifiers"]
-#                 if subject == "prompt_model_version":
-#                     local_db_prompt_model_list = update_prompt_model_version_changelog(
+#                 if subject == "function_model_version":
+#                     local_db_function_model_list = update_function_model_version_changelog(
 #                         action=action,
 #                         project_status=project_status,
 #                         uuid_list=log["identifiers"],
-#                         local_db_prompt_model_list=local_db_prompt_model_list,
-#                         local_code_prompt_model_name_list=local_code_prompt_model_name_list,
+#                         local_db_function_model_list=local_db_function_model_list,
+#                         local_code_function_model_name_list=local_code_function_model_name_list,
 #                     )
 
 #                 elif subject == "chat_model_version":
@@ -418,39 +418,39 @@
 #     return True
 
 
-# def update_prompt_model_changelog(
+# def update_function_model_changelog(
 #     action: ChangeLogAction,
 #     project_status: dict,
 #     uuid_list: List[str],
-#     local_db_prompt_model_list: List[Dict],
-#     local_code_prompt_model_name_list: List[str],
+#     local_db_function_model_list: List[Dict],
+#     local_code_function_model_name_list: List[str],
 # ):
 #     if action == ChangeLogAction.ADD.value:
-#         prompt_model_list = [
-#             x for x in project_status["prompt_models"] if x["uuid"] in uuid_list
+#         function_model_list = [
+#             x for x in project_status["function_models"] if x["uuid"] in uuid_list
 #         ]
-#         for prompt_model in prompt_model_list:
-#             local_db_prompt_model_name_list = [
-#                 x["name"] for x in local_db_prompt_model_list
+#         for function_model in function_model_list:
+#             local_db_function_model_name_list = [
+#                 x["name"] for x in local_db_function_model_list
 #             ]
 
-#             if prompt_model["name"] not in local_db_prompt_model_name_list:
-#                 # IF prompt_model not in Local DB
-#                 if prompt_model["name"] in local_code_prompt_model_name_list:
-#                     # IF prompt_model in Local Code
-#                     prompt_model["used_in_code"] = True
-#                     prompt_model["is_deployed"] = True
+#             if function_model["name"] not in local_db_function_model_name_list:
+#                 # IF function_model not in Local DB
+#                 if function_model["name"] in local_code_function_model_name_list:
+#                     # IF function_model in Local Code
+#                     function_model["used_in_code"] = True
+#                     function_model["is_deployed"] = True
 #                 else:
-#                     prompt_model["used_in_code"] = False
-#                     prompt_model["is_deployed"] = True
-#                 PromptModel.create(**prompt_model)
+#                     function_model["used_in_code"] = False
+#                     function_model["is_deployed"] = True
+#                 FunctionModel.create(**function_model)
 #             else:
-#                 local_db_prompt_model = [
+#                 local_db_function_model = [
 #                     x
-#                     for x in local_db_prompt_model_list
-#                     if x["name"] == prompt_model["name"]
+#                     for x in local_db_function_model_list
+#                     if x["name"] == function_model["name"]
 #                 ][0]
-#                 if local_db_prompt_model["is_deployed"] is False:
+#                 if local_db_function_model["is_deployed"] is False:
 #                     print(
 #                         "Creation of promptmodel with identical name was detected in local & deployment."
 #                     )
@@ -466,11 +466,11 @@
 #                     if not check_same:
 #                         # rename & change name in Local DB
 #                         print(
-#                             f"Please rename local promptmodel {prompt_model['name']} to continue"
+#                             f"Please rename local promptmodel {function_model['name']} to continue"
 #                         )
 #                         validate_new_promptmodel_name = (
-#                             lambda name: name not in local_code_prompt_model_name_list
-#                             and name not in local_db_prompt_model_name_list
+#                             lambda name: name not in local_code_function_model_name_list
+#                             and name not in local_db_function_model_name_list
 #                         )
 #                         new_model_name = inquirer.text(
 #                             message="Enter the new promptmodel name:",
@@ -478,49 +478,49 @@
 #                             invalid_message="promptmodel name already exists.",
 #                         ).execute()
 #                         # new_model_name = input()
-#                         rename_prompt_model(
-#                             local_db_prompt_model["uuid"], new_model_name
+#                         rename_function_model(
+#                             local_db_function_model["uuid"], new_model_name
 #                         )
 
 #                         print("We changed the name of promptmodel in local DB.")
 #                         print(
-#                             f"Please change the name of promptmodel '{prompt_model['name']}' in your project code and restart."
+#                             f"Please change the name of promptmodel '{function_model['name']}' in your project code and restart."
 #                         )
 #                         # dev 꺼버리고, 수정하고 다시 키라고 명령.
-#                         return False, local_db_prompt_model_list
-#                     update_prompt_model_uuid(
-#                         local_db_prompt_model["uuid"], prompt_model["uuid"]
+#                         return False, local_db_function_model_list
+#                     update_function_model_uuid(
+#                         local_db_function_model["uuid"], function_model["uuid"]
 #                     )
-#                     local_db_prompt_model_list: list = [
+#                     local_db_function_model_list: list = [
 #                         model_to_dict(x, recurse=False)
-#                         for x in list(PromptModel.select())
+#                         for x in list(FunctionModel.select())
 #                     ]
 #     else:
 #         # TODO: add code DELETE, CHANGE, FIX later
 #         pass
-#     return True, local_db_prompt_model_list
+#     return True, local_db_function_model_list
 
 
-# def update_prompt_model_version_changelog(
+# def update_function_model_version_changelog(
 #     action: ChangeLogAction,
 #     project_status: dict,
 #     uuid_list: List[str],
-#     local_db_prompt_model_list: List[Dict],
-#     local_code_prompt_model_name_list: List[str],
+#     local_db_function_model_list: List[Dict],
+#     local_code_function_model_name_list: List[str],
 # ) -> List[Dict[str, Any]]:
 #     if action == ChangeLogAction.ADD.value:
-#         # find prompt_model_version in project_status['prompt_model_versions'] where uuid in uuid_list
-#         prompt_model_version_list_in_changelog = [
-#             x for x in project_status["prompt_model_versions"] if x["uuid"] in uuid_list
+#         # find function_model_version in project_status['function_model_versions'] where uuid in uuid_list
+#         function_model_version_list_in_changelog = [
+#             x for x in project_status["function_model_versions"] if x["uuid"] in uuid_list
 #         ]
 
-#         # check if prompt_model_version['uuid'] is in local_db_prompt_model_list
+#         # check if function_model_version['uuid'] is in local_db_function_model_list
 #         local_db_version_uuid_list = [
-#             str(x.uuid) for x in list(PromptModelVersion.select())
+#             str(x.uuid) for x in list(FunctionModelVersion.select())
 #         ]
 #         version_list_to_update = [
 #             x
-#             for x in prompt_model_version_list_in_changelog
+#             for x in function_model_version_list_in_changelog
 #             if x["uuid"] not in local_db_version_uuid_list
 #         ]
 #         version_uuid_list_to_update = [x["uuid"] for x in version_list_to_update]
@@ -537,14 +537,14 @@
 #             if x["version_uuid"] in version_uuid_list_to_update
 #         ]
 
-#         for prompt_model_version in version_list_to_update:
-#             prompt_model_version["status"] = ModelVersionStatus.CANDIDATE.value
+#         for function_model_version in version_list_to_update:
+#             function_model_version["status"] = ModelVersionStatus.CANDIDATE.value
 
-#         PromptModelVersion.insert_many(version_list_to_update).execute()
+#         FunctionModelVersion.insert_many(version_list_to_update).execute()
 #         Prompt.insert_many(prompts_to_update).execute()
 #         RunLog.insert_many(run_logs_to_update).execute()
 
-#         return local_db_prompt_model_list
+#         return local_db_function_model_list
 #     else:
 #         pass
 

@@ -18,8 +18,8 @@ import promptmodel.utils.logger as logger
 from promptmodel import DevApp
 from promptmodel.llms.llm_dev import LLMDev
 from promptmodel.database.models import (
-    DeployedPromptModel,
-    DeployedPromptModelVersion,
+    DeployedFunctionModel,
+    DeployedFunctionModelVersion,
     DeployedPrompt,
 )
 from promptmodel.types.enums import ServerTask, LocalTask, LocalTaskErrorType
@@ -49,18 +49,18 @@ class DevWebsocketClient:
         self.pending_requests: Dict[str, asyncio.Event] = {}
         self.responses: Dict[str, Queue] = defaultdict(Queue)
 
-    async def _get_prompt_models(self, prompt_model_name: str):
-        """Get prompt_model from registry"""
+    async def _get_function_models(self, function_model_name: str):
+        """Get function_model from registry"""
         with self.rwlock.gen_rlock():
-            prompt_model = next(
+            function_model = next(
                 (
-                    prompt_model
-                    for prompt_model in self._devapp.prompt_models
-                    if prompt_model.name == prompt_model_name
+                    function_model
+                    for function_model in self._devapp.function_models
+                    if function_model.name == function_model_name
                 ),
                 None,
             )
-        return prompt_model
+        return function_model
 
     def update_devapp_instance(self, new_devapp):
         with self.rwlock.gen_wlock():
@@ -85,19 +85,19 @@ class DevWebsocketClient:
             if message["type"] == LocalTask.RUN_PROMPT_MODEL:
                 messages: List[Dict] = message["messages_for_run"]
 
-                # # Check prompt_model in Local Usage
-                # prompt_model_names = self._devapp._get_prompt_model_name_list()
-                # if prompt_model_name not in prompt_model_names:
-                #     logger.error(f"There is no prompt_model {prompt_model_name}.")
+                # # Check function_model in Local Usage
+                # function_model_names = self._devapp._get_function_model_name_list()
+                # if function_model_name not in function_model_names:
+                #     logger.error(f"There is no function_model {function_model_name}.")
                 #     return
 
-                # Start PromptModel Running
+                # Start FunctionModel Running
                 output = {"raw_output": "", "parsed_outputs": {}}
                 try:
-                    logger.info("Started PromptModel")
-                    # create prompt_model_dev_instance
-                    prompt_model_dev = LLMDev()
-                    # find prompt_model_uuid from local db
+                    logger.info("Started FunctionModel")
+                    # create function_model_dev_instance
+                    function_model_dev = LLMDev()
+                    # find function_model_uuid from local db
 
                     data = {
                         "type": ServerTask.UPDATE_RESULT_RUN.value,
@@ -129,7 +129,7 @@ class DevWebsocketClient:
 
                     res: AsyncGenerator[
                         LLMStreamResponse, None
-                    ] = prompt_model_dev.dev_run(
+                    ] = function_model_dev.dev_run(
                         messages=messages_for_run,
                         parsing_type=parsing_type,
                         functions=function_schemas,

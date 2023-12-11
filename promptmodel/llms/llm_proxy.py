@@ -19,8 +19,8 @@ from litellm.utils import ModelResponse, get_max_tokens
 from promptmodel.llms.llm import LLM
 from promptmodel.database.models import (
     DeployedPrompt,
-    DeployedPromptModel,
-    DeployedPromptModelVersion,
+    DeployedFunctionModel,
+    DeployedFunctionModelVersion,
 )
 from promptmodel.database.crud import (
     get_deployed_prompts,
@@ -39,7 +39,7 @@ from promptmodel.apis.base import AsyncAPIClient
 from promptmodel.types.response import (
     LLMResponse,
     LLMStreamResponse,
-    PromptModelConfig,
+    FunctionModelConfig,
     ChatModelConfig,
 )
 
@@ -784,7 +784,7 @@ class LLMProxy(LLM):
         """fetch prompts.
 
         Args:
-            name (str): name of PromptModel
+            name (str): name of FunctionModel
 
         Returns:
             Tuple[List[Dict[str, str]], Optional[Dict[str, Any]]]: (prompts, version_detail)
@@ -832,22 +832,22 @@ class LLMProxy(LLM):
                 try:
                     prompts_data = await AsyncAPIClient.execute(
                         method="GET",
-                        path="/fetch_prompt_model_version",
-                        params={"prompt_model_name": name, "version": version},
+                        path="/fetch_function_model_version",
+                        params={"function_model_name": name, "version": version},
                         use_cli_key=False,
                     )
                     prompts_data = prompts_data.json()
                 except Exception as e:
                     raise e
-                prompt_model_versions = prompts_data["prompt_model_versions"]
+                function_model_versions = prompts_data["function_model_versions"]
                 prompts = prompts_data["prompts"]
                 if version == "deploy":
-                    for version in prompt_model_versions:
+                    for version in function_model_versions:
                         if version["is_published"] is True:
                             version["ratio"] = 1.0
-                    selected_version = select_version_by_ratio(prompt_model_versions)
+                    selected_version = select_version_by_ratio(function_model_versions)
                 else:
-                    selected_version = prompt_model_versions[0]
+                    selected_version = function_model_versions[0]
 
                 prompt_rows = list(
                     filter(
