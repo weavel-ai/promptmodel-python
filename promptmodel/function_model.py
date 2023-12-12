@@ -98,6 +98,19 @@ class FunctionModel(metaclass=RegisteringMeta):
         return FunctionModelConfig(prompt, version_detail)
 
     @check_connection_status_decorator
+    def get_prompts(self, *args, **kwargs) -> List[Dict[str, Any]]:
+        """Get prompts for the promptmodel. (Deprecated)
+        Returns:
+            List[Dict]: prompts
+        """
+        # add name to the list of function_models
+
+        prompt, version_detail = run_async_in_sync(
+            LLMProxy.fetch_prompts(self.name, self.version)
+        )
+        return prompt
+
+    @check_connection_status_decorator
     def run(
         self,
         inputs: Dict[str, Any] = {},
