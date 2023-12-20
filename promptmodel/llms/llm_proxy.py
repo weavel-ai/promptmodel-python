@@ -92,7 +92,7 @@ class LLMProxy(LLM):
                 yield item
 
             metadata = {
-                "error_occurs": error_occurs,
+                "error": error_occurs,
                 "error_log": error_log,
             }
 
@@ -155,7 +155,7 @@ class LLMProxy(LLM):
             #         api_response.choices[0].message["role"] = "assistant"
 
             metadata = {
-                "error_occurs": error_occurs,
+                "error": error_occurs,
                 "error_log": error_log,
             }
             await self._async_log_to_cloud(
@@ -185,7 +185,7 @@ class LLMProxy(LLM):
             error_occurs = llm_response.error
             error_log = llm_response.error_log
             metadata = {
-                "error_occurs": error_occurs,
+                "error": error_occurs,
                 "error_log": error_log,
             }
             log_uuid = str(uuid4())
@@ -236,7 +236,7 @@ class LLMProxy(LLM):
             error_occurs = llm_response.error
             error_log = llm_response.error_log
             metadata = {
-                "error_occurs": error_occurs,
+                "error": error_occurs,
                 "error_log": error_log,
             }
             log_uuid = str(uuid4())
@@ -285,7 +285,7 @@ class LLMProxy(LLM):
             error_occurs = llm_response.error
             error_log = llm_response.error_log
             metadata = {
-                "error_occurs": error_occurs,
+                "error": error_occurs,
                 "error_log": error_log,
             }
             api_response = None
@@ -339,7 +339,7 @@ class LLMProxy(LLM):
             error_occurs = llm_response.error
             error_log = llm_response.error_log
             metadata = {
-                "error_occurs": error_occurs,
+                "error": error_occurs,
                 "error_log": error_log,
             }
             api_response = None
@@ -408,7 +408,7 @@ class LLMProxy(LLM):
                 yield item
 
             metadata = {
-                "error_occurs": error_occurs,
+                "error": error_occurs,
                 "error_log": error_log,
             }
             run_async_in_sync(
@@ -468,7 +468,7 @@ class LLMProxy(LLM):
                 yield item
 
             metadata = {
-                "error_occurs": error_occurs,
+                "error": error_occurs,
                 "error_log": error_log,
             }
             await self._async_chat_log_to_cloud(
@@ -597,19 +597,20 @@ class LLMProxy(LLM):
             api_response_dict["response_ms"] = api_response._response_ms
         else:
             api_response_dict = None
+        run_log_request_body = {
+            "uuid": log_uuid,
+            "api_response": api_response_dict,
+            "inputs": inputs,
+            "parsed_outputs": parsed_outputs,
+            "metadata": metadata,
+        }
         res = await AsyncAPIClient.execute(
             method="POST",
-            path="/log_deployment_run",
+            path="/run_log",
             params={
-                "log_uuid": log_uuid,
                 "version_uuid": version_uuid,
             },
-            json={
-                "inputs": inputs,
-                "api_response": api_response_dict,
-                "parsed_outputs": parsed_outputs,
-                "metadata": metadata,
-            },
+            json=run_log_request_body,
             use_cli_key=False,
         )
         if res.status_code != 200:
@@ -623,9 +624,10 @@ class LLMProxy(LLM):
         chat_log_request_list: List[ChatLogRequest] = [],
     ):
         # Perform the logging asynchronously
+
         res = await AsyncAPIClient.execute(
             method="POST",
-            path="/log_deployment_chat",
+            path="/chat_log",
             params={
                 "session_uuid": session_uuid,
                 "version_uuid": version_uuid,
@@ -653,7 +655,7 @@ class LLMProxy(LLM):
             use_cli_key=False,
         )
         if res.status_code != 200:
-            print(f"[red]Failed to log to cloud: {res.json()}[/red]")
+            print(f"[red]Failed to make ChatSession in cloud: {res.json()}[/red]")
         return res
 
     def make_kwargs(self, **kwargs):

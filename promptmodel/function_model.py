@@ -12,6 +12,7 @@ from typing import (
     Coroutine,
     Union,
 )
+from litellm import ModelResponse
 
 import promptmodel.utils.logger as logger
 from promptmodel.llms.llm_proxy import LLMProxy
@@ -324,17 +325,75 @@ class FunctionModel(metaclass=RegisteringMeta):
         return async_gen()
 
     @check_connection_status_decorator
-    async def log(
+    async def log_score(
         self,
         log_uuid: Optional[str] = None,
-        content: Optional[Dict[str, Any]] = {},  # TODO: FIX THIS INTO OPENAI OUTPUT
-        metadata: Optional[Dict[str, Any]] = {},
+        score: Optional[Dict] = {},
         *args,
         **kwargs,
-    ):
+    ) -> str:
+        """Save Scores for RunLog of FunctionModel to the Cloud.
+
+        Args:
+            log_uuid (Optional[str], optional): UUID of the RunLog you want to save score. If None, it will use recent_log_uuid.
+            score (Optional[float], optional): Scores of RunLog. Each keys will be created as Evaluation Metric in Promptmodel Dashboard. Defaults to {}.
+
+        Returns:
+            str: _description_
+        """
         try:
-            if not log_uuid and self.recent_log_uuid is not None:
+            if log_uuid is None and self.recent_log_uuid:
                 log_uuid = self.recent_log_uuid
+            if log_uuid is None:
+                raise Exception(
+                    "log_uuid is None. Please run FunctionModel.run or FunctionModel.log first."
+                )
+
+            res = await AsyncAPIClient.execute(
+                method="POST",
+                path="/run_log_score",
+                params={"run_log_uuid": log_uuid},
+                json=score,
+                use_cli_key=False,
+            )
+            if res.status_code != 200:
+                logger.error(f"Logging error: {res}")
+        except Exception as exception:
+            logger.error(f"Logging error: {exception}")
+
+    @check_connection_status_decorator
+    async def log(
+        self,
+        version_uuid: str,
+        openai_api_response: Optional[ModelResponse] = None,
+        inputs: Optional[Dict[str, Any]] = {},
+        parsed_outputs: Optional[Dict[str, Any]] = {},
+        metadata: Optional[Dict[str, Any]] = None,
+        *args,
+        **kwargs,
+    ) -> str:
+        """Save RunLog of FunctionModel to the Cloud.
+
+        Args:
+            version_uuid (str): version of the FunctionModel. You can find this in the FunctionModelConfig.
+            openai_api_response (Optional[ModelResponse], optional): OpenAI Response Class. Defaults to None.
+            inputs (Optional[Dict[str, Any]], optional): inputs dictionary for the FunctionModel. Defaults to {}.
+            parsed_outputs (Optional[Dict[str, Any]], optional): parsed outputs. Defaults to {}.
+            metadata (Optional[Dict[str, Any]], optional): metadata. You can save Any metadata for RunLog. Defaults to {}.
+
+        Returns:
+            str: UUID of the RunLog.
+        """
+        try:
+            log_uuid = str(uuid4())
+            content = {
+                "uuid": log_uuid,
+                "api_response": openai_api_response.model_dump(),
+                "inputs": inputs,
+                "parsed_outputs": parsed_outputs,
+                "metadata": metadata,
+            }
+
             config = kwargs["config"]
             if (
                 "mask_inputs" in config["project"]
@@ -347,13 +406,16 @@ class FunctionModel(metaclass=RegisteringMeta):
                     }
             res = await AsyncAPIClient.execute(
                 method="POST",
-                path="/log_general",
-                params={"type": InstanceType.RunLog.value, "identifier": log_uuid},
-                json={"content": content, "metadata": metadata},
+                path="/run_log",
+                params={"version_uuid": version_uuid},
+                json=content,
                 use_cli_key=False,
             )
             if res.status_code != 200:
                 logger.error(f"Logging error: {res}")
+
+            self.recent_log_uuid = log_uuid
+            return log_uuid
         except Exception as exception:
             logger.error(f"Logging error: {exception}")
 
