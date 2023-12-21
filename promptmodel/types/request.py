@@ -34,7 +34,7 @@ class ChatLogRequest(BaseModel):
     def __post_init__(
         self,
     ):
-        if self.api_response is not None:
+        if self.api_response is not None and self.message is None:
             self.message = self.api_response.choices[0].message.model_dump()
 
 

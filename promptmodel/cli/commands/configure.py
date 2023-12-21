@@ -8,7 +8,7 @@ from promptmodel.utils.config_utils import upsert_config
 def configure():
     """Saves user's default organization and project."""
 
-    orgs = APIClient.execute(method="GET", path="/list_orgs").json()
+    orgs = APIClient.execute(method="GET", path="/organizations").json()
     choices = [
         {
             "key": org["name"],
@@ -23,7 +23,7 @@ def configure():
 
     projects = APIClient.execute(
         method="GET",
-        path="/list_projects",
+        path="/projects",
         params={"organization_id": org["organization_id"]},
     ).json()
     choices = [

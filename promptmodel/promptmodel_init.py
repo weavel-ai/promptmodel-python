@@ -59,7 +59,7 @@ class CacheManager:
             if cls._instance is None:
                 instance = super(CacheManager, cls).__new__(cls)
                 instance.last_update_time = 0  # to manage update frequency
-                instance.update_interval = 10  # seconds, 6 hours
+                instance.update_interval = 60 * 60 * 6  # seconds, 6 hours
                 instance.program_alive = True
                 instance.background_tasks = []
                 initialize_db()
@@ -102,7 +102,11 @@ class CacheManager:
         # Check if we need to update the cache
         if current_time - self.last_update_time > self.update_interval:
             # Update cache logic
-            await update_deployed_db(config)
+            try:
+                await update_deployed_db(config)
+            except:
+                # try once more
+                await update_deployed_db(config)
             # Update the last update time
             self.last_update_time = current_time
 
@@ -141,49 +145,3 @@ async def update_deployed_db(config):
             upsert_config({"version": res["version"]}, section="project")
     except Exception as exception:
         logger.error(f"Deployment cache update error: {exception}")
-
-
-async def log(
-    type: InstanceType,
-    identifier: str,
-    content: Optional[Dict[str, Any]] = {},  # TODO: FIX THIS INTO OPENAI OUTPUT
-    metadata: Optional[Dict[str, Any]] = {},
-):
-    config = read_config()
-    if (
-        config
-        and "connection" in config
-        and (
-            (
-                "online" in config["connection"]
-                and config["connection"]["online"] == True
-            )
-            or (
-                "initializing" in config["connection"]
-                and config["connection"]["initializing"] == True
-            )
-        )
-    ):
-        pass
-    else:
-        try:
-            if (
-                "mask_inputs" in config["project"]
-                and config["project"]["mask_inputs"] is True
-            ):
-                if "inputs" in content:
-                    content["inputs"] = {
-                        key: "MASKED" for key, value in content["inputs"].items()
-                    }
-
-            res = await AsyncAPIClient.execute(
-                method="POST",
-                path="/log_general",
-                params={"type": type, "identifier": identifier},
-                json={"content": content, "metadata": metadata},
-                use_cli_key=False,
-            )
-            if res.status_code != 200:
-                logger.error(f"Logging error: {res}")
-        except Exception as exception:
-            logger.error(f"Logging error: {exception}")

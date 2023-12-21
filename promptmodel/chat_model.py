@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Coroutine, Union
 from uuid import uuid4
+
+from litellm import ModelResponse
+
 from promptmodel import DevClient
 
 from promptmodel.llms.llm_proxy import LLMProxy
@@ -220,18 +223,54 @@ class ChatModel(metaclass=RegisteringMeta):
         # )
 
     @check_connection_status_decorator
-    async def log_metadata_to_session(
-        self, metadata: Optional[Dict[str, Any]] = {}, *args, **kwargs
+    async def log_score_to_session(
+        self, score: Optional[Dict[str, Any]] = {}, *args, **kwargs
     ):
         try:
             res = await AsyncAPIClient.execute(
                 method="POST",
-                path="/log_general",
+                path="/save_chat_session_score",
                 params={
-                    "type": InstanceType.ChatLogSession.value,
-                    "identifier": self.session_uuid,
+                    "chat_session_uuid": self.session_uuid,
                 },
-                json={"content": {}, "metadata": metadata},
+                json=score,
+                use_cli_key=False,
+            )
+            if res.status_code != 200:
+                logger.error(f"Logging error: {res}")
+        except Exception as exception:
+            logger.error(f"Logging error: {exception}")
+
+    @check_connection_status_decorator
+    async def log_score(
+        self,
+        log_uuid: Optional[str] = None,
+        score: Optional[Dict[str, Any]] = {},
+        *args,
+        **kwargs,
+    ):
+        """Log score for the ChatMessage in the Cloud DB.
+
+        Args:
+            log_uuid (Optional[str], optional): UUID of log to save score. Defaults to None. If None, it will use the recent log_uuid.
+            score (Optional[Dict[str, Any]], optional): scores for message. Each keys will be created as Evaluation Metric in Promptmodel Dashboard. Defaults to {}.
+        """
+        try:
+            if not log_uuid and self.recent_log_uuid:
+                log_uuid = self.recent_log_uuid
+
+            if log_uuid is None:
+                raise ValueError(
+                    "log_uuid is None. Please give log_uuid or run ChatModel.log or ChatModel.run first."
+                )
+
+            res = await AsyncAPIClient.execute(
+                method="POST",
+                path="/chat_message_score",
+                params={
+                    "chat_message_uuid": log_uuid,
+                },
+                json=score,
                 use_cli_key=False,
             )
             if res.status_code != 200:
@@ -242,23 +281,71 @@ class ChatModel(metaclass=RegisteringMeta):
     @check_connection_status_decorator
     async def log(
         self,
-        log_uuid: Optional[str] = None,
-        content: Optional[Dict[str, Any]] = {},  # TODO: FIX THIS INTO OPENAI OUTPUT
-        metadata: Optional[Dict[str, Any]] = {},
+        openai_api_response: Optional[ModelResponse] = None,
+        messages: Optional[List[Dict[str, Any]]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
         *args,
         **kwargs,
-    ):
+    ) -> List[str]:
+        """
+        Log Messages to the Cloud DB.
+        Args:
+            openai_api_response (Optional[ModelResponse], optional): Response from the LLM. Defaults to None.
+            messages (Optional[List[Dict[str, Any]]], optional): List of messages. Defaults to None.
+            metadata (Optional[Dict[str, Any]], optional): Metadata for the log. Defaults to {}. It will be saved in the Last Log.
+
+        You can give either openai_api_response or messages.
+        If you give messages, it will log messages to the Cloud DB. This is useful when you want to log user messages to the Cloud DB.
+        If you give openai_api_response, it will log messages to the Cloud DB. This is useful when you want to log the response of the LLM to the Cloud DB.
+
+        Returns:
+            List[str]: List of log_uuids in the Cloud DB. You can log scores for each logs using this log_uuid with method ChatModel.log_score.
+        """
         try:
-            if not log_uuid and self.recent_log_uuid:
-                log_uuid = self.recent_log_uuid
+            if messages and openai_api_response:
+                raise ValueError(
+                    "You can give either openai_api_response or messages. You cannot give both."
+                )
+
+            chat_message_requests_body = []
+            if messages:
+                chat_message_requests_body = [
+                    ChatLogRequest(
+                        **{"message": message, "uuid": str(uuid4())}
+                    ).model_dump()
+                    for message in messages
+                ]
+            elif openai_api_response:
+                chat_message_requests_body = [
+                    ChatLogRequest(
+                        **{
+                            "message": openai_api_response.choices[
+                                0
+                            ].message.model_dump(),
+                            "uuid": str(uuid4()),
+                            "api_response": openai_api_response,
+                        }
+                    ).model_dump()
+                ]
+
+            chat_message_requests_body[-1]["metadata"] = metadata
+
+            uuid_list = [x["uuid"] for x in chat_message_requests_body]
+
             res = await AsyncAPIClient.execute(
                 method="POST",
-                path="/log_general",
-                params={"type": InstanceType.ChatLog.value, "identifier": log_uuid},
-                json={"content": content, "metadata": metadata},
+                path="/chat_log",
+                params={
+                    "session_uuid": self.session_uuid,
+                },
+                json=chat_message_requests_body,
                 use_cli_key=False,
             )
             if res.status_code != 200:
                 logger.error(f"Logging error: {res}")
+
+            # last log_uuid will be saved in the recent_log_uuid
+            self.recent_log_uuid = uuid_list[-1]
+            return uuid_list
         except Exception as exception:
             logger.error(f"Logging error: {exception}")

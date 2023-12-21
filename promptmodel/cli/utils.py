@@ -14,7 +14,7 @@ def get_org(config: Dict[str, Any]) -> Dict[str, Any]:
         print("User not logged in. Please run [violet]prompt login[/violet] first.")
         exit()
     if "default_org" not in config["user"]:
-        orgs = APIClient.execute(method="GET", path="/list_orgs").json()
+        orgs = APIClient.execute(method="GET", path="/organizations").json()
         choices = [
             {
                 "key": org["name"],
@@ -38,7 +38,7 @@ def get_project(config: Dict[str, Any], org: Dict[str, Any]) -> Dict[str, Any]:
     if "default_project" not in config["user"]:
         projects = APIClient.execute(
             method="GET",
-            path="/list_projects",
+            path="/projects",
             params={"organization_id": org["organization_id"]},
         ).json()
         choices = [
