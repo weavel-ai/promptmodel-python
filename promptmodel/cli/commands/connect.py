@@ -37,7 +37,7 @@ def connect():
         # connect
         res = APIClient.execute(
             method="POST",
-            path="/connect_cli_project",
+            path="/project/cli_connect",
             params={"project_uuid": project["uuid"]},
         )
         if res.status_code != 200:
@@ -58,7 +58,7 @@ def connect():
 
         res = APIClient.execute(
             method="POST",
-            path="/connect_cli_project",
+            path="/project/cli_connect",
             params={"project_uuid": project["uuid"]},
         )
         if res.status_code != 200:

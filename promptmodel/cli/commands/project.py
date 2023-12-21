@@ -17,7 +17,7 @@ def list():
     org = get_org(config)
     projects = APIClient.execute(
         method="GET",
-        path="/list_projects",
+        path="/projects",
         params={"organization_id": org["organization_id"]},
     ).json()
     print("\nProjects:")

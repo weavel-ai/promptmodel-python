@@ -59,7 +59,7 @@ class CacheManager:
             if cls._instance is None:
                 instance = super(CacheManager, cls).__new__(cls)
                 instance.last_update_time = 0  # to manage update frequency
-                instance.update_interval = 10  # seconds, 6 hours
+                instance.update_interval = 60 * 60 * 6  # seconds, 6 hours
                 instance.program_alive = True
                 instance.background_tasks = []
                 initialize_db()
@@ -102,7 +102,11 @@ class CacheManager:
         # Check if we need to update the cache
         if current_time - self.last_update_time > self.update_interval:
             # Update cache logic
-            await update_deployed_db(config)
+            try:
+                await update_deployed_db(config)
+            except:
+                # try once more
+                await update_deployed_db(config)
             # Update the last update time
             self.last_update_time = current_time
 

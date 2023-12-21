@@ -25,7 +25,7 @@ def login():
     while waiting_time < 300:
         # Check access every 5 seconds
         try:
-            res = APIClient.execute("/check_cli_access", ignore_auth_error=True)
+            res = APIClient.execute("/cli_access/check", ignore_auth_error=True)
             if res.json() == True:
                 print("[green]Access granted![/green] 🎉")
                 print(

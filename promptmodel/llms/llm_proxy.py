@@ -841,7 +841,7 @@ class LLMProxy(LLM):
                 try:
                     prompts_data = await AsyncAPIClient.execute(
                         method="GET",
-                        path="/fetch_function_model_version",
+                        path="/function_model_versions",
                         params={"function_model_name": name, "version": version},
                         use_cli_key=False,
                     )
@@ -915,7 +915,7 @@ class LLMProxy(LLM):
             try:
                 res_data = await AsyncAPIClient.execute(
                     method="GET",
-                    path="/fetch_chat_model_version_with_chat_log",
+                    path="/chat_model_versions_with_logs",
                     params={
                         "chat_model_name": name,
                         "session_uuid": session_uuid,
