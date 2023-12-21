@@ -17,11 +17,13 @@ if testmode == "true":
     GRANT_ACCESS_URL = WEB_CLIENT_URL + "/cli/grant-access"
 else:
     ENDPOINT_URL = (
-        os.environ.get("PROMPTMODEL_BACKEND_PUBLIC_URL", "http://localhost:8000")
+        os.environ.get(
+            "PROMPTMODEL_BACKEND_PUBLIC_URL", "https://promptmodel.up.railway.app/"
+        )
         + "/api/cli"
     )
     WEB_CLIENT_URL = os.environ.get(
-        "PROMPTMODEL_FRONTEND_PUBLIC_URL", "http://localhost:3000"
+        "PROMPTMODEL_FRONTEND_PUBLIC_URL", "https://app.promptmodel.run"
     )
     GRANT_ACCESS_URL = WEB_CLIENT_URL + "/cli/grant-access"
 
