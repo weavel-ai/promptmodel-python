@@ -4,7 +4,7 @@ typer[all]
 cryptography
 pyyaml
 InquirerPy
-litellm
+litellm==1.15.0
 python-dotenv
 websockets==10.4
 termcolor

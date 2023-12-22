@@ -3,4 +3,4 @@ from .function_model import FunctionModel, PromptModel
 from .chat_model import ChatModel
 from .promptmodel_init import init
 
-__version__ = "0.1.8"
+__version__ = "0.1.9"
