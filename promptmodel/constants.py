@@ -18,7 +18,7 @@ if testmode == "true":
 else:
     ENDPOINT_URL = (
         os.environ.get(
-            "PROMPTMODEL_BACKEND_PUBLIC_URL", "https://promptmodel.up.railway.app/"
+            "PROMPTMODEL_BACKEND_PUBLIC_URL", "https://promptmodel.up.railway.app"
         )
         + "/api/cli"
     )
