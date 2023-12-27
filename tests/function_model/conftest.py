@@ -19,6 +19,7 @@ def mock_fetch_prompts():
     mock_version_details = {
         "model": "gpt-3.5-turbo",
         "uuid": "testuuid",
+        "version": 1,
         "parsing_type": None,
         "output_keys": None,
     }

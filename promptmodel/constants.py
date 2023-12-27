@@ -22,6 +22,7 @@ else:
         )
         + "/api/cli"
     )
+
     WEB_CLIENT_URL = os.environ.get(
         "PROMPTMODEL_FRONTEND_PUBLIC_URL", "https://app.promptmodel.run"
     )

@@ -96,7 +96,12 @@ class ChatModel(metaclass=RegisteringMeta):
         else:
             self.session_uuid = session_uuid
 
-    def get_config(self) -> ChatModelConfig:
+    @check_connection_status_decorator
+    def get_config(
+        self,
+        *args,
+        **kwargs,
+    ) -> ChatModelConfig:
         """Get config for the ChatModel.
         It will fetch the published prompt and version config from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
         - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
@@ -108,7 +113,15 @@ class ChatModel(metaclass=RegisteringMeta):
         prompt, version_detail, message_logs = run_async_in_sync(
             LLMProxy.fetch_chat_model(self.name, self.session_uuid, self.version)
         )
-        return ChatModelConfig(prompt, version_detail, message_logs)
+
+        return ChatModelConfig(
+            system_prompt=prompt,
+            model=version_detail["model"],
+            name=self.name,
+            version_uuid=str(version_detail["uuid"]),
+            version=version_detail["version"],
+            message_logs=message_logs,
+        )
 
     @check_connection_status_decorator
     def add_messages(
@@ -169,12 +182,12 @@ class ChatModel(metaclass=RegisteringMeta):
                     yield item
                     cache: LLMStreamResponse = item
                 if cache:
-                    self.recent_log_uuid = cache.pm_log_uuid
+                    self.recent_log_uuid = cache.pm_detail.log_uuid
 
             return gen()
         else:
             res = self.llm_proxy.chat_run(self.session_uuid, functions, tools)
-            self.recent_log_uuid = res.pm_log_uuid
+            self.recent_log_uuid = res.pm_detail.log_uuid
             return res
         # return self.llm_proxy.chat_run(self.session_uuid, functions, self.api_key)
 
@@ -209,14 +222,14 @@ class ChatModel(metaclass=RegisteringMeta):
                     yield item
                     cache: LLMStreamResponse = item
                 if cache:
-                    self.recent_log_uuid = cache.pm_log_uuid
+                    self.recent_log_uuid = cache.pm_detail.log_uuid
 
             return async_gen()
         else:
             res: LLMResponse = await self.llm_proxy.chat_arun(
                 self.session_uuid, functions
             )
-            self.recent_log_uuid = res.pm_log_uuid
+            self.recent_log_uuid = res.pm_detail.log_uuid
             return res
         # return await self.llm_proxy.chat_arun(
         #     self.session_uuid, functions, self.api_key

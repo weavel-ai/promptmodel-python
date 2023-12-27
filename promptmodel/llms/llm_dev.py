@@ -42,7 +42,7 @@ class LLMDev:
         self,
         messages: List[Dict[str, Any]],
         parsing_type: Optional[ParsingType] = None,
-        functions: List[Any] = [],
+        functions: Optional[List[Any]] = None,
         model: Optional[str] = None,
     ) -> AsyncGenerator[Any, None]:
         """Parse & stream output from openai chat completion."""
@@ -90,7 +90,7 @@ class LLMDev:
     async def dev_chat(
         self,
         messages: List[Dict[str, Any]],
-        functions: List[Any] = [],
+        functions: Optional[List[Any]] = None,
         tools: Optional[List[Any]] = None,
         model: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:

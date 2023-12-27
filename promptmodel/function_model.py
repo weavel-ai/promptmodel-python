@@ -96,7 +96,19 @@ class FunctionModel(metaclass=RegisteringMeta):
         prompt, version_detail = run_async_in_sync(
             LLMProxy.fetch_prompts(self.name, self.version)
         )
-        return FunctionModelConfig(prompt, version_detail)
+        return FunctionModelConfig(
+            prompts=prompt,
+            model=version_detail["model"],
+            name=self.name,
+            version_uuid=str(version_detail["uuid"]),
+            version=version_detail["version"],
+            parsing_type=version_detail["parsing_type"]
+            if "parsing_type" in version_detail
+            else None,
+            output_keys=version_detail["output_keys"]
+            if "output_keys" in version_detail
+            else None,
+        )
 
     @check_connection_status_decorator
     def run(
@@ -119,7 +131,7 @@ class FunctionModel(metaclass=RegisteringMeta):
             It does not raise error. If error occurs, you can check error in response.error and error_log in response.error_log.
         """
         res: LLMResponse = self.llm_proxy.run(inputs, functions, tools, self.api_key)
-        self.recent_log_uuid = res.pm_log_uuid
+        self.recent_log_uuid = res.pm_detail.log_uuid
         return res
 
     @check_connection_status_decorator
@@ -145,7 +157,7 @@ class FunctionModel(metaclass=RegisteringMeta):
         res: LLMResponse = await self.llm_proxy.arun(
             inputs, functions, tools, self.api_key
         )
-        self.recent_log_uuid = res.pm_log_uuid
+        self.recent_log_uuid = res.pm_detail.log_uuid
         return res
 
     @check_connection_status_decorator
@@ -174,7 +186,7 @@ class FunctionModel(metaclass=RegisteringMeta):
             cache = item
 
         if cache:
-            self.recent_log_uuid = cache.pm_log_uuid
+            self.recent_log_uuid = cache.pm_detail.log_uuid
 
     @check_connection_status_decorator
     async def astream(
@@ -205,7 +217,7 @@ class FunctionModel(metaclass=RegisteringMeta):
                 yield item
                 cache = item
             if cache:
-                self.recent_log_uuid = cache.pm_log_uuid
+                self.recent_log_uuid = cache.pm_detail.log_uuid
 
         return async_gen()
 
@@ -232,7 +244,7 @@ class FunctionModel(metaclass=RegisteringMeta):
         res: LLMResponse = self.llm_proxy.run_and_parse(
             inputs, functions, tools, self.api_key
         )
-        self.recent_log_uuid = res.pm_log_uuid
+        self.recent_log_uuid = res.pm_detail.log_uuid
         return res
 
     @check_connection_status_decorator
@@ -258,7 +270,7 @@ class FunctionModel(metaclass=RegisteringMeta):
         res: LLMResponse = await self.llm_proxy.arun_and_parse(
             inputs, functions, tools, self.api_key
         )
-        self.recent_log_uuid = res.pm_log_uuid
+        self.recent_log_uuid = res.pm_detail.log_uuid
         return res
 
     @check_connection_status_decorator
@@ -289,7 +301,7 @@ class FunctionModel(metaclass=RegisteringMeta):
             cache = item
 
         if cache:
-            self.recent_log_uuid = cache.pm_log_uuid
+            self.recent_log_uuid = cache.pm_detail.log_uuid
 
     @check_connection_status_decorator
     async def astream_and_parse(
@@ -320,7 +332,7 @@ class FunctionModel(metaclass=RegisteringMeta):
                 yield item
                 cache = item
             if cache:
-                self.recent_log_uuid = cache.pm_log_uuid
+                self.recent_log_uuid = cache.pm_detail.log_uuid
 
         return async_gen()
 

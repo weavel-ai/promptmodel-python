@@ -54,6 +54,7 @@ def get_deployed_prompts(function_model_name: str) -> Tuple[List[DeployedPrompt]
 
         version_details = {
             "model": selected_version["model"],
+            "version" : selected_version["version"],
             "uuid": selected_version["uuid"],
             "parsing_type": selected_version["parsing_type"],
             "output_keys": selected_version["output_keys"],

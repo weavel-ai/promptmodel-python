@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from litellm import token_counter
 
 
@@ -62,10 +62,11 @@ def num_tokens_for_messages_for_each(
 
 
 def num_tokens_from_functions_input(
-    functions: List[Any], model="gpt-3.5-turbo-0613"
+    functions: Optional[List[Any]] = None, model="gpt-3.5-turbo-0613"
 ) -> int:
     """Return the number of tokens used by a list of functions."""
-
+    if functions is None:
+        return 0
     num_tokens = 0
     for function in functions:
         function_tokens = token_counter(model=model, text=function["name"])

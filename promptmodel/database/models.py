@@ -35,6 +35,7 @@ class DeployedFunctionModel(BaseModel):
 
 class DeployedFunctionModelVersion(BaseModel):
     uuid = UUIDField(unique=True, default=uuid4)
+    version = IntegerField(null=False)
     from_version = IntegerField(null=True)
     function_model_uuid = ForeignKeyField(
         DeployedFunctionModel,

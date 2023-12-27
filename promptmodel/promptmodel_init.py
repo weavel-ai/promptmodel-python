@@ -88,6 +88,7 @@ class CacheManager:
         # Current time
         current_time = time.time()
         config = read_config()
+
         if not config:
             upsert_config({"version": 0}, section="project")
             config = {"project": {"version": 0}}

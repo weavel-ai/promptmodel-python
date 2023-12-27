@@ -583,7 +583,7 @@ async def test_run_and_parsing(mocker):
     res: LLMResponse = llm.run_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )
@@ -597,7 +597,7 @@ async def test_run_and_parsing(mocker):
     res: LLMResponse = llm.run_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key", "key2"],
         model="gpt-3.5-turbo",
     )
@@ -621,7 +621,7 @@ async def test_run_and_parsing(mocker):
                 {"role": "user", "content": "What is the weather like in Boston?"}
             ],
             parsing_type=ParsingType.SQUARE_BRACKET.value,
-            functions=[],
+             
             output_keys=["key"],
             model="gpt-3.5-turbo",
         )
@@ -643,7 +643,7 @@ async def test_run_and_parsing(mocker):
     res: LLMResponse = llm.run_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )
@@ -667,7 +667,7 @@ async def test_run_and_parsing(mocker):
     res: LLMResponse = llm.run_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )
@@ -685,7 +685,7 @@ async def test_run_and_parsing(mocker):
     res: LLMResponse = llm.run_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )
@@ -722,7 +722,7 @@ async def test_arun_and_parsing(mocker):
     res: LLMResponse = await llm.arun_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )
@@ -736,7 +736,7 @@ async def test_arun_and_parsing(mocker):
     res: LLMResponse = await llm.arun_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key", "key2"],
         model="gpt-3.5-turbo",
     )
@@ -760,7 +760,7 @@ async def test_arun_and_parsing(mocker):
                 {"role": "user", "content": "What is the weather like in Boston?"}
             ],
             parsing_type=ParsingType.SQUARE_BRACKET.value,
-            functions=[],
+             
             output_keys=["key"],
             model="gpt-3.5-turbo",
         )
@@ -782,7 +782,7 @@ async def test_arun_and_parsing(mocker):
     res: LLMResponse = await llm.arun_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )
@@ -806,7 +806,7 @@ async def test_arun_and_parsing(mocker):
     res: LLMResponse = await llm.arun_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )
@@ -824,7 +824,7 @@ async def test_arun_and_parsing(mocker):
     res: LLMResponse = await llm.arun_and_parse(
         messages=[{"role": "user", "content": "What is the weather like in Boston?"}],
         parsing_type=ParsingType.SQUARE_BRACKET.value,
-        functions=[],
+         
         output_keys=["key"],
         model="gpt-3.5-turbo",
     )

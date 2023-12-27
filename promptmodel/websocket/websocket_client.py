@@ -115,17 +115,21 @@ class DevWebsocketClient:
                     parsing_success = True
                     error_log = None
                     function_call = None
-                    function_schemas: List[Dict] = message[
-                        "function_schemas"
-                    ]  # this has a mock_response which should not be sent to LLM
+                    function_schemas: Optional[List[Dict]] = (
+                        message["function_schemas"]
+                        if "function_schemas" in message
+                        else None
+                    )  # ehese schemata have mock_response which should not be sent to LLM
                     function_mock_responses = {}
-                    for function_schema in function_schemas:
-                        function_mock_responses[
-                            function_schema["name"]
-                        ] = function_schema["mock_response"]
 
-                    for schema in function_schemas:
-                        del schema["mock_response"]
+                    if function_schemas:
+                        for function_schema in function_schemas:
+                            function_mock_responses[
+                                function_schema["name"]
+                            ] = function_schema["mock_response"]
+
+                        for schema in function_schemas:
+                            del schema["mock_response"]
 
                     res: AsyncGenerator[
                         LLMStreamResponse, None
@@ -295,17 +299,21 @@ class DevWebsocketClient:
                     error_log = None
                     function_call = None
 
-                    function_schemas: List[Dict] = message[
-                        "function_schemas"
-                    ]  # this has a mock_response which should not be sent to LLM
+                    function_schemas: Optional[List[Dict]] = (
+                        message["function_schemas"]
+                        if "function_schemas" in message
+                        else None
+                    )  # this has a mock_response which should not be sent to LLM
                     function_mock_responses = {}
-                    for function_schema in function_schemas:
-                        function_mock_responses[
-                            function_schema["name"]
-                        ] = function_schema["mock_response"]
 
-                    for schema in function_schemas:
-                        del schema["mock_response"]
+                    if function_schemas:
+                        for function_schema in function_schemas:
+                            function_mock_responses[
+                                function_schema["name"]
+                            ] = function_schema["mock_response"]
+
+                        for schema in function_schemas:
+                            del schema["mock_response"]
 
                     res: AsyncGenerator[
                         LLMStreamResponse, None
