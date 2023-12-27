@@ -48,6 +48,8 @@ class LLMDev:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
+        if functions == []:
+            functions = None
         response: AsyncGenerator[ModelResponse, None] = await acompletion(
             model=_model,
             messages=[
@@ -97,6 +99,8 @@ class LLMDev:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
+        if functions == []:
+            functions = None
 
         if model != "HCX-002":
             # Truncate the output if it is too long

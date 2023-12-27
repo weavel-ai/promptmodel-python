@@ -116,6 +116,8 @@ class LLM:
     ) -> LLMResponse:
         """Return the response from openai chat completion."""
         response = None
+        if functions == []:
+            functions = None
         try:
             response: ModelResponse = completion(
                 model=model,
@@ -163,6 +165,8 @@ class LLM:
         **kwargs,
     ) -> LLMResponse:
         """Return the response from openai chat completion."""
+        if functions == []:
+            functions = None
         response = None
         try:
             response: ModelResponse = await acompletion(
@@ -211,6 +215,8 @@ class LLM:
         **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Stream openai chat completion."""
+        if functions == []:
+            functions = None
         response = None
         try:
             # load_prompt()
@@ -245,6 +251,8 @@ class LLM:
         **kwargs,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
+        if functions == []:
+            functions = None
         response = None
         try:
             start_time = datetime.datetime.now()
@@ -278,6 +286,8 @@ class LLM:
         api_key: Optional[str] = None,
     ) -> LLMResponse:
         """Parse and return output from openai chat completion."""
+        if functions == []:
+            functions = None
         response = None
         parsed_success = True
         parse_result = None
@@ -364,6 +374,8 @@ class LLM:
 
         Now generate the output:
         """
+        if functions == []:
+            functions = None
         response = None
         parsed_success = True
         parse_result = None
@@ -435,6 +447,8 @@ class LLM:
         **kwargs,
     ) -> Generator[LLMStreamResponse, None, None]:
         """Parse & stream output from openai chat completion."""
+        if functions == []:
+            functions = None
         response = None
         try:
             if parsing_type == ParsingType.COLON.value:
@@ -580,6 +594,8 @@ class LLM:
         api_key: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
+        if functions == []:
+            functions = None
         response = None
         try:
             if parsing_type == ParsingType.COLON.value:
