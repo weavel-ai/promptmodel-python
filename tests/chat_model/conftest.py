@@ -17,6 +17,7 @@ def mock_fetch_chat_model():
     mock_version_details = {
         "model": "gpt-4-1106-preview",
         "uuid": "testuuid",
+        "version": 1,
     }
     mock_message_logs = [
         {

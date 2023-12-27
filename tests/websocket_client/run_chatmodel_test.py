@@ -123,8 +123,6 @@ async def test_run_model_function_call(
                 }
             ],
             "model": "gpt-3.5-turbo",
-            "functions": [],
-            "function_schemas": [],
         },
         ws=mock_websocket,
     )

@@ -42,12 +42,14 @@ class LLMDev:
         self,
         messages: List[Dict[str, Any]],
         parsing_type: Optional[ParsingType] = None,
-        functions: List[Any] = [],
+        functions: Optional[List[Any]] = None,
         model: Optional[str] = None,
     ) -> AsyncGenerator[Any, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
+        if functions == []:
+            functions = None
         response: AsyncGenerator[ModelResponse, None] = await acompletion(
             model=_model,
             messages=[
@@ -90,13 +92,15 @@ class LLMDev:
     async def dev_chat(
         self,
         messages: List[Dict[str, Any]],
-        functions: List[Any] = [],
+        functions: Optional[List[Any]] = None,
         tools: Optional[List[Any]] = None,
         model: Optional[str] = None,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
         raw_output = ""
+        if functions == []:
+            functions = None
 
         if model != "HCX-002":
             # Truncate the output if it is too long

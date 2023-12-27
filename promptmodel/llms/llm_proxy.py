@@ -41,6 +41,7 @@ from promptmodel.types.response import (
     LLMStreamResponse,
     FunctionModelConfig,
     ChatModelConfig,
+    PMDetail,
 )
 from promptmodel.types.request import ChatLogRequest
 
@@ -88,7 +89,13 @@ class LLMProxy(LLM):
                     item.raw_output = None
                     item.parsed_outputs = None
                     item.function_call = None
-                item.pm_log_uuid = log_uuid
+                item.pm_detail = PMDetail(
+                    model=version_details["model"],
+                    name=self._name,
+                    version_uuid=str(version_details["uuid"]),
+                    version=version_details["version"],
+                    log_uuid=log_uuid,
+                )
                 yield item
 
             metadata = {
@@ -143,7 +150,13 @@ class LLMProxy(LLM):
                 if item.error and not error_occurs:
                     error_occurs = True
                     error_log = item.error_log
-                item.pm_log_uuid = log_uuid
+                item.pm_detail = PMDetail(
+                    model=version_details["model"],
+                    name=self._name,
+                    version_uuid=str(version_details["uuid"]),
+                    version=version_details["version"],
+                    log_uuid=log_uuid,
+                )
                 yield item
 
             # # add string_cache in model_response
@@ -217,7 +230,13 @@ class LLMProxy(LLM):
                 llm_response.parsed_outputs = None
                 llm_response.function_call = None
 
-            llm_response.pm_log_uuid = log_uuid
+            llm_response.pm_detail = PMDetail(
+                model=version_details["model"],
+                name=self._name,
+                version_uuid=str(version_details["uuid"]),
+                version=version_details["version"],
+                log_uuid=log_uuid,
+            )
             return llm_response
 
         return wrapper
@@ -265,7 +284,13 @@ class LLMProxy(LLM):
                 llm_response.parsed_outputs = None
                 llm_response.function_call = None
 
-            llm_response.pm_log_uuid = log_uuid
+            llm_response.pm_detail = PMDetail(
+                model=version_details["model"],
+                name=self._name,
+                version_uuid=str(version_details["uuid"]),
+                version=version_details["version"],
+                log_uuid=log_uuid,
+            )
             return llm_response
 
         return async_wrapper
@@ -317,7 +342,13 @@ class LLMProxy(LLM):
                 llm_response.parsed_outputs = None
                 llm_response.function_call = None
 
-            llm_response.pm_log_uuid = log_uuid
+            llm_response.pm_detail = PMDetail(
+                model=version_details["model"],
+                name=self._name,
+                version_uuid=str(version_details["uuid"]),
+                version=version_details["version"],
+                log_uuid=log_uuid,
+            )
             return llm_response
 
         return wrapper
@@ -368,7 +399,13 @@ class LLMProxy(LLM):
                 llm_response.parsed_outputs = None
                 llm_response.function_call = None
 
-            llm_response.pm_log_uuid = log_uuid
+            llm_response.pm_detail = PMDetail(
+                model=version_details["model"],
+                name=self._name,
+                version_uuid=str(version_details["uuid"]),
+                version=version_details["version"],
+                log_uuid=log_uuid,
+            )
             return llm_response
 
         return async_wrapper
@@ -404,7 +441,13 @@ class LLMProxy(LLM):
                     item.raw_output = None
                     item.parsed_outputs = None
                     item.function_call = None
-                item.pm_log_uuid = log_uuid
+                item.pm_detail = PMDetail(
+                    model=version_details["model"],
+                    name=self._name,
+                    version_uuid=str(version_details["uuid"]),
+                    version=version_details["version"],
+                    log_uuid=log_uuid,
+                )
                 yield item
 
             metadata = {
@@ -464,7 +507,13 @@ class LLMProxy(LLM):
                     item.parsed_outputs = None
                     item.function_call = None
 
-                item.pm_log_uuid = log_uuid
+                item.pm_detail = PMDetail(
+                    model=version_details["model"],
+                    name=self._name,
+                    version_uuid=str(version_details["uuid"]),
+                    version=version_details["version"],
+                    log_uuid=log_uuid,
+                )
                 yield item
 
             metadata = {
@@ -839,17 +888,20 @@ class LLMProxy(LLM):
 
             else:
                 try:
-                    prompts_data = await AsyncAPIClient.execute(
+                    config_list = await AsyncAPIClient.execute(
                         method="GET",
                         path="/function_model_versions",
                         params={"function_model_name": name, "version": version},
                         use_cli_key=False,
                     )
-                    prompts_data = prompts_data.json()
+                    config_list = config_list.json()
                 except Exception as e:
                     raise e
-                function_model_versions = prompts_data["function_model_versions"]
-                prompts = prompts_data["prompts"]
+
+                function_model_versions = [
+                    x["function_model_version"] for x in config_list
+                ]
+
                 if version == "deploy":
                     for version in function_model_versions:
                         if version["is_published"] is True:
@@ -858,18 +910,20 @@ class LLMProxy(LLM):
                 else:
                     selected_version = function_model_versions[0]
 
-                prompt_rows = list(
-                    filter(
-                        lambda prompt: str(prompt["version_uuid"])
-                        == str(selected_version["uuid"]),
-                        prompts,
-                    )
-                )
+                # config.prompts where config.function_model_version.uuid = selected_version.uuid
+                prompt_rows = [
+                    config["prompts"]
+                    for config in config_list
+                    if config["function_model_version"]["uuid"]
+                    == selected_version["uuid"]
+                ][0]
+
                 # sort prompt_rows by step
                 prompt_rows = sorted(prompt_rows, key=lambda prompt: prompt["step"])
 
                 version_detail = {
                     "model": selected_version["model"],
+                    "version": selected_version["version"],
                     "uuid": selected_version["uuid"],
                     "parsing_type": selected_version["parsing_type"],
                     "output_keys": selected_version["output_keys"],
@@ -946,6 +1000,7 @@ class LLMProxy(LLM):
             version_detail = {
                 "model": selected_version["model"],
                 "uuid": selected_version["uuid"],
+                "version": selected_version["version"],
             }
             if session_uuid:
                 chat_logs: List[Dict] = res_data["chat_logs"]

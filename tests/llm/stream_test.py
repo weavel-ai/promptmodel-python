@@ -20,7 +20,6 @@ def test_stream(mocker):
 
     stream_res: Generator[LLMStreamResponse, None, None] = llm.stream(
         messages=test_messages,
-        functions=[],
         model="gpt-3.5-turbo",
     )
     error_count = 0
@@ -83,7 +82,6 @@ async def test_astream(mocker):
 
     stream_res: AsyncGenerator[LLMStreamResponse, None] = llm.astream(
         messages=test_messages,
-        functions=[],
         model="gpt-3.5-turbo",
     )
     error_count = 0

@@ -122,8 +122,6 @@ async def test_run_model_function_call(
             "model": "gpt-3.5-turbo",
             "parsing_type": None,
             "output_keys": None,
-            "functions": [],
-            "function_schemas": [],
         },
         ws=mock_websocket,
     )
