@@ -44,6 +44,7 @@ class LLMDev:
         parsing_type: Optional[ParsingType] = None,
         functions: Optional[List[Any]] = None,
         model: Optional[str] = None,
+        **kwargs,
     ) -> AsyncGenerator[Any, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
@@ -58,6 +59,7 @@ class LLMDev:
             ],
             stream=True,
             functions=functions,
+            **kwargs,
         )
         function_call = {"name": "", "arguments": ""}
         finish_reason_function_call = False
@@ -95,6 +97,7 @@ class LLMDev:
         functions: Optional[List[Any]] = None,
         tools: Optional[List[Any]] = None,
         model: Optional[str] = None,
+        **kwargs,
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         """Parse & stream output from openai chat completion."""
         _model = model or self._model
@@ -136,7 +139,7 @@ class LLMDev:
         is_stream_unsupported = model in ["HCX-002"]
         if not is_stream_unsupported:
             args["stream"] = True
-        response: AsyncGenerator[ModelResponse, None] = await acompletion(**args)
+        response: AsyncGenerator[ModelResponse, None] = await acompletion(**args, **kwargs)
         if is_stream_unsupported:
             yield LLMStreamResponse(raw_output=response.choices[0].message.content)
         else:
