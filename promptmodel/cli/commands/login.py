@@ -14,7 +14,7 @@ def login():
     # TODO: Check if already logged in
     api_key = generate_api_key()
     encrypted_key = encrypt_message(api_key)
-    upsert_config({"encrypted_api_key": encrypted_key}, section="user")
+    upsert_config({"encrypted_api_key": encrypted_key}, section="connection")
     url = f"{GRANT_ACCESS_URL}?token={api_key}"
     webbrowser.open(url)
     print("Please grant access to the CLI by visiting the URL in your browser.")

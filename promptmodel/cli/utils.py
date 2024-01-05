@@ -10,10 +10,10 @@ def get_org(config: Dict[str, Any]) -> Dict[str, Any]:
 
     :return: A dictionary containing the current organization.
     """
-    if "user" not in config:
+    if "connection" not in config:
         print("User not logged in. Please run [violet]prompt login[/violet] first.")
         exit()
-    if "default_org" not in config["user"]:
+    if "org" not in config["connection"]:
         orgs = APIClient.execute(method="GET", path="/organizations").json()
         choices = [
             {
@@ -25,7 +25,7 @@ def get_org(config: Dict[str, Any]) -> Dict[str, Any]:
         ]
         org = inquirer.select(message="Select organization:", choices=choices).execute()
     else:
-        org = config["user"]["default_org"]
+        org = config["connection"]["org"]
     return org
 
 
@@ -35,7 +35,7 @@ def get_project(config: Dict[str, Any], org: Dict[str, Any]) -> Dict[str, Any]:
 
     :return: A dictionary containing the current project.
     """
-    if "default_project" not in config["user"]:
+    if "project" not in config["connection"]:
         projects = APIClient.execute(
             method="GET",
             path="/projects",
@@ -51,5 +51,5 @@ def get_project(config: Dict[str, Any], org: Dict[str, Any]) -> Dict[str, Any]:
         ]
         project = inquirer.select(message="Select project:", choices=choices).execute()
     else:
-        project = config["user"]["default_project"]
+        project = config["connection"]["project"]
     return project
