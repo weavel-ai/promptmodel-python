@@ -38,7 +38,7 @@ def configure():
         message="Select default project:", choices=choices
     ).execute()
 
-    upsert_config({"default_org": org, "default_project": project}, section="user")
+    upsert_config({"org": org, "project": project}, section="connection")
 
 
 app = typer.Typer(invoke_without_command=True, callback=configure)

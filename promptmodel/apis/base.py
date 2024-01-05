@@ -37,15 +37,15 @@ class APIClient:
         """
         config = read_config()
         if use_cli_key:
-            if "user" not in config:
+            if "connection" not in config:
                 print(
                     "User not logged in. Please run [violet]prompt login[/violet] first."
                 )
                 exit()
 
             encrypted_key = (
-                config["user"]["encrypted_api_key"]
-                if "encrypted_api_key" in config["user"]
+                config["connection"]["encrypted_api_key"]
+                if "encrypted_api_key" in config["connection"]
                 else None
             )
             if encrypted_key is None:
@@ -150,13 +150,13 @@ class AsyncAPIClient:
         """
         config = read_config()
         if use_cli_key:
-            if "user" not in config:
+            if "connection" not in config:
                 print(
                     "User not logged in. Please run [violet]prompt login[/violet] first."
                 )
                 exit()
 
-            encrypted_key = config["user"]["encrypted_api_key"]
+            encrypted_key = config["connection"]["encrypted_api_key"]
             if encrypted_key is None:
                 raise Exception("No API key found. Please run 'prompt login' first.")
             decrypted_key = decrypt_message(encrypted_key)
