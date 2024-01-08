@@ -94,7 +94,6 @@ def connect():
             "function_schemas": devapp_instance._get_function_schema_list(),
             "samples": devapp_instance.samples,
         },
-        use_cli_key=False,
     )
     if res.status_code != 200:
         print(f"Error: {res.json()['detail']}")
