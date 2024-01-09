@@ -129,3 +129,21 @@ class FunctionSchema(BaseModel):
     name: str
     description: Optional[str] = None
     parameters: _Parameters
+
+class PromptComponentConfig(BaseModel):
+    """Response Class for PromptComponent.get_config().
+    Created after calling PromptComponent.log_start()
+    name: str
+        name of the PromptComponent.
+    version_uuid: str
+        version uuid of the PromptComponent.
+    version: int
+        version id of the PromptComponent.
+    log_uuid: str
+        log_uuid for current trace.
+    """
+
+    name: str
+    version_uuid: str
+    log_uuid: str
+    version: int

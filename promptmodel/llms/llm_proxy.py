@@ -41,16 +41,23 @@ from promptmodel.types.response import (
     LLMStreamResponse,
     FunctionModelConfig,
     ChatModelConfig,
+    PromptComponentConfig,
     PMDetail,
 )
 from promptmodel.types.request import ChatLogRequest
 
 
 class LLMProxy(LLM):
-    def __init__(self, name: str, version: Optional[Union[str, int]] = "deploy"):
+    def __init__(
+        self,
+        name: str,
+        version: Optional[Union[str, int]] = "deploy",
+        prompt_component_config: Optional[PromptComponentConfig] = None
+    ):
         super().__init__()
         self._name = name
         self.version = version
+        self.prompt_component_config = prompt_component_config
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
@@ -644,6 +651,7 @@ class LLMProxy(LLM):
         if api_response:
             api_response_dict = api_response.model_dump()
             api_response_dict["response_ms"] = api_response._response_ms
+            api_response_dict["_response_ms"] = api_response._response_ms
         else:
             api_response_dict = None
         run_log_request_body = {
@@ -663,7 +671,21 @@ class LLMProxy(LLM):
             use_cli_key=False,
         )
         if res.status_code != 200:
-            print(f"[red]Failed to log to cloud: {res.json()}[/red]")
+            print(f"[red]Failed to log to cloud: {res.json()}[/red]");
+            
+        if self.prompt_component_config:
+            res_connect = await AsyncAPIClient.execute(
+                method="POST",
+                path="/prompt_component/connect",
+                json={
+                    "component_log_uuid": self.prompt_component_config.log_uuid,
+                    "run_log_uuid": log_uuid,      
+                },
+                use_cli_key=False,
+            )
+            if res_connect.status_code != 200:
+                print(f"[red]Failed to connect prompt component to run log: {res_connect.json()}[/red]")
+
         return res
 
     async def _async_chat_log_to_cloud(
