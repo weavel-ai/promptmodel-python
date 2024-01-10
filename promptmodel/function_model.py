@@ -22,6 +22,7 @@ from promptmodel.types.response import (
     LLMStreamResponse,
     LLMResponse,
     FunctionModelConfig,
+    UnitConfig
 )
 from promptmodel.types.enums import InstanceType
 from promptmodel.apis.base import AsyncAPIClient
@@ -65,6 +66,7 @@ class FunctionModel(metaclass=RegisteringMeta):
         name (_type_): _description_
         version (Optional[ Union[str, int] ], optional): Choose which FunctionModel version to use. Defaults to "deploy". It can be "deploy", "latest", or version number.
         api_key (Optional[str], optional): API key for the LLM. Defaults to None. If None, use api_key in .env file.
+        unit_config (Optional[UnitConfig], optional): If it is not None, every logs from this FunctionModel will be connected to the UnitLogger. Defaults to None.
     """
 
     def __init__(
@@ -74,10 +76,12 @@ class FunctionModel(metaclass=RegisteringMeta):
             Union[str, int]
         ] = "deploy",  # "deploy" or "latest" or version number
         api_key: Optional[str] = None,
+        unit_config: Optional[UnitConfig] = None,
     ):
         self.name = name
         self.api_key = api_key
-        self.llm_proxy = LLMProxy(name, version)
+        self.unit_config = unit_config
+        self.llm_proxy = LLMProxy(name, version, unit_config)
         self.version = version
         self.recent_log_uuid = None
 
@@ -425,7 +429,20 @@ class FunctionModel(metaclass=RegisteringMeta):
             )
             if res.status_code != 200:
                 logger.error(f"Logging error: {res}")
-
+                
+            if self.unit_config:
+                res = await AsyncAPIClient.execute(
+                    method="POST",
+                    path="/unit/connect",
+                    json={
+                        "unit_log_uuid": self.unit_config.log_uuid,
+                        "run_log_uuid": log_uuid,
+                    },
+                    use_cli_key=False,
+                )
+                if res.status_code != 200:
+                    logger.error(f"Logging error: {res}")
+                
             self.recent_log_uuid = log_uuid
             return log_uuid
         except Exception as exception:
