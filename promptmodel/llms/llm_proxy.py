@@ -41,7 +41,7 @@ from promptmodel.types.response import (
     LLMStreamResponse,
     FunctionModelConfig,
     ChatModelConfig,
-    PromptComponentConfig,
+    UnitConfig,
     PMDetail,
 )
 from promptmodel.types.request import ChatLogRequest
@@ -52,12 +52,12 @@ class LLMProxy(LLM):
         self,
         name: str,
         version: Optional[Union[str, int]] = "deploy",
-        prompt_component_config: Optional[PromptComponentConfig] = None
+        unit_config: Optional[UnitConfig] = None
     ):
         super().__init__()
         self._name = name
         self.version = version
-        self.prompt_component_config = prompt_component_config
+        self.unit_config = unit_config
 
     def _wrap_gen(self, gen: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
@@ -673,12 +673,12 @@ class LLMProxy(LLM):
         if res.status_code != 200:
             print(f"[red]Failed to log to cloud: {res.json()}[/red]");
             
-        if self.prompt_component_config:
+        if self.unit_config:
             res_connect = await AsyncAPIClient.execute(
                 method="POST",
-                path="/prompt_component/connect",
+                path="/unit/connect",
                 json={
-                    "component_log_uuid": self.prompt_component_config.log_uuid,
+                    "unit_log_uuid": self.unit_config.log_uuid,
                     "run_log_uuid": log_uuid,      
                 },
                 use_cli_key=False,

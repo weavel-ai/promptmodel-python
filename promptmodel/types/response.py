@@ -130,15 +130,15 @@ class FunctionSchema(BaseModel):
     description: Optional[str] = None
     parameters: _Parameters
 
-class PromptComponentConfig(BaseModel):
-    """Response Class for PromptComponent.get_config().
-    Created after calling PromptComponent.log_start()
+class UnitConfig(BaseModel):
+    """Response Class for UnitLogger.get_config().
+    Created after calling UnitLogger.log_start()
     name: str
-        name of the PromptComponent.
+        name of the UnitLogger.
     version_uuid: str
-        version uuid of the PromptComponent.
+        version uuid of the UnitLogger.
     version: int
-        version id of the PromptComponent.
+        version id of the UnitLogger.
     log_uuid: str
         log_uuid for current trace.
     """

@@ -1,29 +1,17 @@
-from uuid import uuid4
 from typing import (
-    Any,
-    AsyncGenerator,
     Dict,
-    Generator,
-    List,
     Optional,
-    Coroutine,
-    Union,
 )
-from litellm import ModelResponse
 
 import promptmodel.utils.logger as logger
 from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.utils.config_utils import check_connection_status_decorator
 from promptmodel.types.response import (
-    LLMStreamResponse,
-    LLMResponse,
-    FunctionModelConfig,
-    PromptComponentConfig,
+    UnitConfig,
 )
 from promptmodel.apis.base import AsyncAPIClient
-from promptmodel import DevClient
 
-class PromptComponent:
+class UnitLogger:
     def __init__(
         self,
         name: str,
@@ -31,25 +19,26 @@ class PromptComponent:
     ):
         self.name: str = name
         self.version: int = version
-        self.config: Optional[PromptComponentConfig] = None
+        self.config: Optional[UnitConfig] = None
         
     @check_connection_status_decorator
-    def get_config(self) -> Optional[PromptComponentConfig]:
+    def get_config(self) -> Optional[UnitConfig]:
         """Get the config of the component
-        You can get the config directly from the PromptComponent.confg attribute.
+        You can get the config directly from the UnitLogger.confg attribute.
         """
         return self.config
     
     @check_connection_status_decorator
-    async def log_start(self, *args, **kwargs) -> Optional["PromptComponent"]:
+    async def log_start(self, *args, **kwargs) -> Optional["UnitLogger"]:
         """Create Component Log on the cloud.
-        It returns the PromptComponent itself, so you can use it like this:
-        >>> component = PromptComponent("intent_classification_unit", 1).log_start()
-        >>> res = FunctionModel("intent_classifier", prompt_component_config=component.config).run(...)
+        It returns the UnitLogger itself, so you can use it like this:
+        >>> component = UnitLogger("intent_classification_unit", 1).log_start()
+        >>> res = FunctionModel("intent_classifier", unit_config=component.config).run(...)
+        >>> component.log_score({"accuracy": 0.9})
         """
         res = await AsyncAPIClient.execute(
             method="POST",
-            path="/prompt_component/log",
+            path="/unit/log",
             json={
                 "name": self.name,
                 "version": self.version,
@@ -60,7 +49,7 @@ class PromptComponent:
             logger.error(f"Failed to log start for component {self.name} v{self.version}")
             return None
         else:
-            self.config = PromptComponentConfig(**res.json())
+            self.config = UnitConfig(**res.json())
             
         return self
         
@@ -69,9 +58,9 @@ class PromptComponent:
     async def log_score(self, scores: Dict[str, float], *args, **kwargs):
         res = await AsyncAPIClient.execute(
             method="POST",
-            path="/prompt_component/score",
+            path="/unit/score",
             json={
-                "component_log_uuid" : self.config.log_uuid,
+                "unit_log_uuid" : self.config.log_uuid,
                 "scores": scores,
             },
             use_cli_key=False
