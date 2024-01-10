@@ -1,5 +1,6 @@
 """LLM for Development TestRun"""
 import re
+from datetime import datetime
 from typing import Any, AsyncGenerator, List, Dict, Optional
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -9,14 +10,20 @@ from promptmodel.types.enums import ParsingType, get_pattern_by_type
 from promptmodel.utils import logger
 from promptmodel.utils.output_utils import convert_str_to_type, update_dict
 from promptmodel.utils.token_counting import (
+    num_tokens_for_messages,
     num_tokens_for_messages_for_each,
     num_tokens_from_functions_input,
 )
-from promptmodel.types.response import LLMStreamResponse, ModelResponse
-
+from promptmodel.types.response import (
+    LLMResponse,
+    LLMStreamResponse,
+    ModelResponse,
+    Usage,
+    Choices,
+    Message,
+)
 
 load_dotenv()
-
 
 class OpenAIMessage(BaseModel):
     role: Optional[str] = None
@@ -51,6 +58,9 @@ class LLMDev:
         raw_output = ""
         if functions == []:
             functions = None
+            
+        start_time = datetime.now()
+        
         response: AsyncGenerator[ModelResponse, None] = await acompletion(
             model=_model,
             messages=[
@@ -79,6 +89,24 @@ class LLMDev:
             if chunk.choices[0].finish_reason == "function_call":
                 finish_reason_function_call = True
                 yield LLMStreamResponse(function_call=function_call)
+                
+            if chunk.choices[0].finish_reason != None:
+                end_time = datetime.now()
+                response_ms = (end_time - start_time).total_seconds() * 1000
+                yield LLMStreamResponse(
+                    api_response=self.make_model_response_dev(
+                        chunk,
+                        response_ms,
+                        messages,
+                        raw_output,
+                        functions=functions,
+                        function_call=function_call
+                        if chunk.choices[0].finish_reason == "function_call"
+                        else None,
+                        tools=None,
+                        tool_calls=None
+                    )
+                )
 
         # parsing
         if parsing_type and not finish_reason_function_call:
@@ -139,6 +167,8 @@ class LLMDev:
         is_stream_unsupported = model in ["HCX-002"]
         if not is_stream_unsupported:
             args["stream"] = True
+        
+        start_time = datetime.now()
         response: AsyncGenerator[ModelResponse, None] = await acompletion(**args, **kwargs)
         if is_stream_unsupported:
             yield LLMStreamResponse(raw_output=response.choices[0].message.content)
@@ -166,3 +196,96 @@ class LLMDev:
                         api_response=chunk if not yield_api_response_with_fc else None,
                         raw_output=chunk.choices[0].delta.content,
                     )
+                    
+                if getattr(chunk.choices[0].delta, "finish_reason", None) is not None:
+                    end_time = datetime.now()
+                    response_ms = (end_time - start_time).total_seconds() * 1000
+                    yield LLMStreamResponse(
+                        api_response=self.make_model_response_dev(
+                            chunk,
+                            response_ms,
+                            messages,
+                            raw_output,
+                            functions=None,
+                            function_call=None
+                            if chunk.choices[0].finish_reason == "function_call"
+                            else None,
+                            tools=None,
+                            tool_calls=None
+                        )
+                    )
+
+    def make_model_response_dev(
+        self,
+        chunk: ModelResponse,
+        response_ms,
+        messages: List[Dict[str, str]],
+        raw_output: str,
+        functions: Optional[List[Any]] = None,
+        function_call: Optional[Dict[str, Any]] = None,
+        tools: Optional[List[Any]] = None,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> ModelResponse:
+        """Make ModelResponse object from openai response."""
+        count_start_time = datetime.now()
+        prompt_token: int = num_tokens_for_messages(
+            messages=messages, model=chunk["model"]
+        )
+        completion_token: int = num_tokens_for_messages(
+            model=chunk["model"],
+            messages=[{"role": "assistant", "content": raw_output}],
+        )
+
+        if functions and len(functions) > 0:
+            functions_token = num_tokens_from_functions_input(
+                functions=functions, model=chunk["model"]
+            )
+            prompt_token += functions_token
+
+        if tools and len(tools) > 0:
+            tools_token = num_tokens_from_functions_input(
+                functions=[tool["function"] for tool in tools], model=chunk["model"]
+            )
+            prompt_token += tools_token
+        # if function_call:
+        #     function_call_token = num_tokens_from_function_call_output(
+        #         function_call_output=function_call, model=chunk["model"]
+        #     )
+        #     completion_token += function_call_token
+
+        count_end_time = datetime.now()
+        logger.debug(
+            f"counting token time : {(count_end_time - count_start_time).total_seconds() * 1000} ms"
+        )
+
+        usage = Usage(
+            **{
+                "prompt_tokens": prompt_token,
+                "completion_tokens": completion_token,
+                "total_tokens": prompt_token + completion_token,
+            }
+        )
+
+        last_message = Message(
+            role=chunk.choices[0].delta.role
+            if getattr(chunk.choices[0].delta, "role", None)
+            else "assistant",
+            content=raw_output if raw_output != "" else None,
+            function_call=function_call if function_call else None,
+            tool_calls=tool_calls if tool_calls else None,
+        )
+        choices = [
+            Choices(finish_reason=chunk.choices[0].finish_reason, message=last_message)
+        ]
+
+        res = ModelResponse(
+            id=chunk["id"],
+            created=chunk["created"],
+            model=chunk["model"],
+            stream=True,
+        )
+        res.choices = choices
+        res.usage = usage
+        res._response_ms = response_ms
+
+        return res

@@ -144,6 +144,8 @@ class DevWebsocketClient:
                         # send item to backend
                         # save item & parse
                         # if type(item) == str: raw output, if type(item) == dict: parsed output
+                        data = {"status": "running"}
+                        
                         if item.raw_output is not None:
                             output["raw_output"] += item.raw_output
                             data = {
@@ -172,7 +174,14 @@ class DevWebsocketClient:
                         if item.error and parsing_success is True:
                             parsing_success = not item.error
                             error_log = item.error_log
-
+                            
+                        if item.api_response and "message" in item.api_response.choices[0]:
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_RUN.value,
+                                "status": "running",
+                                "api_response": item.api_response.model_dump(),
+                            }
+                            
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
                         await ws.send(json.dumps(data, cls=CustomJSONEncoder))
@@ -325,6 +334,7 @@ class DevWebsocketClient:
 
                     raw_output = ""
                     async for chunk in res:
+                        data = {"status": "running"}
                         logger.debug(f"Chunk: {chunk}")
                         if chunk.raw_output is not None:
                             raw_output += chunk.raw_output
@@ -347,6 +357,13 @@ class DevWebsocketClient:
 
                         if chunk.error:
                             error_log = chunk.error_log
+                            
+                        if chunk.api_response and "message" in chunk.api_response.choices[0]:
+                            data = {
+                                "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                "status": "running",
+                                "api_response": chunk.api_response.model_dump(),
+                            }
 
                         data.update(response)
                         # logger.debug(f"Sent response: {data}")
@@ -438,6 +455,7 @@ class DevWebsocketClient:
 
                         raw_output = ""
                         async for item in res_after_function_call:
+                            data = {"status": "running"}
                             if item.raw_output is not None:
                                 raw_output += item.raw_output
                                 data = {
@@ -448,6 +466,13 @@ class DevWebsocketClient:
 
                             if item.error:
                                 error_log = item.error_log
+                                
+                            if chunk.api_response and "message" in chunk.api_response.choices[0]:
+                                data = {
+                                    "type": ServerTask.UPDATE_RESULT_CHAT_RUN.value,
+                                    "status": "running",
+                                    "api_response": chunk.api_response.model_dump(),
+                                }
 
                             data.update(response)
                             # logger.debug(f"Sent response: {data}")
