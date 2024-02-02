@@ -29,7 +29,7 @@ def init(from_cli: bool = True):
             "[yellow]promptmodel_dev.py[/yellow] was already initialized in this directory."
         )
         print(
-            "Run [violet][bold]prompt dev[/bold][/violet] to start engineering prompts."
+            "Run [violet][bold]prompt connect[/bold][/violet] to start engineering prompts."
         )
 
 
