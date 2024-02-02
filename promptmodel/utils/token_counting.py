@@ -3,11 +3,16 @@ from litellm import token_counter
 
 
 def set_inputs_to_prompts(inputs: Dict[str, Any], prompts: List[Dict[str, str]]):
-    messages = [
-        {"content": prompt["content"].format(**inputs), "role": prompt["role"]}
-        for prompt in prompts
-    ]
-    return messages
+    messages = []
+    for prompt in prompts:
+        prompt["content"] = prompt["content"].replace("{", "{{").replace("}", "}}")
+        prompt["content"] = prompt["content"].replace("{{{{", "{").replace("}}}}", "}")
+        messages.append(
+            {
+                "content": prompt["content"].format(**inputs),
+                "role": prompt["role"],
+            }
+        )
 
 
 def num_tokens_for_messages(

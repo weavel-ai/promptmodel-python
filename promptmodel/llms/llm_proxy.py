@@ -550,13 +550,18 @@ class LLMProxy(LLM):
         kwargs,
     ):
         stringified_inputs = {key: str(value) for key, value in inputs.items()}
-        messages = [
-            {
-                "content": prompt["content"].format(**stringified_inputs),
-                "role": prompt["role"],
-            }
-            for prompt in prompts
-        ]
+        
+        messages = []
+        for prompt in prompts:
+            prompt["content"] = prompt["content"].replace("{", "{{").replace("}", "}}")
+            prompt["content"] = prompt["content"].replace("{{{{", "{").replace("}}}}", "}")
+            messages.append(
+                {
+                    "content": prompt["content"].format(**stringified_inputs),
+                    "role": prompt["role"],
+                }
+            )
+        
         call_args = {
             "messages": messages,
             "model": version_detail["model"] if version_detail else None,
