@@ -123,6 +123,26 @@ class ChatModel(metaclass=RegisteringMeta):
             message_logs=message_logs,
         )
 
+    def get_prompts(self) -> str:
+        """Get prompts for the ChatModel. (Deprecated)
+        Returns:
+            str: system prompt for the ChatModel.
+        """
+        prompt, version_detail, message_logs = run_async_in_sync(
+            LLMProxy.fetch_chat_model(self.name, self.session_uuid, self.version)
+        )
+        return prompt
+
+    def get_messages(self) -> List[Dict[str, Any]]:
+        """Get message logs for the ChatModel. (Deprecated)
+        Returns:
+            List[Dict[str, Any]]: messages for the ChatModel.
+        """
+        prompt, version_detail, message_logs = run_async_in_sync(
+            LLMProxy.fetch_chat_model(self.name, self.session_uuid, self.version)
+        )
+        return message_logs
+
     @check_connection_status_decorator
     def add_messages(
         self,
