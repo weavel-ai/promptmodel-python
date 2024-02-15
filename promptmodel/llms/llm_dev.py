@@ -1,5 +1,6 @@
 """LLM for Development TestRun"""
 import re
+import json
 from datetime import datetime
 from typing import Any, AsyncGenerator, List, Dict, Optional
 from pydantic import BaseModel
@@ -69,6 +70,7 @@ class LLMDev:
             ],
             stream=True,
             functions=functions,
+            response_format={"type":"json_object"} if parsing_type == ParsingType.JSON else {"type":"text"},
             **kwargs,
         )
         function_call = {"name": "", "arguments": ""}
@@ -110,14 +112,17 @@ class LLMDev:
 
         # parsing
         if parsing_type and not finish_reason_function_call:
-            parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)
-            whole_pattern = parsing_pattern["whole"]
-            parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
-            for parsed_result in parsed_results:
-                key = parsed_result[0]
-                type_str = parsed_result[1]
-                value = convert_str_to_type(parsed_result[2], type_str)
-                yield LLMStreamResponse(parsed_outputs={key: value})
+            if parsing_type == ParsingType.JSON:
+                yield LLMStreamResponse(parsed_outputs=json.loads(raw_output))
+            else: 
+                parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)
+                whole_pattern = parsing_pattern["whole"]
+                parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
+                for parsed_result in parsed_results:
+                    key = parsed_result[0]
+                    type_str = parsed_result[1]
+                    value = convert_str_to_type(parsed_result[2], type_str)
+                    yield LLMStreamResponse(parsed_outputs={key: value})
 
     async def dev_chat(
         self,
