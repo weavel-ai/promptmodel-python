@@ -43,6 +43,7 @@ class ParsingType(str, Enum):
     SQUARE_BRACKET = "square_bracket"
     DOUBLE_SQUARE_BRACKET = "double_square_bracket"
     HTML = "html"
+    JSON = "json"
 
 
 class ParsingPattern(dict, Enum):
