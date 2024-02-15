@@ -72,28 +72,36 @@ class LLM:
             return ParseResult(parsed_outputs={}, error=False, error_log=None)
         if raw_output is None:
             return ParseResult(parsed_outputs={}, error=True, error_log="No content")
-        parsing_pattern = get_pattern_by_type(parsing_type)
-        whole_pattern = parsing_pattern["whole"]
-        parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
-        parsed_outputs = {}
-        error: bool = False
-        error_log: str = None
+        
+        if parsing_type == ParsingType.JSON:
+            try:
+                parsed_outputs = json.loads(raw_output)
+                return ParseResult(parsed_outputs=parsed_outputs, error=False, error_log=None)
+            except Exception as e:
+                return ParseResult(parsed_outputs={}, error=True, error_log=str(e))
+        else:
+            parsing_pattern = get_pattern_by_type(parsing_type)
+            whole_pattern = parsing_pattern["whole"]
+            parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
+            parsed_outputs = {}
+            error: bool = False
+            error_log: str = None
 
-        try:
-            for parsed_result in parsed_results:
-                key = parsed_result[0]
-                type_str = parsed_result[1]
-                value = convert_str_to_type(parsed_result[2], type_str)
-                parsed_outputs[key] = value
-        except Exception as e:
-            error = True
-            error_log = str(e)
+            try:
+                for parsed_result in parsed_results:
+                    key = parsed_result[0]
+                    type_str = parsed_result[1]
+                    value = convert_str_to_type(parsed_result[2], type_str)
+                    parsed_outputs[key] = value
+            except Exception as e:
+                error = True
+                error_log = str(e)
 
-        return ParseResult(
-            parsed_outputs=parsed_outputs,
-            error=error,
-            error_log=error_log,
-        )
+            return ParseResult(
+                parsed_outputs=parsed_outputs,
+                error=error,
+                error_log=error_log,
+            )
 
     def __validate_openai_messages(
         self, messages: List[Dict[str, str]]
@@ -302,6 +310,7 @@ class LLM:
                 functions=functions,
                 tools=tools,
                 api_key=api_key,
+                response_format={"type": "json_object"} if parsing_type == ParsingType.JSON else {"type": "text"},
             )
             raw_output = getattr(response.choices[0].message, "content", None)
 
@@ -390,6 +399,7 @@ class LLM:
                 functions=functions,
                 tools=tools,
                 api_key=api_key,
+                response_format={"type": "json_object"} if parsing_type == ParsingType.JSON else {"type": "text"},
             )
             raw_output = getattr(response.choices[0].message, "content", None)
 
@@ -457,6 +467,12 @@ class LLM:
                     error=True, error_log="Cannot stream colon type"
                 )
                 return
+            if parsing_type == ParsingType.JSON:
+                # cannot stream json type
+                yield LLMStreamResponse(
+                    error=True, error_log="Cannot stream json type"
+                )
+            
             start_time = datetime.datetime.now()
             response = completion(
                 model=model,
@@ -604,6 +620,11 @@ class LLM:
                     error=True, error_log="Cannot stream colon type"
                 )
                 return
+            if parsing_type == ParsingType.JSON:
+                # cannot stream json type
+                yield LLMStreamResponse(
+                    error=True, error_log="Cannot stream json type"
+                )
             start_time = datetime.datetime.now()
             response = await acompletion(
                 model=model,
