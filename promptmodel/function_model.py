@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from uuid import uuid4
 from typing import (
@@ -96,10 +97,37 @@ class FunctionModel(metaclass=RegisteringMeta):
             FunctionModelConfig: config for the promptmodel. It contains prompts and version_detail.
         """
         # add name to the list of function_models
-
-        prompt, version_detail = run_async_in_sync(
-            LLMProxy.fetch_prompts(self.name, self.version)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(LLMProxy.fetch_prompts_sync, self.name, self.version)
+            prompt, version_detail = future.result()
+        
+        return FunctionModelConfig(
+            prompts=prompt,
+            model=version_detail["model"],
+            name=self.name,
+            version_uuid=str(version_detail["uuid"]),
+            version=version_detail["version"],
+            parsing_type=version_detail["parsing_type"]
+            if "parsing_type" in version_detail
+            else None,
+            output_keys=version_detail["output_keys"]
+            if "output_keys" in version_detail
+            else None,
         )
+    
+    @check_connection_status_decorator
+    async def get_config_async(self, *args, **kwargs) -> FunctionModelConfig:
+        """Get config for the promptmodel.
+        It will fetch the prompt and version you specified from the Cloud. (It will be saved in cache DB, so there is no extra latency for API call.)
+        - If you made A/B testing in Web Dashboard, it will fetch the prompt randomly by the A/B testing ratio.
+        If dev mode is initializing, it will return None
+
+        Returns:
+            FunctionModelConfig: config for the promptmodel. It contains prompts and version_detail.
+        """
+        # add name to the list of function_models
+        prompt, version_detail = await LLMProxy.fetch_prompts(self.name, self.version)
+        
         return FunctionModelConfig(
             prompts=prompt,
             model=version_detail["model"],

@@ -1,3 +1,6 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import threading
 from typing import (
     Any,
     AsyncGenerator,
@@ -35,7 +38,7 @@ from promptmodel.utils.token_counting import (
     num_tokens_from_functions_input,
 )
 from promptmodel.utils.output_utils import update_dict
-from promptmodel.apis.base import AsyncAPIClient
+from promptmodel.apis.base import APIClient, AsyncAPIClient
 from promptmodel.types.response import (
     LLMResponse,
     LLMStreamResponse,
@@ -193,9 +196,10 @@ class LLMProxy(LLM):
 
     def _wrap_method(self, method: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(inputs: Dict[str, Any], **kwargs):
-            prompts, version_details = run_async_in_sync(
-                LLMProxy.fetch_prompts(self._name, self.version)
-            )
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(LLMProxy.fetch_prompts_sync, self._name, self.version)
+                prompts, version_details = future.result()
+                
             call_args = self._prepare_call_args(
                 prompts, version_details, inputs, kwargs
             )
@@ -210,27 +214,17 @@ class LLMProxy(LLM):
             }
             log_uuid = str(uuid4())
             if llm_response.parsed_outputs:
-                run_async_in_sync(
-                    self._async_log_to_cloud(
-                        log_uuid=log_uuid,
-                        version_uuid=version_details["uuid"],
-                        inputs=inputs,
-                        api_response=llm_response.api_response,
-                        parsed_outputs=llm_response.parsed_outputs,
-                        metadata=metadata,
-                    )
+                logging_thread = threading.Thread(
+                    target=self._sync_log_to_cloud, args=(version_details["uuid"], log_uuid, inputs, llm_response.api_response, llm_response.parsed_outputs, metadata)
                 )
+                logging_thread.start()
+
             else:
-                run_async_in_sync(
-                    self._async_log_to_cloud(
-                        log_uuid=log_uuid,
-                        version_uuid=version_details["uuid"],
-                        inputs=inputs,
-                        api_response=llm_response.api_response,
-                        parsed_outputs={},
-                        metadata=metadata,
-                    )
+                logging_thread = threading.Thread(
+                    target=self._sync_log_to_cloud, args=(version_details["uuid"], log_uuid, inputs, llm_response.api_response, {}, metadata)
                 )
+                logging_thread.start()
+
             if error_occurs:
                 # delete all promptmodel data in llm_response
                 llm_response.raw_output = None
@@ -267,23 +261,16 @@ class LLMProxy(LLM):
             }
             log_uuid = str(uuid4())
             if llm_response.parsed_outputs:
-                await self._async_log_to_cloud(
-                    log_uuid=log_uuid,
-                    version_uuid=version_details["uuid"],
-                    inputs=inputs,
-                    api_response=llm_response.api_response,
-                    parsed_outputs=llm_response.parsed_outputs,
-                    metadata=metadata,
+                logging_thread = threading.Thread(
+                    target=self._sync_log_to_cloud, args=(version_details["uuid"], log_uuid, inputs, llm_response.api_response, llm_response.parsed_outputs, metadata)
                 )
+                logging_thread.start()
+
             else:
-                await self._async_log_to_cloud(
-                    log_uuid=log_uuid,
-                    version_uuid=version_details["uuid"],
-                    inputs=inputs,
-                    api_response=llm_response.api_response,
-                    parsed_outputs={},
-                    metadata=metadata,
+                logging_thread = threading.Thread(
+                    target=self._sync_log_to_cloud, args=(version_details["uuid"], log_uuid, inputs, llm_response.api_response, {}, metadata)
                 )
+                logging_thread.start()
 
             if error_occurs:
                 # delete all promptmodel data in llm_response
@@ -692,6 +679,64 @@ class LLMProxy(LLM):
                 print(f"[red]Failed to connect prompt component to run log: {res_connect.json()}[/red]")
 
         return res
+    
+    def _sync_log_to_cloud(
+        self,
+        version_uuid: str,
+        log_uuid: str,
+        inputs: Optional[Dict] = None,
+        api_response: Optional[ModelResponse] = None,
+        parsed_outputs: Optional[Dict] = None,
+        metadata: Optional[Dict] = None,
+    ):
+        config = read_config()
+        if (
+            "project" in config
+            and "mask_inputs" in config["project"]
+            and config["project"]["mask_inputs"] == True
+        ):
+            inputs = {key: "PRIVATE LOGGING" for key, value in inputs.items()}
+
+        # Perform the logging asynchronously
+        if api_response:
+            api_response_dict = api_response.model_dump()
+            api_response_dict["response_ms"] = api_response._response_ms
+            api_response_dict["_response_ms"] = api_response._response_ms
+        else:
+            api_response_dict = None
+        run_log_request_body = {
+            "uuid": log_uuid,
+            "api_response": api_response_dict,
+            "inputs": inputs,
+            "parsed_outputs": parsed_outputs,
+            "metadata": metadata,
+        }
+        res = APIClient.execute(
+            method="POST",
+            path="/run_log",
+            params={
+                "version_uuid": version_uuid,
+            },
+            json=run_log_request_body,
+            use_cli_key=False,
+        )
+        if res.status_code != 200:
+            print(f"[red]Failed to log to cloud: {res.json()}[/red]");
+            
+        if self.unit_config:
+            res_connect = APIClient.execute(
+                method="POST",
+                path="/unit/connect",
+                json={
+                    "unit_log_uuid": self.unit_config.log_uuid,
+                    "run_log_uuid": log_uuid,      
+                },
+                use_cli_key=False,
+            )
+            if res_connect.status_code != 200:
+                print(f"[red]Failed to connect prompt component to run log: {res_connect.json()}[/red]")
+
+        return res
 
     async def _async_chat_log_to_cloud(
         self,
@@ -963,7 +1008,15 @@ class LLMProxy(LLM):
                     {"role": prompt["role"], "content": prompt["content"]}
                     for prompt in prompt_rows
                 ], version_detail
-
+                
+    @staticmethod
+    def fetch_prompts_sync(
+        name,
+        version: Optional[Union[str, int]] = "deploy",
+    ) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
+        prompts, version_detail = asyncio.run(LLMProxy.fetch_prompts(name, version))
+        return prompts, version_detail
+        
     @staticmethod
     async def fetch_chat_model(
         name: str,
