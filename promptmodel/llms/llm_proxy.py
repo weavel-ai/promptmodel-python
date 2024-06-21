@@ -13,25 +13,18 @@ from typing import (
     Union,
 )
 
-from uuid import UUID
 from threading import Thread
 from rich import print
 from uuid import uuid4
 
 from litellm.utils import ModelResponse, get_max_tokens
 from promptmodel.llms.llm import LLM
-from promptmodel.database.models import (
-    DeployedPrompt,
-    DeployedFunctionModel,
-    DeployedFunctionModelVersion,
-)
 from promptmodel.database.crud import (
     get_deployed_prompts,
 )
 from promptmodel.promptmodel_init import CacheManager
-from promptmodel.utils.config_utils import read_config, upsert_config
+from promptmodel.utils.config_utils import read_config
 from promptmodel.utils.random_utils import select_version_by_ratio
-from promptmodel.utils import logger
 from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.utils.token_counting import (
     num_tokens_for_messages_for_each,
@@ -42,8 +35,6 @@ from promptmodel.apis.base import APIClient, AsyncAPIClient
 from promptmodel.types.response import (
     LLMResponse,
     LLMStreamResponse,
-    FunctionModelConfig,
-    ChatModelConfig,
     UnitConfig,
     PMDetail,
 )
@@ -55,7 +46,7 @@ class LLMProxy(LLM):
         self,
         name: str,
         version: Optional[Union[str, int]] = "deploy",
-        unit_config: Optional[UnitConfig] = None
+        unit_config: Optional[UnitConfig] = None,
     ):
         super().__init__()
         self._name = name
@@ -140,6 +131,8 @@ class LLMProxy(LLM):
                 **call_args
             )
 
+            print("hi")
+
             log_uuid = str(uuid4())
 
             api_response = None
@@ -181,6 +174,8 @@ class LLMProxy(LLM):
                 "error": error_occurs,
                 "error_log": error_log,
             }
+
+            print(error_log)
             await self._async_log_to_cloud(
                 log_uuid=log_uuid,
                 version_uuid=version_details["uuid"],
@@ -537,18 +532,20 @@ class LLMProxy(LLM):
         kwargs,
     ):
         stringified_inputs = {key: str(value) for key, value in inputs.items()}
-        
+
         messages = []
         for prompt in prompts:
             prompt["content"] = prompt["content"].replace("{", "{{").replace("}", "}}")
-            prompt["content"] = prompt["content"].replace("{{{{", "{").replace("}}}}", "}")
+            prompt["content"] = (
+                prompt["content"].replace("{{{{", "{").replace("}}}}", "}")
+            )
             messages.append(
                 {
                     "content": prompt["content"].format(**stringified_inputs),
                     "role": prompt["role"],
                 }
             )
-        
+
         call_args = {
             "messages": messages,
             "model": version_detail["model"] if version_detail else None,
@@ -663,20 +660,22 @@ class LLMProxy(LLM):
             use_cli_key=False,
         )
         if res.status_code != 200:
-            print(f"[red]Failed to log to cloud: {res.json()}[/red]");
-            
+            print(f"[red]Failed to log to cloud: {res.json()}[/red]")
+
         if self.unit_config:
             res_connect = await AsyncAPIClient.execute(
                 method="POST",
                 path="/unit/connect",
                 json={
                     "unit_log_uuid": self.unit_config.log_uuid,
-                    "run_log_uuid": log_uuid,      
+                    "run_log_uuid": log_uuid,
                 },
                 use_cli_key=False,
             )
             if res_connect.status_code != 200:
-                print(f"[red]Failed to connect prompt component to run log: {res_connect.json()}[/red]")
+                print(
+                    f"[red]Failed to connect prompt component to run log: {res_connect.json()}[/red]"
+                )
 
         return res
     

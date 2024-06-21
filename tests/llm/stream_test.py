@@ -1,13 +1,13 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import nest_asyncio
-from typing import Generator, AsyncGenerator, Dict, List, Any, Optional
+from typing import Generator, AsyncGenerator, List
 from litellm import ModelResponse
 
 from promptmodel.llms.llm import LLM
 from promptmodel.llms.llm_proxy import LLMProxy
-from promptmodel.types.response import LLMResponse, LLMStreamResponse
+from promptmodel.types.response import LLMStreamResponse
 from promptmodel.utils.async_utils import run_async_in_sync
 
 

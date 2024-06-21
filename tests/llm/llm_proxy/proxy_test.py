@@ -1,13 +1,10 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
-from typing import Generator, AsyncGenerator, Dict, List, Any, Optional
-from litellm import ModelResponse
+from typing import Generator, AsyncGenerator, List
 
-from promptmodel.llms.llm import LLM, ParseResult
 from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.types.response import LLMResponse, LLMStreamResponse
-from promptmodel.types.enums import ParsingType
 
 proxy = LLMProxy(name="test")
 

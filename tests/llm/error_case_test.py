@@ -1,21 +1,14 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
-from typing import Generator, AsyncGenerator, Dict, List, Any, Optional
+from typing import AsyncGenerator, List
 from litellm import ModelResponse
 
 from ..constants import function_shemas
 from promptmodel.llms.llm import LLM, ParseResult
-from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.types.response import (
     LLMResponse,
     LLMStreamResponse,
-    Message,
     Delta,
-    Choices,
-    Usage,
-    FunctionCall,
-    ChoiceDeltaFunctionCall,
     StreamingChoices,
 )
 from promptmodel.types.enums import ParsingType

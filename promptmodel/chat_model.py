@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Coroutine, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 from litellm import ModelResponse
@@ -12,12 +11,10 @@ from promptmodel.llms.llm_proxy import LLMProxy
 from promptmodel.utils import logger
 from promptmodel.utils.config_utils import (
     read_config,
-    upsert_config,
     check_connection_status_decorator,
 )
 from promptmodel.utils.async_utils import run_async_in_sync
 from promptmodel.types.response import LLMStreamResponse, LLMResponse, ChatModelConfig
-from promptmodel.types.enums import InstanceType
 from promptmodel.types.request import ChatLogRequest
 from promptmodel.apis.base import AsyncAPIClient
 

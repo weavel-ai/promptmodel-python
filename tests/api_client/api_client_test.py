@@ -1,8 +1,6 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import MagicMock
 
-from typing import Generator, AsyncGenerator, Dict, List, Any
-from litellm import ModelResponse
 
 from promptmodel.apis.base import APIClient, AsyncAPIClient
 from promptmodel.utils.crypto import decrypt_message, generate_api_key, encrypt_message

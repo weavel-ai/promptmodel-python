@@ -1,6 +1,7 @@
 """
 Prompt & model versioning on the cloud, built for developers.
 """
+
 from setuptools import setup, find_namespace_packages
 
 # Read README.md for the long description
@@ -9,7 +10,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="promptmodel",
-    version="0.1.19",
+    version="0.2.0",
     packages=find_namespace_packages(),
     entry_points={
         "console_scripts": [

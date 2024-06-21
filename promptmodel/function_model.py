@@ -25,7 +25,6 @@ from promptmodel.types.response import (
     FunctionModelConfig,
     UnitConfig
 )
-from promptmodel.types.enums import InstanceType
 from promptmodel.apis.base import AsyncAPIClient
 from promptmodel import DevClient
 
