@@ -1,8 +1,8 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import nest_asyncio
-from typing import Generator, AsyncGenerator, Dict, List, Any, Optional
+from typing import Generator, AsyncGenerator, List, Optional
 from litellm import ModelResponse
 
 from ..constants import function_shemas

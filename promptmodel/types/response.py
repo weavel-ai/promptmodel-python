@@ -7,21 +7,13 @@ from typing import (
 from pydantic import BaseModel
 from litellm.utils import (
     ModelResponse,
-    Usage,
-    Message,
-    Choices,
-    StreamingChoices,
-    Delta,
-    FunctionCall,
-    Function,
-    ChatCompletionMessageToolCall,
 )
+from litellm.types.utils import FunctionCall, ChatCompletionMessageToolCall
 from openai._models import BaseModel as OpenAIObject
 from openai.types.chat.chat_completion import *
 from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaFunctionCall,
     ChoiceDeltaToolCall,
-    ChoiceDeltaToolCallFunction,
 )
 
 
@@ -129,6 +121,7 @@ class FunctionSchema(BaseModel):
     name: str
     description: Optional[str] = None
     parameters: _Parameters
+
 
 class UnitConfig(BaseModel):
     """Response Class for UnitLogger.get_config().
