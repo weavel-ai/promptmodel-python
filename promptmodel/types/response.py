@@ -8,12 +8,21 @@ from pydantic import BaseModel
 from litellm.utils import (
     ModelResponse,
 )
-from litellm.types.utils import FunctionCall, ChatCompletionMessageToolCall
+from litellm.types.utils import (
+    FunctionCall,
+    ChatCompletionMessageToolCall,
+    Usage,
+    Choices,
+    Message,
+    Delta,
+    StreamingChoices,
+)
 from openai._models import BaseModel as OpenAIObject
 from openai.types.chat.chat_completion import *
 from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaFunctionCall,
     ChoiceDeltaToolCall,
+    ChoiceDeltaToolCallFunction,
 )
 
 

@@ -1,4 +1,5 @@
 """LLM for Development TestRun"""
+
 import re
 import json
 from datetime import datetime
@@ -24,6 +25,7 @@ from promptmodel.types.response import (
 )
 
 load_dotenv()
+
 
 class OpenAIMessage(BaseModel):
     role: Optional[str] = None
@@ -58,9 +60,9 @@ class LLMDev:
         raw_output = ""
         if functions == []:
             functions = None
-            
+
         start_time = datetime.now()
-        
+
         response: AsyncGenerator[ModelResponse, None] = await acompletion(
             model=_model,
             messages=[
@@ -69,7 +71,11 @@ class LLMDev:
             ],
             stream=True,
             functions=functions,
-            response_format={"type":"json_object"} if parsing_type == ParsingType.JSON else {"type":"text"},
+            response_format=(
+                {"type": "json_object"}
+                if parsing_type == ParsingType.JSON
+                else {"type": "text"}
+            ),
             **kwargs,
         )
         function_call = {"name": "", "arguments": ""}
@@ -90,7 +96,7 @@ class LLMDev:
             if chunk.choices[0].finish_reason == "function_call":
                 finish_reason_function_call = True
                 yield LLMStreamResponse(function_call=function_call)
-                
+
             if chunk.choices[0].finish_reason != None:
                 end_time = datetime.now()
                 response_ms = (end_time - start_time).total_seconds() * 1000
@@ -101,11 +107,13 @@ class LLMDev:
                         messages,
                         raw_output,
                         functions=functions,
-                        function_call=function_call
-                        if chunk.choices[0].finish_reason == "function_call"
-                        else None,
+                        function_call=(
+                            function_call
+                            if chunk.choices[0].finish_reason == "function_call"
+                            else None
+                        ),
                         tools=None,
-                        tool_calls=None
+                        tool_calls=None,
                     )
                 )
 
@@ -113,7 +121,7 @@ class LLMDev:
         if parsing_type and not finish_reason_function_call:
             if parsing_type == ParsingType.JSON:
                 yield LLMStreamResponse(parsed_outputs=json.loads(raw_output))
-            else: 
+            else:
                 parsing_pattern: Dict[str, str] = get_pattern_by_type(parsing_type)
                 whole_pattern = parsing_pattern["whole"]
                 parsed_results = re.findall(whole_pattern, raw_output, flags=re.DOTALL)
@@ -171,9 +179,11 @@ class LLMDev:
         is_stream_unsupported = model in ["HCX-002"]
         if not is_stream_unsupported:
             args["stream"] = True
-        
+
         start_time = datetime.now()
-        response: AsyncGenerator[ModelResponse, None] = await acompletion(**args, **kwargs)
+        response: AsyncGenerator[ModelResponse, None] = await acompletion(
+            **args, **kwargs
+        )
         if is_stream_unsupported:
             yield LLMStreamResponse(raw_output=response.choices[0].message.content)
         else:
@@ -200,7 +210,7 @@ class LLMDev:
                         api_response=chunk if not yield_api_response_with_fc else None,
                         raw_output=chunk.choices[0].delta.content,
                     )
-                    
+
                 if getattr(chunk.choices[0].delta, "finish_reason", None) is not None:
                     end_time = datetime.now()
                     response_ms = (end_time - start_time).total_seconds() * 1000
@@ -211,11 +221,13 @@ class LLMDev:
                             messages,
                             raw_output,
                             functions=None,
-                            function_call=None
-                            if chunk.choices[0].finish_reason == "function_call"
-                            else None,
+                            function_call=(
+                                None
+                                if chunk.choices[0].finish_reason == "function_call"
+                                else None
+                            ),
                             tools=None,
-                            tool_calls=None
+                            tool_calls=None,
                         )
                     )
 
@@ -271,9 +283,11 @@ class LLMDev:
         )
 
         last_message = Message(
-            role=chunk.choices[0].delta.role
-            if getattr(chunk.choices[0].delta, "role", None)
-            else "assistant",
+            role=(
+                chunk.choices[0].delta.role
+                if getattr(chunk.choices[0].delta, "role", None)
+                else "assistant"
+            ),
             content=raw_output if raw_output != "" else None,
             function_call=function_call if function_call else None,
             tool_calls=tool_calls if tool_calls else None,
